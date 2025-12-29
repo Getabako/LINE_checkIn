@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "prisma generate && tsc -b && vite build",
+    "build": "prisma generate && prisma db push && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "prisma generate",
