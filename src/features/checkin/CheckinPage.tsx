@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, addDays, isToday, isTomorrow } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
@@ -13,6 +14,17 @@ import {
   getAvailableDurations,
 } from '../../lib/price';
 import clsx from 'clsx';
+
+const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
+  switch (name) {
+    case 'basketball':
+      return <FaBasketballBall className={className} />;
+    case 'dumbbell':
+      return <FaDumbbell className={className} />;
+    default:
+      return null;
+  }
+};
 
 export const CheckinPage: React.FC = () => {
   const navigate = useNavigate();
@@ -82,7 +94,9 @@ export const CheckinPage: React.FC = () => {
       <main className="p-4 pb-32">
         {/* 選択中の施設 */}
         <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg mb-6">
-          <span className="text-2xl">{facility?.icon}</span>
+          <div className="w-10 h-10 bg-primary-500 text-white rounded-lg flex items-center justify-center">
+            <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
+          </div>
           <div>
             <p className="font-semibold text-gray-900">{facility?.name}</p>
             <p className="text-xs text-gray-500">を利用予定</p>

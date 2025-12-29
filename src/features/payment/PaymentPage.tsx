@@ -3,11 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FiCheckCircle } from 'react-icons/fi';
+import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { FACILITIES, calculateEndTime } from '../../lib/price';
 import { checkinApi } from '../../lib/api';
+
+const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
+  switch (name) {
+    case 'basketball':
+      return <FaBasketballBall className={className} />;
+    case 'dumbbell':
+      return <FaDumbbell className={className} />;
+    default:
+      return null;
+  }
+};
 
 export const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
@@ -68,7 +80,9 @@ export const PaymentPage: React.FC = () => {
           {/* 施設 */}
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">{facility.icon}</span>
+              <div className="w-12 h-12 bg-primary-500 text-white rounded-lg flex items-center justify-center">
+                <FacilityIcon name={facility.iconName} className="w-6 h-6" />
+              </div>
               <div>
                 <p className="text-lg font-bold text-gray-900">{facility.name}</p>
                 <p className="text-sm text-gray-500">{facility.description}</p>

@@ -28,14 +28,14 @@ export const FACILITIES = [
     id: 'GYM',
     name: '体育館',
     description: 'バスケットボール・バレーボール等',
-    icon: '🏀',
+    iconName: 'basketball' as const,
     operatingHours: '07:00 - 21:00',
   },
   {
     id: 'TRAINING',
     name: 'トレーニングジム',
     description: 'ウェイトトレーニング・有酸素運動',
-    icon: '💪',
+    iconName: 'dumbbell' as const,
     operatingHours: '07:00 - 21:00',
   },
 ] as const;

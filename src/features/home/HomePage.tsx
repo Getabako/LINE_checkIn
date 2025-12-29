@@ -1,11 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { FACILITIES } from '../../lib/price';
 import { FacilityType } from '../../lib/api';
 import clsx from 'clsx';
+
+const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
+  switch (name) {
+    case 'basketball':
+      return <FaBasketballBall className={className} />;
+    case 'dumbbell':
+      return <FaDumbbell className={className} />;
+    default:
+      return null;
+  }
+};
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -54,7 +66,12 @@ export const HomePage: React.FC = () => {
               )}
             >
               <div className="flex items-start gap-4">
-                <div className="text-4xl">{facility.icon}</div>
+                <div className={clsx(
+                  'w-12 h-12 rounded-lg flex items-center justify-center',
+                  facilityType === facility.id ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-600'
+                )}>
+                  <FacilityIcon name={facility.iconName} className="w-6 h-6" />
+                </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900">
@@ -84,7 +101,10 @@ export const HomePage: React.FC = () => {
 
           <div className="space-y-4">
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">🏀 体育館</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <FaBasketballBall className="w-4 h-4 text-primary-500" />
+                体育館
+              </h4>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-gray-50 p-2 rounded">
                   <p className="text-gray-500 text-xs">平日 07:00-17:00</p>
@@ -102,7 +122,10 @@ export const HomePage: React.FC = () => {
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">💪 トレーニングジム</h4>
+              <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <FaDumbbell className="w-4 h-4 text-primary-500" />
+                トレーニングジム
+              </h4>
               <div className="bg-gray-50 p-2 rounded text-sm">
                 <p className="text-gray-500 text-xs">全日 07:00-21:00</p>
                 <p className="font-semibold">¥2,200/h</p>

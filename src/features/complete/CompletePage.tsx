@@ -2,13 +2,25 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCheckCircle, FiCopy, FiHome } from 'react-icons/fi';
+import { FiCheckCircle, FiCopy, FiHome, FiAlertTriangle } from 'react-icons/fi';
+import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { checkinApi, Checkin } from '../../lib/api';
 import { FACILITIES, calculateEndTime } from '../../lib/price';
 import { useCheckinStore } from '../../stores/checkinStore';
+
+const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
+  switch (name) {
+    case 'basketball':
+      return <FaBasketballBall className={className} />;
+    case 'dumbbell':
+      return <FaDumbbell className={className} />;
+    default:
+      return null;
+  }
+};
 
 export const CompletePage: React.FC = () => {
   const navigate = useNavigate();
@@ -144,7 +156,9 @@ export const CompletePage: React.FC = () => {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{facility?.icon}</span>
+              <div className="w-10 h-10 bg-primary-500 text-white rounded-lg flex items-center justify-center">
+                <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
+              </div>
               <p className="font-semibold text-gray-900">{facility?.name}</p>
             </div>
           </div>
@@ -170,9 +184,10 @@ export const CompletePage: React.FC = () => {
 
         {/* 注意事項 */}
         <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-          <p className="text-sm text-yellow-700">
-            ⚠️ 暗証番号は予約時間内のみ有効です。時間外はご利用いただけません。
-          </p>
+          <div className="flex items-start gap-2 text-sm text-yellow-700">
+            <FiAlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>暗証番号は予約時間内のみ有効です。時間外はご利用いただけません。</span>
+          </div>
         </div>
       </main>
 
