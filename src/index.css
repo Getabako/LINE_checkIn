@@ -46,21 +46,22 @@
            focus:ring-2 focus:ring-primary-500 focus:border-primary-500
            outline-none transition-all duration-200;
   }
-}
 
-/* PIN入力用のスタイル */
-.pin-input {
-  @apply w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg
-         focus:ring-2 focus:ring-primary-500 focus:border-primary-500
-         outline-none transition-all duration-200;
-}
+  /* PIN入力用のスタイル */
+  .pin-input {
+    @apply w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg
+           focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+           outline-none transition-all duration-200;
+  }
 
-/* 施設カード選択時のスタイル */
-.facility-card {
-  @apply card cursor-pointer transition-all duration-200
-         hover:shadow-md hover:border-primary-300;
-}
+  /* 施設カード選択時のスタイル */
+  .facility-card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4
+           cursor-pointer transition-all duration-200
+           hover:shadow-md hover:border-primary-300;
+  }
 
-.facility-card.selected {
-  @apply border-primary-500 bg-primary-50 shadow-md;
+  .facility-card.selected {
+    @apply border-primary-500 bg-primary-50 shadow-md;
+  }
 }
