@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ユーザー
+model User {
+  id          String    @id @default(cuid())
+  lineUserId  String    @unique
+  displayName String
+  pictureUrl  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  checkins    Checkin[]
+}
+
+// チェックイン（利用予約）
+model Checkin {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  facilityType  String    // GYM or TRAINING
+  date          DateTime  // 利用日
+  startTime     String    // 開始時間 (HH:mm)
+  duration      Int       // 利用時間（時間単位）
+  totalPrice    Int       // 合計金額
+  pinCode       String?   // 4桁暗証番号（決済完了後に発行）
+  status        String    @default("PENDING") // PENDING, PAID, USED, EXPIRED, CANCELLED
+  paymentId     String?   // LINE Pay取引ID
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([pinCode])
+  @@index([status])
+}
+
+// 料金マスタ
+model PricePlan {
+  id           String  @id @default(cuid())
+  facilityType String  // GYM or TRAINING
+  dayType      String  // WEEKDAY or WEEKEND
+  timeSlot     String  // DAYTIME (07:00-17:00) or EVENING (17:00-21:00) or ALLDAY
+  pricePerHour Int     // 1時間あたりの料金
+  isActive     Boolean @default(true)
+}

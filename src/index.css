@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 text-white font-semibold py-3 px-6 rounded-lg
+           hover:bg-primary-600 active:bg-primary-700
+           disabled:bg-gray-300 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+
+  .btn-line {
+    @apply bg-line-green text-white font-semibold py-3 px-6 rounded-lg
+           hover:bg-line-green-dark active:opacity-90
+           disabled:bg-gray-300 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 font-semibold py-3 px-6 rounded-lg
+           border border-gray-300
+           hover:bg-gray-50 active:bg-gray-100
+           disabled:bg-gray-100 disabled:cursor-not-allowed
+           transition-colors duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg
+           focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+           outline-none transition-all duration-200;
+  }
+}
+
+/* PIN入力用のスタイル */
+.pin-input {
+  @apply w-14 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg
+         focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+         outline-none transition-all duration-200;
+}
+
+/* 施設カード選択時のスタイル */
+.facility-card {
+  @apply card cursor-pointer transition-all duration-200
+         hover:shadow-md hover:border-primary-300;
+}
+
+.facility-card.selected {
+  @apply border-primary-500 bg-primary-50 shadow-md;
+}
