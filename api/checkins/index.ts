@@ -128,11 +128,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const parsedDate = new Date(date);
       const totalPrice = calculatePrice(facilityType, parsedDate, startTime, duration);
 
-      // 開発環境用: LINE Payをスキップして直接PIN発行
-      const isDev = process.env.NODE_ENV === 'development' || !process.env.LINE_PAY_CHANNEL_ID;
+      // 決済スキップモード: SKIP_PAYMENT=true または LINE_PAY_CHANNEL_ID未設定の場合
+      const skipPayment = process.env.SKIP_PAYMENT === 'true' || !process.env.LINE_PAY_CHANNEL_ID;
 
-      const pinCode = isDev ? generatePinCode() : null;
-      const status = isDev ? 'PAID' : 'PENDING';
+      const pinCode = skipPayment ? generatePinCode() : null;
+      const status = skipPayment ? 'PAID' : 'PENDING';
 
       const checkin = await prisma.checkin.create({
         data: {
@@ -147,10 +147,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       });
 
-      // 本番環境ではLINE Pay決済URLを返す
+      // LINE Pay決済URLを返す（決済スキップモードでない場合）
       let paymentUrl: string | null = null;
 
-      if (!isDev && process.env.LINE_PAY_CHANNEL_ID) {
+      if (!skipPayment && process.env.LINE_PAY_CHANNEL_ID) {
         // LINE Pay Request API を呼び出す
         const linePayResponse = await requestLinePay({
           checkinId: checkin.id,
