@@ -8,7 +8,6 @@ import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { FACILITIES, calculateEndTime } from '../../lib/price';
-import { checkinApi } from '../../lib/api';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
