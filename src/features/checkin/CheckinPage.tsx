@@ -39,31 +39,26 @@ export const CheckinPage: React.FC = () => {
     setTotalPrice,
   } = useCheckinStore();
 
-  // 施設が選択されていない場合はホームに戻す
   React.useEffect(() => {
     if (!facilityType) {
       navigate('/');
     }
   }, [facilityType, navigate]);
 
-  // 日付選択肢を生成（今日から7日間）
   const dateOptions = React.useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   }, []);
 
-  // 料金を計算
   const priceInfo = React.useMemo(() => {
     if (!facilityType || !date || !startTime) return null;
     return calculatePrice(facilityType, date, startTime, duration);
   }, [facilityType, date, startTime, duration]);
 
-  // 利用可能な時間数
   const availableDurations = React.useMemo(() => {
     if (!startTime) return [1, 2, 3, 4];
     return getAvailableDurations(startTime);
   }, [startTime]);
 
-  // 時間選択時にdurationを調整
   React.useEffect(() => {
     if (startTime && !availableDurations.includes(duration)) {
       setDuration(availableDurations[availableDurations.length - 1] || 1);
@@ -88,38 +83,41 @@ export const CheckinPage: React.FC = () => {
   const canProceed = date && startTime && priceInfo;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
       <Header title="日時選択" showBack />
 
-      <main className="p-4 pb-32">
+      <main className="p-4 pb-36">
         {/* 選択中の施設 */}
-        <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg mb-6">
-          <div className="w-10 h-10 bg-primary-500 text-white rounded-lg flex items-center justify-center">
+        <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-2xl mb-6 border border-primary-100/50 animate-fade-in">
+          <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-xl flex items-center justify-center shadow-sm">
             <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">{facility?.name}</p>
-            <p className="text-xs text-gray-500">を利用予定</p>
+            <p className="font-bold text-primary-800">{facility?.name}</p>
+            <p className="text-xs text-primary-400">を利用予定</p>
           </div>
         </div>
 
         {/* 日付選択 */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">利用日</h3>
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        <section className="mb-6 animate-fade-in-up">
+          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            利用日
+          </h3>
+          <div className="flex gap-2 overflow-x-auto pb-2 stagger-children">
             {dateOptions.map((d) => (
               <button
                 key={d.toISOString()}
                 onClick={() => setDate(d)}
                 className={clsx(
-                  'flex-shrink-0 px-4 py-3 rounded-lg border-2 text-center min-w-[80px] transition-all',
+                  'flex-shrink-0 px-4 py-3 rounded-xl border-2 text-center min-w-[80px] transition-all duration-300 transform hover:-translate-y-0.5',
                   date?.toDateString() === d.toDateString()
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
+                    : 'border-gray-100 bg-white text-gray-700 shadow-sm hover:border-primary-200 hover:shadow-card'
                 )}
               >
-                <p className="text-sm font-medium">{formatDateLabel(d)}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm font-bold">{formatDateLabel(d)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
                   {format(d, 'M/d', { locale: ja })}
                 </p>
               </button>
@@ -128,18 +126,21 @@ export const CheckinPage: React.FC = () => {
         </section>
 
         {/* 開始時間選択 */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">開始時間</h3>
-          <div className="grid grid-cols-4 gap-2">
+        <section className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            開始時間
+          </h3>
+          <div className="grid grid-cols-4 gap-2 stagger-children">
             {TIME_SLOTS.map((time) => (
               <button
                 key={time}
                 onClick={() => setStartTime(time)}
                 className={clsx(
-                  'py-3 rounded-lg border-2 text-sm font-medium transition-all',
+                  'py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 transform hover:-translate-y-0.5',
                   startTime === time
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
+                    : 'border-gray-100 bg-white text-gray-600 shadow-sm hover:border-primary-200 hover:shadow-card'
                 )}
               >
                 {time}
@@ -149,18 +150,21 @@ export const CheckinPage: React.FC = () => {
         </section>
 
         {/* 利用時間選択 */}
-        <section className="mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">利用時間</h3>
+        <section className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            利用時間
+          </h3>
           <div className="flex gap-2">
             {availableDurations.map((d) => (
               <button
                 key={d}
                 onClick={() => setDuration(d)}
                 className={clsx(
-                  'flex-1 py-3 rounded-lg border-2 text-sm font-medium transition-all',
+                  'flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 transform hover:-translate-y-0.5',
                   duration === d
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300'
+                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
+                    : 'border-gray-100 bg-white text-gray-600 shadow-sm hover:border-primary-200 hover:shadow-card'
                 )}
               >
                 {d}時間
@@ -168,7 +172,7 @@ export const CheckinPage: React.FC = () => {
             ))}
           </div>
           {startTime && (
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-primary-400 mt-2 ml-1">
               {startTime} 〜 {calculateEndTime(startTime, duration)}
             </p>
           )}
@@ -176,20 +180,23 @@ export const CheckinPage: React.FC = () => {
 
         {/* 料金内訳 */}
         {priceInfo && (
-          <section className="p-4 bg-white rounded-xl border border-gray-200">
-            <h3 className="font-semibold text-gray-900 mb-3">料金内訳</h3>
+          <section className="p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-scale-in">
+            <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+              <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+              料金内訳
+            </h3>
             <div className="space-y-2">
               {priceInfo.breakdown.map((item, index) => (
-                <div key={index} className="flex justify-between text-sm">
-                  <span className="text-gray-600">
+                <div key={index} className="flex justify-between text-sm py-1">
+                  <span className="text-gray-500">
                     {item.hour}:00 〜 {item.hour + 1}:00
                   </span>
-                  <span className="font-medium">¥{item.price.toLocaleString()}</span>
+                  <span className="font-semibold text-gray-700">¥{item.price.toLocaleString()}</span>
                 </div>
               ))}
-              <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
-                <span className="font-semibold">合計</span>
-                <span className="font-bold text-lg text-primary-600">
+              <div className="border-t-2 border-primary-100 pt-3 mt-3 flex justify-between items-center">
+                <span className="font-bold text-gray-700">合計</span>
+                <span className="font-bold text-2xl bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
                   ¥{priceInfo.totalPrice.toLocaleString()}
                 </span>
               </div>
@@ -199,10 +206,10 @@ export const CheckinPage: React.FC = () => {
       </main>
 
       {/* 固定フッター */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-gray-600">お支払い金額</span>
-          <span className="text-xl font-bold text-primary-600">
+          <span className="text-gray-500 text-sm">お支払い金額</span>
+          <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
             ¥{(priceInfo?.totalPrice || 0).toLocaleString()}
           </span>
         </div>

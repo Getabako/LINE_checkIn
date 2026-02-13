@@ -40,14 +40,12 @@ export const CompletePage: React.FC = () => {
       return;
     }
 
-    // ローカルストレージから予約情報を取得
     try {
       const checkins = JSON.parse(localStorage.getItem('gym-checkins') || '[]');
       const found = checkins.find((c: Checkin) => c.id === checkinId);
       if (found) {
         setCheckin(found);
       } else {
-        // フォールバック: APIから取得を試みる
         checkinApi.getById(checkinId)
           .then((data) => setCheckin(data))
           .catch(() => setError('予約情報が見つかりません'));
@@ -78,7 +76,7 @@ export const CompletePage: React.FC = () => {
 
   if (error || !checkin) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || '予約情報が見つかりません'}</p>
           <Button onClick={() => navigate('/')}>ホームに戻る</Button>
@@ -90,113 +88,117 @@ export const CompletePage: React.FC = () => {
   const facility = FACILITIES.find((f) => f.id === checkin.facilityType);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
       <Header title="予約完了" />
 
-      <main className="p-4 pb-24">
+      <main className="p-4 pb-28">
         {/* 完了メッセージ */}
-        <div className="text-center py-6">
-          <div className="w-16 h-16 bg-line-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FiCheckCircle className="w-10 h-10 text-line-green" />
+        <div className="text-center py-8 animate-fade-in-up">
+          <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg animate-bounce-soft">
+            <FiCheckCircle className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             決済が完了しました
           </h2>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-400 text-sm">
             入館用の暗証番号を発行しました
           </p>
         </div>
 
         {/* 暗証番号カード */}
-        <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl p-6 text-white shadow-lg mb-6">
-          <p className="text-primary-100 text-sm mb-2">入館用暗証番号</p>
-          <div className="flex items-center justify-center gap-3">
-            <div className="flex gap-2">
+        <div className="bg-gradient-to-br from-primary-500 via-primary-500 to-primary-400 rounded-2xl p-6 text-white shadow-lg mb-6 animate-fade-in-up relative overflow-hidden" style={{ animationDelay: '0.1s' }}>
+          {/* 装飾的な円 */}
+          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full"></div>
+          
+          <p className="text-primary-100 text-sm mb-3 relative">入館用暗証番号</p>
+          <div className="flex items-center justify-center gap-3 relative">
+            <div className="flex gap-2.5">
               {checkin.pinCode?.split('').map((digit, index) => (
                 <div
                   key={index}
-                  className="w-14 h-16 bg-white/20 rounded-lg flex items-center justify-center"
+                  className="w-16 h-18 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20 animate-scale-in"
+                  style={{ animationDelay: `${0.3 + index * 0.1}s` }}
                 >
-                  <span className="text-3xl font-bold">{digit}</span>
+                  <span className="text-4xl font-bold">{digit}</span>
                 </div>
               ))}
             </div>
           </div>
           <button
             onClick={handleCopyPin}
-            className="mt-4 flex items-center justify-center gap-2 w-full py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+            className="mt-5 flex items-center justify-center gap-2 w-full py-2.5 bg-white/20 backdrop-blur-sm rounded-xl hover:bg-white/30 transition-all duration-300 border border-white/10 relative"
           >
             <FiCopy className="w-4 h-4" />
-            <span className="text-sm">{copied ? 'コピーしました' : 'コピーする'}</span>
+            <span className="text-sm font-medium">{copied ? 'コピーしました！' : 'コピーする'}</span>
           </button>
         </div>
 
         {/* 利用方法 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">入館方法</h3>
-          <ol className="space-y-3 text-sm">
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
-                1
-              </span>
-              <span className="text-gray-600">施設入口の電子ロックに向かう</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
-                2
-              </span>
-              <span className="text-gray-600">上記の4桁暗証番号を入力</span>
-            </li>
-            <li className="flex gap-3">
-              <span className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-xs font-bold">
-                3
-              </span>
-              <span className="text-gray-600">ロックが解除されたら入館</span>
-            </li>
+        <div className="bg-white rounded-2xl shadow-card border border-gray-100/50 p-5 mb-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <h3 className="font-bold text-primary-800 mb-4 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            入館方法
+          </h3>
+          <ol className="space-y-4 text-sm">
+            {[
+              '施設入口の電子ロックに向かう',
+              '上記の4桁暗証番号を入力',
+              'ロックが解除されたら入館',
+            ].map((text, i) => (
+              <li key={i} className="flex gap-3 items-start">
+                <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-lg flex items-center justify-center text-xs font-bold shadow-sm">
+                  {i + 1}
+                </span>
+                <span className="text-gray-600 pt-0.5">{text}</span>
+              </li>
+            ))}
           </ol>
         </div>
 
         {/* 予約詳細 */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-card border border-gray-100/50 overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary-500 text-white rounded-lg flex items-center justify-center">
+              <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-xl flex items-center justify-center shadow-sm">
                 <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
               </div>
-              <p className="font-semibold text-gray-900">{facility?.name}</p>
+              <p className="font-bold text-gray-900">{facility?.name}</p>
             </div>
           </div>
-          <div className="p-4 space-y-2 text-sm">
+          <div className="p-4 space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">利用日</span>
-              <span className="font-medium">
+              <span className="text-gray-400">利用日</span>
+              <span className="font-semibold text-gray-700">
                 {format(new Date(checkin.date), 'yyyy年M月d日(E)', { locale: ja })}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">利用時間</span>
-              <span className="font-medium">
+              <span className="text-gray-400">利用時間</span>
+              <span className="font-semibold text-gray-700">
                 {checkin.startTime} 〜 {calculateEndTime(checkin.startTime, checkin.duration)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">お支払い金額</span>
-              <span className="font-medium">¥{checkin.totalPrice.toLocaleString()}</span>
+              <span className="text-gray-400">お支払い金額</span>
+              <span className="font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+                ¥{checkin.totalPrice.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
 
         {/* 注意事項 */}
-        <div className="mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-          <div className="flex items-start gap-2 text-sm text-yellow-700">
-            <FiAlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+        <div className="mt-5 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+          <div className="flex items-start gap-2.5 text-sm text-amber-700">
+            <FiAlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
             <span>暗証番号は予約時間内のみ有効です。時間外はご利用いただけません。</span>
           </div>
         </div>
       </main>
 
       {/* 固定フッター */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30">
         <Button variant="secondary" fullWidth onClick={handleBackHome}>
           <FiHome className="w-5 h-5" />
           ホームに戻る

@@ -16,12 +16,12 @@ export const Button: React.FC<ButtonProps> = ({
   className,
   ...props
 }) => {
-  const baseStyles = 'font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2';
+  const baseStyles = 'font-semibold py-3.5 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 transform hover:-translate-y-0.5 active:translate-y-0';
 
   const variantStyles = {
-    primary: 'bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 disabled:bg-gray-300',
-    secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100',
-    line: 'bg-line-green text-white hover:bg-line-green-dark active:opacity-90 disabled:bg-gray-300',
+    primary: 'bg-gradient-to-r from-primary-500 to-primary-400 text-white shadow-button hover:shadow-button-hover hover:from-primary-600 hover:to-primary-500 active:from-primary-700 active:to-primary-600 disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none disabled:hover:translate-y-0',
+    secondary: 'bg-white text-gray-700 border-2 border-gray-200 shadow-sm hover:shadow-card hover:bg-sky-50 hover:border-primary-200 active:bg-sky-100 disabled:bg-gray-100 disabled:hover:translate-y-0',
+    line: 'bg-line-green text-white shadow-md hover:shadow-lg hover:bg-line-green-dark active:opacity-90 disabled:bg-gray-300 disabled:shadow-none disabled:hover:translate-y-0',
   };
 
   return (
