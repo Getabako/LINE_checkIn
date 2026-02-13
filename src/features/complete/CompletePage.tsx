@@ -34,25 +34,29 @@ export const CompletePage: React.FC = () => {
   const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
-    const fetchCheckin = async () => {
-      if (!checkinId) {
-        setError('予約情報が見つかりません');
-        setIsLoading(false);
-        return;
-      }
+    if (!checkinId) {
+      setError('予約情報が見つかりません');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        const data = await checkinApi.getById(checkinId);
-        setCheckin(data);
-      } catch (err) {
-        console.error('Failed to fetch checkin:', err);
-        setError('予約情報の取得に失敗しました');
-      } finally {
-        setIsLoading(false);
+    // ローカルストレージから予約情報を取得
+    try {
+      const checkins = JSON.parse(localStorage.getItem('gym-checkins') || '[]');
+      const found = checkins.find((c: Checkin) => c.id === checkinId);
+      if (found) {
+        setCheckin(found);
+      } else {
+        // フォールバック: APIから取得を試みる
+        checkinApi.getById(checkinId)
+          .then((data) => setCheckin(data))
+          .catch(() => setError('予約情報が見つかりません'));
       }
-    };
-
-    fetchCheckin();
+    } catch {
+      setError('予約情報の取得に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
   }, [checkinId]);
 
   const handleCopyPin = async () => {

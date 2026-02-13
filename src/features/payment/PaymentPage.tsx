@@ -37,33 +37,46 @@ export const PaymentPage: React.FC = () => {
 
   const facility = FACILITIES.find((f) => f.id === facilityType);
 
+  const [paymentStep, setPaymentStep] = React.useState(0);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
   const handlePayment = async () => {
     if (!facilityType || !date || !startTime) return;
 
     setIsLoading(true);
+    setIsProcessing(true);
     setError(null);
 
-    try {
-      const response = await checkinApi.create({
-        facilityType,
-        date: format(date, 'yyyy-MM-dd'),
-        startTime,
-        duration,
-      });
+    // フェイク決済処理（ステップを順に進める）
+    setPaymentStep(1); // カード情報確認中
+    await new Promise((r) => setTimeout(r, 1200));
+    setPaymentStep(2); // 決済処理中
+    await new Promise((r) => setTimeout(r, 1500));
+    setPaymentStep(3); // 暗証番号発行中
+    await new Promise((r) => setTimeout(r, 1000));
 
-      // LINE Pay決済ページへリダイレクト
-      if (response.paymentUrl) {
-        window.location.href = response.paymentUrl;
-      } else {
-        // 開発環境用：直接完了ページへ
-        navigate(`/complete?checkinId=${response.checkin.id}`);
-      }
-    } catch (err) {
-      console.error('Payment error:', err);
-      setError('決済処理中にエラーが発生しました。もう一度お試しください。');
-    } finally {
-      setIsLoading(false);
-    }
+    // 4桁のランダム暗証番号を生成
+    const pinCode = String(Math.floor(1000 + Math.random() * 9000));
+
+    // ローカルストレージに予約情報を保存
+    const checkinData = {
+      id: crypto.randomUUID(),
+      facilityType,
+      date: format(date, 'yyyy-MM-dd'),
+      startTime,
+      duration,
+      totalPrice,
+      pinCode,
+      status: 'PAID',
+      createdAt: new Date().toISOString(),
+    };
+
+    const existing = JSON.parse(localStorage.getItem('gym-checkins') || '[]');
+    existing.push(checkinData);
+    localStorage.setItem('gym-checkins', JSON.stringify(existing));
+
+    setIsLoading(false);
+    navigate(`/complete?checkinId=${checkinData.id}`);
   };
 
   if (!facility || !date || !startTime) {
@@ -142,6 +155,32 @@ export const PaymentPage: React.FC = () => {
             <FiCheckCircle className="w-6 h-6 text-line-green" />
           </div>
         </div>
+
+        {/* フェイク決済処理ステップ */}
+        {isProcessing && (
+          <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+            <div className="flex justify-center mb-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
+            </div>
+            <div className="space-y-2">
+              {[
+                'カード情報を確認中...',
+                '決済を処理中...',
+                '暗証番号を発行中...',
+              ].map((label, i) => (
+                <p
+                  key={i}
+                  className={`text-sm transition-opacity duration-300 text-center ${
+                    i + 1 <= paymentStep ? 'opacity-100' : 'opacity-30'
+                  } ${i + 1 === paymentStep ? 'font-medium text-primary-600' : 'text-gray-600'}`}
+                >
+                  {i + 1 < paymentStep ? '✓ ' : i + 1 === paymentStep ? '● ' : '○ '}
+                  {label}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* エラー表示 */}
         {error && (
