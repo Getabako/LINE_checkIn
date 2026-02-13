@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCheckCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiCreditCard } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
@@ -144,15 +144,15 @@ export const PaymentPage: React.FC = () => {
         {/* 決済方法 */}
         <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
           <h3 className="font-semibold text-gray-900 mb-3">お支払い方法</h3>
-          <div className="flex items-center gap-3 p-3 bg-line-green/10 rounded-lg border-2 border-line-green">
-            <div className="w-12 h-12 bg-line-green rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">LINE</span>
+          <div className="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border-2 border-indigo-500">
+            <div className="w-12 h-12 bg-indigo-500 rounded-lg flex items-center justify-center">
+              <FiCreditCard className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-gray-900">LINE Pay</p>
-              <p className="text-sm text-gray-500">LINEアプリで簡単決済</p>
+              <p className="font-semibold text-gray-900">クレジットカード</p>
+              <p className="text-sm text-gray-500">Stripe決済</p>
             </div>
-            <FiCheckCircle className="w-6 h-6 text-line-green" />
+            <FiCheckCircle className="w-6 h-6 text-indigo-500" />
           </div>
         </div>
 
@@ -193,12 +193,11 @@ export const PaymentPage: React.FC = () => {
       {/* 固定フッター */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
         <Button
-          variant="line"
           fullWidth
           loading={isLoading}
           onClick={handlePayment}
         >
-          LINE Payで支払う
+          カードで支払う
         </Button>
         <p className="text-xs text-gray-400 text-center mt-2">
           お支払い完了後、暗証番号が発行されます
