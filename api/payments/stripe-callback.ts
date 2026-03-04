@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
-import { createGuestAccess, isRemoteLockConfigured } from '../lib/remotelock';
+import { createBooking, isRemoteLockConfigured } from '../lib/remotelock';
 
 const prisma = new PrismaClient();
 
@@ -66,7 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
         const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
 
-        const result = await createGuestAccess({
+        const result = await createBooking({
+          checkinId,
           name: `Checkin ${checkinId}`,
           startsAt,
           endsAt,
