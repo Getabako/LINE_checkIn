@@ -40,21 +40,15 @@ export const CompletePage: React.FC = () => {
       return;
     }
 
-    try {
-      const checkins = JSON.parse(localStorage.getItem('gym-checkins') || '[]');
-      const found = checkins.find((c: Checkin) => c.id === checkinId);
-      if (found) {
-        setCheckin(found);
-      } else {
-        checkinApi.getById(checkinId)
-          .then((data) => setCheckin(data))
-          .catch(() => setError('予約情報が見つかりません'));
-      }
-    } catch {
-      setError('予約情報の取得に失敗しました');
-    } finally {
-      setIsLoading(false);
-    }
+    checkinApi.getById(checkinId)
+      .then((data) => {
+        setCheckin(data);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setError('予約情報が見つかりません');
+        setIsLoading(false);
+      });
   }, [checkinId]);
 
   const handleCopyPin = async () => {

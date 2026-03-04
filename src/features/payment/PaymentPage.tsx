@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FiCheckCircle, FiCreditCard, FiShield } from 'react-icons/fi';
@@ -8,6 +8,7 @@ import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { FACILITIES, calculateEndTime } from '../../lib/price';
+import { api } from '../../lib/api';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
@@ -22,8 +23,10 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 
 export const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const cancelled = searchParams.get('cancelled') === 'true';
 
   const { facilityType, date, startTime, duration, totalPrice } = useCheckinStore();
 
@@ -35,43 +38,39 @@ export const PaymentPage: React.FC = () => {
 
   const facility = FACILITIES.find((f) => f.id === facilityType);
 
-  const [paymentStep, setPaymentStep] = React.useState(0);
-  const [isProcessing, setIsProcessing] = React.useState(false);
-
   const handlePayment = async () => {
     if (!facilityType || !date || !startTime) return;
 
     setIsLoading(true);
-    setIsProcessing(true);
     setError(null);
 
-    setPaymentStep(1);
-    await new Promise((r) => setTimeout(r, 1200));
-    setPaymentStep(2);
-    await new Promise((r) => setTimeout(r, 1500));
-    setPaymentStep(3);
-    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const response = await api.post<{
+        checkoutUrl?: string;
+        checkinId: string;
+        mode: 'stripe' | 'skip';
+      }>('/payments/create-checkout', {
+        facilityType,
+        date: format(date, 'yyyy-MM-dd'),
+        startTime,
+        duration,
+      });
 
-    const pinCode = String(Math.floor(1000 + Math.random() * 9000));
-
-    const checkinData = {
-      id: crypto.randomUUID(),
-      facilityType,
-      date: format(date, 'yyyy-MM-dd'),
-      startTime,
-      duration,
-      totalPrice,
-      pinCode,
-      status: 'PAID',
-      createdAt: new Date().toISOString(),
-    };
-
-    const existing = JSON.parse(localStorage.getItem('gym-checkins') || '[]');
-    existing.push(checkinData);
-    localStorage.setItem('gym-checkins', JSON.stringify(existing));
-
-    setIsLoading(false);
-    navigate(`/complete?checkinId=${checkinData.id}`);
+      if (response.mode === 'skip') {
+        // Stripe未設定時: 直接完了ページへ
+        navigate(`/complete?checkinId=${response.checkinId}`);
+      } else if (response.checkoutUrl) {
+        // Stripe Checkoutページへリダイレクト
+        window.location.href = response.checkoutUrl;
+      } else {
+        setError('決済ページの作成に失敗しました');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      setError('決済処理中にエラーが発生しました。もう一度お試しください。');
+      setIsLoading(false);
+    }
   };
 
   if (!facility || !date || !startTime) {
@@ -173,44 +172,12 @@ export const PaymentPage: React.FC = () => {
           </div>
         </div>
 
-        {/* フェイク決済処理ステップ */}
-        {isProcessing && (
-          <div className="mt-6 p-5 bg-white rounded-2xl shadow-card-hover border border-primary-100 animate-scale-in">
-            <div className="flex justify-center mb-5">
-              <div className="w-12 h-12 relative">
-                <div className="absolute inset-0 rounded-full border-3 border-primary-100"></div>
-                <div className="absolute inset-0 rounded-full border-3 border-primary-500 border-t-transparent animate-spin"></div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {[
-                'カード情報を確認中...',
-                '決済を処理中...',
-                '暗証番号を発行中...',
-              ].map((label, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-all duration-500 ${
-                    i + 1 <= paymentStep ? 'opacity-100' : 'opacity-30'
-                  } ${i + 1 === paymentStep ? 'bg-primary-50' : ''}`}
-                >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-500 ${
-                    i + 1 < paymentStep
-                      ? 'bg-primary-500 text-white'
-                      : i + 1 === paymentStep
-                        ? 'bg-primary-500 text-white animate-pulse-soft'
-                        : 'bg-gray-200 text-gray-400'
-                  }`}>
-                    {i + 1 < paymentStep ? '✓' : i + 1}
-                  </div>
-                  <span className={`text-sm ${
-                    i + 1 === paymentStep ? 'font-semibold text-primary-700' : 'text-gray-500'
-                  }`}>
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
+        {/* キャンセルメッセージ */}
+        {cancelled && (
+          <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-200 animate-fade-in-up">
+            <p className="text-amber-700 text-sm font-medium">
+              決済がキャンセルされました。もう一度お試しください。
+            </p>
           </div>
         )}
 

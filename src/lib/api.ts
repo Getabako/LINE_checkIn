@@ -99,7 +99,12 @@ export interface CreateCheckinRequest {
 
 export interface CreateCheckinResponse {
   checkin: Checkin;
-  paymentUrl: string;
+}
+
+export interface CreateCheckoutResponse {
+  checkoutUrl?: string;
+  checkinId: string;
+  mode: 'stripe' | 'skip';
 }
 
 // API functions
