@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
-import { createBooking, isRemoteLockConfigured } from '../lib/remotelock';
+import { createBooking, isRemoteLockConfigured } from '../lib/remotelock.js';
 
 const prisma = new PrismaClient();
 
