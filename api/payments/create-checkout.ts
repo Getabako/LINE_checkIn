@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
+import { createBooking, isRemoteLockConfigured } from '../lib/remotelock';
 
 const prisma = new PrismaClient();
 
@@ -134,9 +135,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Stripe Checkout Session作成
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    if (!stripeSecretKey) {
-      // Stripeキー未設定時はフォールバック（ランダムPIN発行）
-      const pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const skipPayment = !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    if (skipPayment) {
+      // 決済スキップ: RemoteLock APIでPIN発行（設定済みの場合）
+      let pinCode: string;
+      if (isRemoteLockConfigured()) {
+        try {
+          const startHour = parseInt(startTime.split(':')[0], 10);
+          const endHour = startHour + duration;
+          const dateStr = parsedDate.toISOString().split('T')[0];
+          const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
+          const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+
+          const result = await createBooking({
+            checkinId: checkin.id,
+            name: `Checkin ${checkin.id}`,
+            startsAt,
+            endsAt,
+            facilityType,
+          });
+          pinCode = result.pinCode;
+        } catch (error) {
+          console.error('RemoteLock API error, falling back to random PIN:', error);
+          pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+        }
+      } else {
+        pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+      }
       await prisma.checkin.update({
         where: { id: checkin.id },
         data: { status: 'PAID', pinCode },
