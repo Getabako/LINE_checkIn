@@ -48,6 +48,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // GET: チェックイン詳細取得
     if (req.method === 'GET') {
+      const formatParam = req.query.format as string;
+
+      // 領収書PDF取得
+      if (formatParam === 'receipt') {
+        if (checkinData.status !== 'PAID') {
+          return res.status(400).json({ error: '決済済みのチェックインのみ領収書を発行できます' });
+        }
+        try {
+          const { generateReceipt } = await import('../../server-lib/pdf.js');
+          const userDoc = await db.collection(COLLECTIONS.USERS).doc(checkinData.userId).get();
+          const user = userDoc.exists ? userDoc.data()! : { displayName: '利用者' };
+          const pdf = await generateReceipt(
+            { id, ...checkinData },
+            { displayName: user.displayName }
+          );
+          return res.status(200).json({ pdf });
+        } catch (e) {
+          console.error('Receipt generation error:', e);
+          return res.status(500).json({ error: 'Failed to generate receipt' });
+        }
+      }
+
       return res.status(200).json({ id: checkinDoc.id, ...checkinData });
     }
 

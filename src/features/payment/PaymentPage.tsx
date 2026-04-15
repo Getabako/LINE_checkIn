@@ -38,6 +38,7 @@ export const PaymentPage: React.FC = () => {
   const {
     location, facilityType, date, startTime, duration, totalPrice,
     couponCode, couponDiscount, memberDiscount, memberTypeName,
+    multiDateMode, dates, recurringType,
     setCoupon, setMemberDiscount,
   } = useCheckinStore();
   const { paymentEnabled, remoteLockEnabled } = useDebugStore();
@@ -117,11 +118,8 @@ export const PaymentPage: React.FC = () => {
     }
 
     try {
-      const response = await api.post<{
-        checkoutUrl?: string;
-        checkinId: string;
-        mode: 'stripe' | 'skip';
-      }>('/payments/create-checkout', {
+      const isMulti = multiDateMode && dates.length > 0;
+      const payload: Record<string, unknown> = {
         location,
         facilityType,
         date: format(date, 'yyyy-MM-dd'),
@@ -129,10 +127,27 @@ export const PaymentPage: React.FC = () => {
         duration,
         couponCode: couponCode || undefined,
         skipRemoteLock: !remoteLockEnabled,
-      });
+      };
+
+      if (isMulti) {
+        if (recurringType) {
+          payload.recurring = { type: recurringType, count: dates.length };
+        } else {
+          payload.dates = dates.map((d) => format(d, 'yyyy-MM-dd'));
+        }
+      }
+
+      const response = await api.post<{
+        checkoutUrl?: string;
+        checkinId: string;
+        checkinIds?: string[];
+        groupId?: string;
+        mode: 'stripe' | 'skip';
+      }>('/payments/create-checkout', payload);
 
       if (response.mode === 'skip') {
-        navigate(`/complete?checkinId=${response.checkinId}`);
+        const groupParam = response.groupId ? `&groupId=${response.groupId}` : '';
+        navigate(`/complete?checkinId=${response.checkinId}${groupParam}`);
       } else if (response.checkoutUrl) {
         window.location.href = response.checkoutUrl;
       } else {
@@ -177,12 +192,32 @@ export const PaymentPage: React.FC = () => {
               <span className="text-gray-400 text-sm">拠点</span>
               <span className="font-semibold text-gray-700">{locationName}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-400 text-sm">利用日</span>
-              <span className="font-semibold text-gray-700">
-                {format(date, 'yyyy年M月d日(E)', { locale: ja })}
-              </span>
-            </div>
+            {multiDateMode && dates.length > 1 ? (
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-400 text-sm">利用日（{dates.length}日分）</span>
+                  {recurringType && (
+                    <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-semibold">
+                      {recurringType === 'WEEKLY' ? '毎週' : '隔週'}
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1 ml-2">
+                  {dates.map((d, i) => (
+                    <p key={i} className="text-sm font-semibold text-gray-700">
+                      {format(d, 'yyyy年M月d日(E)', { locale: ja })}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400 text-sm">利用日</span>
+                <span className="font-semibold text-gray-700">
+                  {format(date, 'yyyy年M月d日(E)', { locale: ja })}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">利用時間</span>
               <span className="font-semibold text-gray-700">

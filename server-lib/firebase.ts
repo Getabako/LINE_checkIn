@@ -38,4 +38,8 @@ export const COLLECTIONS = {
   MEMBER_TYPES: 'memberTypes',
   USER_MEMBERSHIPS: 'userMemberships',
   REVIEWS: 'reviews',
+  EVENTS: 'events',
+  SCHOOLS: 'schools',
+  EVENT_REGISTRATIONS: 'eventRegistrations',
+  SCHOOL_REGISTRATIONS: 'schoolRegistrations',
 } as const;

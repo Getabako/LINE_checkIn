@@ -41,8 +41,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = getDb();
     const checkinsRef = db.collection(COLLECTIONS.CHECKINS);
 
-    // GET: チェックイン一覧取得
+    // GET: チェックイン一覧 or イベント/スクール取得
     if (req.method === 'GET') {
+      const type = req.query.type as string;
+
+      // 公開イベント一覧
+      if (type === 'events') {
+        const snapshot = await db.collection(COLLECTIONS.EVENTS)
+          .where('isActive', '==', true)
+          .orderBy('date', 'asc')
+          .get();
+        const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return res.status(200).json(events);
+      }
+
+      // 公開ス���ール一覧
+      if (type === 'schools') {
+        const snapshot = await db.collection(COLLECTIONS.SCHOOLS)
+          .where('isActive', '==', true)
+          .orderBy('createdAt', 'desc')
+          .get();
+        const schools = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        return res.status(200).json(schools);
+      }
+      const { groupId } = req.query;
+
+      // groupIdでフィルタ
+      if (groupId && typeof groupId === 'string') {
+        const snapshot = await checkinsRef
+          .where('userId', '==', userId)
+          .where('groupId', '==', groupId)
+          .orderBy('date', 'asc')
+          .get();
+
+        const checkins = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        return res.status(200).json(checkins);
+      }
+
       const snapshot = await checkinsRef
         .where('userId', '==', userId)
         .orderBy('createdAt', 'desc')
@@ -56,8 +95,94 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(checkins);
     }
 
-    // POST: 新規チェックイン作成
+    // POST: イベント/スクール申込み or 新規チェックイン作成
     if (req.method === 'POST') {
+      const type = req.query.type as string;
+
+      // イベント申込み
+      if (type === 'event-register') {
+        const { eventId } = req.body;
+        if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
+
+        const eventDoc = await db.collection(COLLECTIONS.EVENTS).doc(eventId).get();
+        if (!eventDoc.exists) return res.status(404).json({ error: 'Event not found' });
+        const event = eventDoc.data()!;
+
+        // 定員チェック
+        if (event.capacity > 0 && event.currentCount >= event.capacity) {
+          return res.status(400).json({ error: '定員に達しています' });
+        }
+
+        // 重複チェック
+        const existing = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
+          .where('eventId', '==', eventId)
+          .where('lineUserId', '==', profile.userId)
+          .limit(1)
+          .get();
+        if (!existing.empty) {
+          return res.status(400).json({ error: '既に申込み済みです' });
+        }
+
+        const now = new Date().toISOString();
+        const regData = {
+          eventId,
+          userId,
+          lineUserId: profile.userId,
+          status: 'REGISTERED',
+          paidAmount: event.price || 0,
+          createdAt: now,
+        };
+        const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
+
+        // カウントアップ
+        const { FieldValue } = await import('firebase-admin/firestore');
+        await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+
+        return res.status(201).json({ id: regRef.id, ...regData });
+      }
+
+      // スクール申込み
+      if (type === 'school-register') {
+        const { schoolId } = req.body;
+        if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
+
+        const schoolDoc = await db.collection(COLLECTIONS.SCHOOLS).doc(schoolId).get();
+        if (!schoolDoc.exists) return res.status(404).json({ error: 'School not found' });
+        const school = schoolDoc.data()!;
+
+        // 定員チェック
+        if (school.capacity > 0 && school.currentCount >= school.capacity) {
+          return res.status(400).json({ error: '定員に達しています' });
+        }
+
+        // 重複チェック
+        const existing = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS)
+          .where('schoolId', '==', schoolId)
+          .where('lineUserId', '==', profile.userId)
+          .limit(1)
+          .get();
+        if (!existing.empty) {
+          return res.status(400).json({ error: '既に申込み済みです' });
+        }
+
+        const now = new Date().toISOString();
+        const totalPrice = (school.pricePerSession || 0) * (school.totalSessions || 1);
+        const regData = {
+          schoolId,
+          userId,
+          lineUserId: profile.userId,
+          status: 'REGISTERED',
+          paidAmount: totalPrice,
+          createdAt: now,
+        };
+        const regRef = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS).add(regData);
+
+        // カウントアップ
+        const { FieldValue } = await import('firebase-admin/firestore');
+        await schoolDoc.ref.update({ currentCount: FieldValue.increment(1) });
+
+        return res.status(201).json({ id: regRef.id, ...regData });
+      }
       const { location, facilityType, date, startTime, duration, totalPrice } = req.body;
 
       if (!facilityType || !date || !startTime || !duration) {

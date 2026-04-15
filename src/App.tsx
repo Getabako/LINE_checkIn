@@ -10,6 +10,11 @@ import { CheckinPage } from './features/checkin/CheckinPage';
 import { PaymentPage } from './features/payment/PaymentPage';
 import { CompletePage } from './features/complete/CompletePage';
 import { ReviewPage } from './features/review/ReviewPage';
+import { EventListPage } from './features/events/EventListPage';
+import { EventDetailPage } from './features/events/EventDetailPage';
+import { SchoolListPage } from './features/schools/SchoolListPage';
+import { SchoolDetailPage } from './features/schools/SchoolDetailPage';
+import { AdminPage } from './features/admin/AdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -72,6 +77,11 @@ const App: React.FC = () => {
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/complete" element={<CompletePage />} />
           <Route path="/review" element={<ReviewPage />} />
+          <Route path="/events" element={<EventListPage />} />
+          <Route path="/events/:id" element={<EventDetailPage />} />
+          <Route path="/schools" element={<SchoolListPage />} />
+          <Route path="/schools/:id" element={<SchoolDetailPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

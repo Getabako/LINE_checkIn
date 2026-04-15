@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
+import crypto from 'crypto';
 import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
@@ -116,10 +117,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId = userSnapshot.docs[0].id;
     }
 
-    const { location, facilityType, date, startTime, duration, couponCode, skipPayment: clientSkipPayment, skipRemoteLock: clientSkipRemoteLock } = req.body;
+    const { location, facilityType, date, dates, startTime, duration, couponCode, skipPayment: clientSkipPayment, skipRemoteLock: clientSkipRemoteLock, recurring } = req.body;
+
+    // 定期予約の場合、日付を自動計算
+    let resolvedDates: string[] | null = null;
+    if (recurring && date) {
+      const { type: recurringType, count: recurringCount } = recurring as { type: 'WEEKLY' | 'BIWEEKLY'; count: number };
+      const baseDate = new Date(date);
+      const interval = recurringType === 'BIWEEKLY' ? 14 : 7;
+      resolvedDates = [];
+      for (let i = 0; i < recurringCount; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + interval * i);
+        resolvedDates.push(d.toISOString().split('T')[0]);
+      }
+    } else if (dates && Array.isArray(dates) && dates.length > 0) {
+      resolvedDates = dates as string[];
+    }
 
     // バリデーション
-    if (!location || !facilityType || !date || !startTime || !duration) {
+    if (!location || !facilityType || (!date && !resolvedDates) || !startTime || !duration) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -135,11 +152,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: `Facility type ${facilityType} is not available at ${location}` });
     }
 
-    const parsedDate = new Date(date);
-    let totalPrice = calculatePrice(location, facilityType, parsedDate, startTime, duration);
+    // 複数日 or 単一日の処理
+    const allDates = resolvedDates || [date];
+    const isMultiDate = allDates.length > 1;
+    const groupId = isMultiDate ? crypto.randomUUID() : null;
 
-    // 会員割引の適用
-    let memberDiscount = 0;
+    // 各日の料金を計算
+    let grandTotalPrice = 0;
+    const perDatePrices: { date: string; price: number }[] = [];
+    for (const d of allDates) {
+      const parsedDate = new Date(d);
+      const price = calculatePrice(location, facilityType, parsedDate, startTime, duration);
+      perDatePrices.push({ date: d, price });
+      grandTotalPrice += price;
+    }
+
+    // 会員割引の適用（全日分合算）
+    let memberDiscountPerDay = 0;
     let memberTypeName: string | null = null;
     try {
       const membershipSnapshot = await db
@@ -156,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const memberType = memberTypeDoc.data()!;
           const discountPerHour = memberType.discounts?.[location] || 0;
           if (discountPerHour !== 0) {
-            memberDiscount = Math.abs(discountPerHour) * duration;
+            memberDiscountPerDay = Math.abs(discountPerHour) * duration;
             memberTypeName = memberType.name;
           }
         }
@@ -165,7 +194,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Member discount check error:', e);
     }
 
-    // クーポン割引の適用
+    const totalMemberDiscount = memberDiscountPerDay * allDates.length;
+
+    // クーポン割引の適用（合計金額に対して1回）
     let couponDiscount = 0;
     let couponId: string | null = null;
     if (couponCode) {
@@ -180,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!couponSnapshot.empty) {
           const coupon = couponSnapshot.docs[0].data();
           couponId = couponSnapshot.docs[0].id;
-          const priceAfterMember = totalPrice - memberDiscount;
+          const priceAfterMember = grandTotalPrice - totalMemberDiscount;
 
           if (coupon.discountType === 'PERCENTAGE') {
             couponDiscount = Math.floor(priceAfterMember * (coupon.discountValue / 100));
@@ -193,72 +224,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const finalPrice = Math.max(0, totalPrice - memberDiscount - couponDiscount);
+    const finalPrice = Math.max(0, grandTotalPrice - totalMemberDiscount - couponDiscount);
 
     // スキップフラグ
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     const skipPayment = clientSkipPayment || !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
     const skipRemoteLock = clientSkipRemoteLock || false;
 
-    // Firestore: Checkin作成 (status: PENDING)
+    // Firestore: 各日付のCheckin作成 (status: PENDING)
     const now = new Date().toISOString();
-    const checkinData = {
-      userId,
-      location,
-      facilityType,
-      date,
-      startTime,
-      duration,
-      totalPrice: finalPrice,
-      originalPrice: totalPrice,
-      memberDiscount,
-      memberTypeName,
-      couponCode: couponCode || null,
-      couponId,
-      couponDiscount,
-      pinCode: null,
-      status: 'PENDING',
-      paymentId: null,
-      skipRemoteLock,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const checkinIds: string[] = [];
 
-    const checkinRef = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
-    const checkinId = checkinRef.id;
+    // クーポン割引を日数で按分
+    const couponDiscountPerDay = allDates.length > 0 ? Math.floor(couponDiscount / allDates.length) : 0;
+    const couponDiscountRemainder = couponDiscount - couponDiscountPerDay * allDates.length;
+
+    for (let i = 0; i < allDates.length; i++) {
+      const d = allDates[i];
+      const dayPrice = perDatePrices[i].price;
+      const dayCouponDiscount = couponDiscountPerDay + (i === 0 ? couponDiscountRemainder : 0);
+      const dayFinalPrice = Math.max(0, dayPrice - memberDiscountPerDay - dayCouponDiscount);
+
+      const checkinData = {
+        userId,
+        location,
+        facilityType,
+        date: d,
+        startTime,
+        duration,
+        totalPrice: dayFinalPrice,
+        originalPrice: dayPrice,
+        memberDiscount: memberDiscountPerDay,
+        memberTypeName,
+        couponCode: couponCode || null,
+        couponId,
+        couponDiscount: dayCouponDiscount,
+        pinCode: null,
+        status: 'PENDING',
+        paymentId: null,
+        skipRemoteLock,
+        groupId,
+        recurringType: recurring?.type || null,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const checkinRef = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
+      checkinIds.push(checkinRef.id);
+    }
+
+    const primaryCheckinId = checkinIds[0];
 
     if (skipPayment) {
-      let pinCode: string;
-      if (!skipRemoteLock && isRemoteLockConfigured()) {
-        try {
-          const startHour = parseInt(startTime.split(':')[0], 10);
-          const endHour = startHour + duration;
-          const dateStr = parsedDate.toISOString().split('T')[0];
-          const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
-          const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+      // 各日付のcheckinにPINを発行
+      for (let i = 0; i < checkinIds.length; i++) {
+        const cId = checkinIds[i];
+        const d = allDates[i];
+        let pinCode: string;
 
-          const result = await createBooking({
-            checkinId,
-            name: `Checkin ${checkinId}`,
-            startsAt,
-            endsAt,
-            location,
-            facilityType,
-          });
-          pinCode = result.pinCode;
-        } catch (error) {
-          console.error('RemoteLock API error, falling back to random PIN:', error);
+        if (!skipRemoteLock && isRemoteLockConfigured()) {
+          try {
+            const startHour = parseInt(startTime.split(':')[0], 10);
+            const endHour = startHour + duration;
+            const parsedDate = new Date(d);
+            const dateStr = parsedDate.toISOString().split('T')[0];
+            const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
+            const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+
+            const result = await createBooking({
+              checkinId: cId,
+              name: `Checkin ${cId}`,
+              startsAt,
+              endsAt,
+              location,
+              facilityType,
+            });
+            pinCode = result.pinCode;
+          } catch (error) {
+            console.error('RemoteLock API error, falling back to random PIN:', error);
+            pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+          }
+        } else {
           pinCode = Math.floor(1000 + Math.random() * 9000).toString();
         }
-      } else {
-        pinCode = Math.floor(1000 + Math.random() * 9000).toString();
-      }
 
-      await checkinRef.update({
-        status: 'PAID',
-        pinCode,
-        updatedAt: new Date().toISOString(),
-      });
+        await db.collection(COLLECTIONS.CHECKINS).doc(cId).update({
+          status: 'PAID',
+          pinCode,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       // クーポン使用回数を更新（SKIP_PAYMENT時）
       if (couponId) {
@@ -268,7 +323,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await db.collection('couponRedemptions').add({
             couponId,
             userId,
-            checkinId,
+            checkinId: primaryCheckinId,
             discount: couponDiscount,
             createdAt: new Date().toISOString(),
           });
@@ -277,7 +332,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      return res.status(200).json({ checkinId, mode: 'skip' });
+      return res.status(200).json({
+        checkinId: primaryCheckinId,
+        checkinIds,
+        groupId,
+        mode: 'skip',
+      });
     }
 
     const stripe = new Stripe(stripeSecretKey);
@@ -285,6 +345,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const locationName = LOCATION_NAMES[location] || location;
     const facilityName = FACILITY_NAMES[facilityType] || facilityType;
+
+    const productName = isMultiDate
+      ? `${locationName} ${facilityName} ${duration}時間利用 × ${allDates.length}日`
+      : `${locationName} ${facilityName} ${duration}時間利用`;
+    const parsedFirstDate = new Date(allDates[0]);
+    const productDesc = isMultiDate
+      ? `${parsedFirstDate.toLocaleDateString('ja-JP')} 他${allDates.length - 1}日 ${startTime}〜`
+      : `${parsedFirstDate.toLocaleDateString('ja-JP')} ${startTime}〜`;
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
@@ -294,27 +362,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           price_data: {
             currency: 'jpy',
             product_data: {
-              name: `${locationName} ${facilityName} ${duration}時間利用`,
-              description: `${parsedDate.toLocaleDateString('ja-JP')} ${startTime}〜`,
+              name: productName,
+              description: productDesc,
             },
             unit_amount: finalPrice,
           },
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/api/payments/stripe-callback?session_id={CHECKOUT_SESSION_ID}&checkin_id=${checkinId}`,
+      success_url: `${baseUrl}/api/payments/stripe-callback?session_id={CHECKOUT_SESSION_ID}&checkin_id=${primaryCheckinId}`,
       cancel_url: `${baseUrl}/payment?cancelled=true`,
-      metadata: { checkinId },
+      metadata: {
+        checkinId: primaryCheckinId,
+        checkinIds: checkinIds.join(','),
+        groupId: groupId || '',
+      },
     });
 
-    await checkinRef.update({
-      paymentId: session.id,
-      updatedAt: new Date().toISOString(),
-    });
+    // 全checkinにpaymentIdを設定
+    for (const cId of checkinIds) {
+      await db.collection(COLLECTIONS.CHECKINS).doc(cId).update({
+        paymentId: session.id,
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     return res.status(200).json({
       checkoutUrl: session.url,
-      checkinId,
+      checkinId: primaryCheckinId,
+      checkinIds,
+      groupId,
       mode: 'stripe',
     });
   } catch (error) {

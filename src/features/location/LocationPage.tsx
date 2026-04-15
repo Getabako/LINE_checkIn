@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiMapPin } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiBook, FiSettings } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
@@ -87,6 +87,39 @@ export const LocationPage: React.FC = () => {
               </div>
             </button>
           ))}
+        </div>
+
+        {/* イベント・スクール・管理画面リンク */}
+        <div className="mt-8 space-y-3 stagger-children">
+          <h3 className="font-bold text-primary-800 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            その他
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigate('/events')}
+              className="p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <FiCalendar className="w-6 h-6 text-primary-500 mb-2" />
+              <p className="font-bold text-gray-900 text-sm">イベント</p>
+              <p className="text-xs text-gray-400">開催予定をチェック</p>
+            </button>
+            <button
+              onClick={() => navigate('/schools')}
+              className="p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
+            >
+              <FiBook className="w-6 h-6 text-primary-500 mb-2" />
+              <p className="font-bold text-gray-900 text-sm">スクール</p>
+              <p className="text-xs text-gray-400">定期レッスン</p>
+            </button>
+          </div>
+          <button
+            onClick={() => navigate('/admin')}
+            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-left flex items-center gap-3 hover:bg-gray-100 transition-colors"
+          >
+            <FiSettings className="w-5 h-5 text-gray-400" />
+            <span className="text-sm text-gray-500">管理画面</span>
+          </button>
         </div>
       </main>
 

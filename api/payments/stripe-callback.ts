@@ -35,7 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 既に処理済みの場合は完了ページへ
     if (checkin.status === 'PAID') {
-      return res.redirect(`${baseUrl}/complete?checkinId=${checkinId}`);
+      const groupParam = checkin.groupId ? `&groupId=${checkin.groupId}` : '';
+      return res.redirect(`${baseUrl}/complete?checkinId=${checkinId}${groupParam}`);
     }
 
     // Stripe Session検証
@@ -51,45 +52,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.redirect(`${baseUrl}/payment?cancelled=true`);
     }
 
-    // PIN発行
-    let pinCode: string;
+    // 複数日予約: metadataからcheckinIdsを取得
+    const checkinIdsStr = session.metadata?.checkinIds || checkinId;
+    const allCheckinIds = checkinIdsStr.split(',').filter(Boolean);
 
-    if (!checkin.skipRemoteLock && isRemoteLockConfigured()) {
-      try {
-        const startHour = parseInt(checkin.startTime.split(':')[0], 10);
-        const endHour = startHour + checkin.duration;
-        const parsedDate = new Date(checkin.date);
-        const dateStr = parsedDate.toISOString().split('T')[0];
+    // 各checkinにPINを発行
+    for (const cId of allCheckinIds) {
+      const cDoc = await db.collection(COLLECTIONS.CHECKINS).doc(cId).get();
+      if (!cDoc.exists) continue;
+      const cData = cDoc.data()!;
+      if (cData.status === 'PAID') continue;
 
-        const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
-        const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+      let pinCode: string;
 
-        const result = await createBooking({
-          checkinId,
-          name: `Checkin ${checkinId}`,
-          startsAt,
-          endsAt,
-          location: checkin.location,
-          facilityType: checkin.facilityType,
-        });
-        pinCode = result.pinCode;
-      } catch (error) {
-        console.error('RemoteLock API error, falling back to random PIN:', error);
+      if (!cData.skipRemoteLock && isRemoteLockConfigured()) {
+        try {
+          const startHour = parseInt(cData.startTime.split(':')[0], 10);
+          const endHour = startHour + cData.duration;
+          const parsedDate = new Date(cData.date);
+          const dateStr = parsedDate.toISOString().split('T')[0];
+
+          const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
+          const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+
+          const result = await createBooking({
+            checkinId: cId,
+            name: `Checkin ${cId}`,
+            startsAt,
+            endsAt,
+            location: cData.location,
+            facilityType: cData.facilityType,
+          });
+          pinCode = result.pinCode;
+        } catch (error) {
+          console.error('RemoteLock API error, falling back to random PIN:', error);
+          pinCode = generatePinCode();
+        }
+      } else {
         pinCode = generatePinCode();
       }
-    } else {
-      pinCode = generatePinCode();
+
+      await cDoc.ref.update({
+        status: 'PAID',
+        pinCode,
+        paymentId: sessionId,
+        updatedAt: new Date().toISOString(),
+      });
     }
 
-    // Firestore更新
-    await checkinDoc.ref.update({
-      status: 'PAID',
-      pinCode,
-      paymentId: sessionId,
-      updatedAt: new Date().toISOString(),
-    });
-
-    // クーポン使用回数を更新
+    // クーポン使用回数を更新（1回のみ）
     if (checkin.couponId) {
       try {
         const couponRef = db.collection('coupons').doc(checkin.couponId);
@@ -108,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    return res.redirect(`${baseUrl}/complete?checkinId=${checkinId}`);
+    const groupParam = checkin.groupId ? `&groupId=${checkin.groupId}` : '';
+    return res.redirect(`${baseUrl}/complete?checkinId=${checkinId}${groupParam}`);
   } catch (error) {
     console.error('Stripe callback error:', error);
     return res.redirect(`${baseUrl}/?error=payment_error`);

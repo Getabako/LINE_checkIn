@@ -9,6 +9,14 @@ interface CheckinState {
   startTime: string | null;
   duration: number;
 
+  // 複数日選択
+  multiDateMode: boolean;
+  dates: Date[];
+
+  // 定期予約
+  recurringType: 'WEEKLY' | 'BIWEEKLY' | null;
+  recurringCount: number;
+
   // 計算結果
   totalPrice: number;
 
@@ -29,6 +37,10 @@ interface CheckinState {
   setTotalPrice: (price: number) => void;
   setCoupon: (code: string | null, discount: number) => void;
   setMemberDiscount: (discount: number, typeName: string | null) => void;
+  setMultiDateMode: (enabled: boolean) => void;
+  toggleDate: (date: Date) => void;
+  setDates: (dates: Date[]) => void;
+  setRecurring: (type: 'WEEKLY' | 'BIWEEKLY' | null, count: number) => void;
   reset: () => void;
 }
 
@@ -38,6 +50,10 @@ const initialState = {
   date: null,
   startTime: null,
   duration: 1,
+  multiDateMode: false,
+  dates: [] as Date[],
+  recurringType: null as 'WEEKLY' | 'BIWEEKLY' | null,
+  recurringCount: 4,
   totalPrice: 0,
   couponCode: null,
   couponDiscount: 0,
@@ -56,5 +72,15 @@ export const useCheckinStore = create<CheckinState>((set) => ({
   setTotalPrice: (price) => set({ totalPrice: price }),
   setCoupon: (code, discount) => set({ couponCode: code, couponDiscount: discount }),
   setMemberDiscount: (discount, typeName) => set({ memberDiscount: discount, memberTypeName: typeName }),
+  setMultiDateMode: (enabled) => set({ multiDateMode: enabled, dates: [], recurringType: null }),
+  toggleDate: (date) => set((state) => {
+    const exists = state.dates.some((d) => d.toDateString() === date.toDateString());
+    if (exists) {
+      return { dates: state.dates.filter((d) => d.toDateString() !== date.toDateString()) };
+    }
+    return { dates: [...state.dates, date].sort((a, b) => a.getTime() - b.getTime()) };
+  }),
+  setDates: (dates) => set({ dates }),
+  setRecurring: (type, count) => set({ recurringType: type, recurringCount: count }),
   reset: () => set(initialState),
 }));
