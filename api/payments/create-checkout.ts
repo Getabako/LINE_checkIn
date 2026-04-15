@@ -195,6 +195,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const finalPrice = Math.max(0, totalPrice - memberDiscount - couponDiscount);
 
+    // スキップフラグ
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const skipPayment = clientSkipPayment || !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    const skipRemoteLock = clientSkipRemoteLock || false;
+
     // Firestore: Checkin作成 (status: PENDING)
     const now = new Date().toISOString();
     const checkinData = {
@@ -214,18 +219,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pinCode: null,
       status: 'PENDING',
       paymentId: null,
-      skipRemoteLock: skipRemoteLock || false,
+      skipRemoteLock,
       createdAt: now,
       updatedAt: now,
     };
 
     const checkinRef = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
     const checkinId = checkinRef.id;
-
-    // Stripe Checkout Session作成
-    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const skipPayment = clientSkipPayment || !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
-    const skipRemoteLock = clientSkipRemoteLock || false;
 
     if (skipPayment) {
       let pinCode: string;
