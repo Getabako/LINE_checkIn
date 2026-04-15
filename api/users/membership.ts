@@ -28,12 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ membership: null });
       }
 
-      const membership = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+      const membershipData = snapshot.docs[0].data();
+      const membership = { id: snapshot.docs[0].id, ...membershipData };
 
       // 会員種別の詳細を取得
       const memberTypeDoc = await db
         .collection(COLLECTIONS.MEMBER_TYPES)
-        .doc(membership.memberTypeId as string)
+        .doc(membershipData.memberTypeId as string)
         .get();
 
       return res.status(200).json({
