@@ -10,6 +10,7 @@ import { useCheckinStore } from '../../stores/checkinStore';
 import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
 import { calculateEndTime } from '../../lib/price';
 import { api, couponApi, membershipApi } from '../../lib/api';
+import { useDebugStore } from '../../stores/debugStore';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
@@ -39,6 +40,7 @@ export const PaymentPage: React.FC = () => {
     couponCode, couponDiscount, memberDiscount, memberTypeName,
     setCoupon, setMemberDiscount,
   } = useCheckinStore();
+  const { paymentEnabled, remoteLockEnabled } = useDebugStore();
 
   React.useEffect(() => {
     if (!location || !facilityType || !date || !startTime || !totalPrice) {
@@ -120,6 +122,8 @@ export const PaymentPage: React.FC = () => {
         startTime,
         duration,
         couponCode: couponCode || undefined,
+        skipPayment: !paymentEnabled,
+        skipRemoteLock: !remoteLockEnabled,
       });
 
       if (response.mode === 'skip') {

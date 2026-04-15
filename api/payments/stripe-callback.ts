@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // PIN発行
     let pinCode: string;
 
-    if (isRemoteLockConfigured()) {
+    if (!checkin.skipRemoteLock && isRemoteLockConfigured()) {
       try {
         const startHour = parseInt(checkin.startTime.split(':')[0], 10);
         const endHour = startHour + checkin.duration;

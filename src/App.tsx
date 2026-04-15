@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeLiff } from './lib/liff';
 import { Loading } from './components/common/Loading';
+import { DebugPanel } from './components/common/DebugPanel';
 import { LocationPage } from './features/location/LocationPage';
 import { HomePage } from './features/home/HomePage';
 import { CheckinPage } from './features/checkin/CheckinPage';
@@ -63,6 +64,7 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <DebugPanel />
         <Routes>
           <Route path="/" element={<LocationPage />} />
           <Route path="/facility" element={<HomePage />} />

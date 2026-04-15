@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId = userSnapshot.docs[0].id;
     }
 
-    const { location, facilityType, date, startTime, duration, couponCode } = req.body;
+    const { location, facilityType, date, startTime, duration, couponCode, skipPayment: clientSkipPayment, skipRemoteLock: clientSkipRemoteLock } = req.body;
 
     // バリデーション
     if (!location || !facilityType || !date || !startTime || !duration) {
@@ -214,6 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pinCode: null,
       status: 'PENDING',
       paymentId: null,
+      skipRemoteLock: skipRemoteLock || false,
       createdAt: now,
       updatedAt: now,
     };
@@ -223,11 +224,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Stripe Checkout Session作成
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const skipPayment = !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    const skipPayment = clientSkipPayment || !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    const skipRemoteLock = clientSkipRemoteLock || false;
 
     if (skipPayment) {
       let pinCode: string;
-      if (isRemoteLockConfigured()) {
+      if (!skipRemoteLock && isRemoteLockConfigured()) {
         try {
           const startHour = parseInt(startTime.split(':')[0], 10);
           const endHour = startHour + duration;
