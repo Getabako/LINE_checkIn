@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { getDb, COLLECTIONS } from '../lib/firebase.js';
-import { verifyLiffToken } from '../lib/auth.js';
-import { createBooking, isRemoteLockConfigured } from '../lib/remotelock.js';
+import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { verifyLiffToken } from '../../server-lib/auth.js';
+import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 
 // 拠点別料金表
 const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {

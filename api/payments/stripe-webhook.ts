@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { getDb, COLLECTIONS } from '../lib/firebase.js';
-import { createBooking, isRemoteLockConfigured } from '../lib/remotelock.js';
+import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 
 function generatePinCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();

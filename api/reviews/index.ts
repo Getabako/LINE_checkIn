@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb, COLLECTIONS } from '../lib/firebase.js';
-import { verifyLiffToken } from '../lib/auth.js';
+import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { verifyLiffToken } from '../../server-lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
