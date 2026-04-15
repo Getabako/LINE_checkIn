@@ -60,7 +60,8 @@ export const api = {
 };
 
 // Types
-export type FacilityType = 'GYM' | 'TRAINING';
+export type LocationId = 'ASP' | 'YABASE';
+export type FacilityType = 'GYM' | 'TRAINING_PRIVATE' | 'TRAINING_SHARED';
 export type CheckinStatus = 'PENDING' | 'PAID' | 'USED' | 'EXPIRED' | 'CANCELLED';
 
 export interface User {
@@ -72,6 +73,7 @@ export interface User {
 
 export interface PricePlan {
   id: string;
+  location: LocationId;
   facilityType: FacilityType;
   dayType: 'WEEKDAY' | 'WEEKEND';
   timeSlot: 'DAYTIME' | 'EVENING' | 'ALLDAY';
@@ -80,6 +82,7 @@ export interface PricePlan {
 
 export interface Checkin {
   id: string;
+  location: LocationId;
   facilityType: FacilityType;
   date: string;
   startTime: string;
@@ -91,6 +94,7 @@ export interface Checkin {
 }
 
 export interface CreateCheckinRequest {
+  location: LocationId;
   facilityType: FacilityType;
   date: string;
   startTime: string;
@@ -105,6 +109,47 @@ export interface CreateCheckoutResponse {
   checkoutUrl?: string;
   checkinId: string;
   mode: 'stripe' | 'skip';
+}
+
+// クーポン関連
+export interface CouponValidationResult {
+  valid: boolean;
+  couponId?: string;
+  discountType?: 'PERCENTAGE' | 'FIXED';
+  discountValue?: number;
+  discount?: number;
+  discountedPrice?: number;
+  message: string;
+}
+
+// 会員種別関連
+export interface MemberType {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  discounts: Record<string, number>; // { "ASP": -275, "YABASE": -250 } 等
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface UserMembership {
+  id: string;
+  lineUserId: string;
+  memberTypeId: string;
+  isActive: boolean;
+  memberType?: MemberType;
+}
+
+// レビュー関連
+export interface Review {
+  id: string;
+  checkinId: string;
+  lineUserId: string;
+  displayName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
 
 // API functions
@@ -122,9 +167,30 @@ export const checkinApi = {
 
 export const priceApi = {
   calculate: (params: {
+    location: LocationId;
     facilityType: FacilityType;
     date: string;
     startTime: string;
     duration: number;
   }) => api.post<{ totalPrice: number; breakdown: { hour: number; price: number }[] }>('/prices/calculate', params),
+};
+
+export const couponApi = {
+  validate: (params: { code: string; location: LocationId; totalPrice: number }) =>
+    api.post<CouponValidationResult>('/coupons/validate', params),
+};
+
+export const memberTypeApi = {
+  getAll: () => api.get<MemberType[]>('/member-types'),
+};
+
+export const membershipApi = {
+  get: () => api.get<{ membership: (UserMembership & { memberType: MemberType | null }) | null }>('/users/membership'),
+};
+
+export const reviewApi = {
+  create: (data: { checkinId: string; rating: number; comment?: string }) =>
+    api.post<Review>('/reviews', data),
+  getByCheckin: (checkinId: string) =>
+    api.get<Review | null>(`/reviews?checkinId=${checkinId}`),
 };

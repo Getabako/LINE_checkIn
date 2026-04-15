@@ -34,8 +34,12 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Prisma
-prisma/*.db
-prisma/*.db-journal
+# Vercel
 .vercel
 .env*.local
+
+# Syncthing conflict files
+*.sync-conflict-*
+
+# Keys memo
+KEYS_MEMO.md

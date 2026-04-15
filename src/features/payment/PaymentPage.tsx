@@ -2,13 +2,14 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCheckCircle, FiCreditCard, FiShield } from 'react-icons/fi';
+import { FiCheckCircle, FiCreditCard, FiShield, FiTag, FiX } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { FACILITIES, calculateEndTime } from '../../lib/price';
-import { api } from '../../lib/api';
+import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
+import { calculateEndTime } from '../../lib/price';
+import { api, couponApi, membershipApi } from '../../lib/api';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
@@ -28,18 +29,81 @@ export const PaymentPage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   const cancelled = searchParams.get('cancelled') === 'true';
 
-  const { facilityType, date, startTime, duration, totalPrice } = useCheckinStore();
+  // クーポン状態
+  const [couponInput, setCouponInput] = React.useState('');
+  const [couponLoading, setCouponLoading] = React.useState(false);
+  const [couponMessage, setCouponMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const {
+    location, facilityType, date, startTime, duration, totalPrice,
+    couponCode, couponDiscount, memberDiscount, memberTypeName,
+    setCoupon, setMemberDiscount,
+  } = useCheckinStore();
 
   React.useEffect(() => {
-    if (!facilityType || !date || !startTime || !totalPrice) {
+    if (!location || !facilityType || !date || !startTime || !totalPrice) {
       navigate('/');
     }
-  }, [facilityType, date, startTime, totalPrice, navigate]);
+  }, [location, facilityType, date, startTime, totalPrice, navigate]);
 
-  const facility = FACILITIES.find((f) => f.id === facilityType);
+  // 会員割引の自動適用
+  React.useEffect(() => {
+    if (!location || !duration) return;
+
+    membershipApi.get().then((res) => {
+      if (res.membership?.memberType) {
+        const mt = res.membership.memberType;
+        const discountPerHour = mt.discounts?.[location] || 0;
+        if (discountPerHour !== 0) {
+          const totalDiscount = Math.abs(discountPerHour) * duration;
+          setMemberDiscount(totalDiscount, mt.name);
+        }
+      }
+    }).catch(() => {
+      // 会員情報取得失敗は無視
+    });
+  }, [location, duration, setMemberDiscount]);
+
+  const facility = location ? LOCATION_FACILITIES[location]?.find((f) => f.id === facilityType) : null;
+  const locationName = location ? getLocationName(location) : '';
+
+  // 最終支払額
+  const finalPrice = Math.max(0, totalPrice - couponDiscount - memberDiscount);
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim() || !location) return;
+
+    setCouponLoading(true);
+    setCouponMessage(null);
+
+    try {
+      const result = await couponApi.validate({
+        code: couponInput.trim(),
+        location,
+        totalPrice: totalPrice - memberDiscount,
+      });
+
+      if (result.valid && result.discount) {
+        setCoupon(couponInput.trim().toUpperCase(), result.discount);
+        setCouponMessage({ type: 'success', text: result.message });
+      } else {
+        setCouponMessage({ type: 'error', text: result.message });
+      }
+    } catch {
+      setCouponMessage({ type: 'error', text: 'クーポンの検証に失敗しました' });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCoupon(null, 0);
+    setCouponInput('');
+    setCouponMessage(null);
+  };
 
   const handlePayment = async () => {
-    if (!facilityType || !date || !startTime) return;
+    if (!location || !facilityType || !date || !startTime) return;
 
     setIsLoading(true);
     setError(null);
@@ -50,17 +114,17 @@ export const PaymentPage: React.FC = () => {
         checkinId: string;
         mode: 'stripe' | 'skip';
       }>('/payments/create-checkout', {
+        location,
         facilityType,
         date: format(date, 'yyyy-MM-dd'),
         startTime,
         duration,
+        couponCode: couponCode || undefined,
       });
 
       if (response.mode === 'skip') {
-        // Stripe未設定時: 直接完了ページへ
         navigate(`/complete?checkinId=${response.checkinId}`);
       } else if (response.checkoutUrl) {
-        // Stripe Checkoutページへリダイレクト
         window.location.href = response.checkoutUrl;
       } else {
         setError('決済ページの作成に失敗しました');
@@ -73,7 +137,7 @@ export const PaymentPage: React.FC = () => {
     }
   };
 
-  if (!facility || !date || !startTime) {
+  if (!facility || !date || !startTime || !location) {
     return null;
   }
 
@@ -91,6 +155,7 @@ export const PaymentPage: React.FC = () => {
                 <FacilityIcon name={facility.iconName} className="w-7 h-7" />
               </div>
               <div>
+                <p className="text-xs text-primary-400 mb-0.5">{locationName}</p>
                 <p className="text-lg font-bold text-gray-900">{facility.name}</p>
                 <p className="text-sm text-gray-400">{facility.description}</p>
               </div>
@@ -99,6 +164,10 @@ export const PaymentPage: React.FC = () => {
 
           {/* 詳細 */}
           <div className="p-5 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400 text-sm">拠点</span>
+              <span className="font-semibold text-gray-700">{locationName}</span>
+            </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-400 text-sm">利用日</span>
               <span className="font-semibold text-gray-700">
@@ -113,21 +182,81 @@ export const PaymentPage: React.FC = () => {
             </div>
           </div>
 
-          {/* 料金 */}
+          {/* 料金内訳 */}
           <div className="p-5 bg-gradient-to-r from-sky-50 to-primary-50 border-t border-primary-100/50">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-500 font-medium">お支払い金額</span>
-              <span className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-                ¥{totalPrice.toLocaleString()}
-              </span>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">施設利用料</span>
+                <span className="font-semibold text-gray-700">¥{totalPrice.toLocaleString()}</span>
+              </div>
+              {memberDiscount > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-emerald-600">{memberTypeName}割引</span>
+                  <span className="font-semibold text-emerald-600">-¥{memberDiscount.toLocaleString()}</span>
+                </div>
+              )}
+              {couponDiscount > 0 && (
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-emerald-600">クーポン割引</span>
+                  <span className="font-semibold text-emerald-600">-¥{couponDiscount.toLocaleString()}</span>
+                </div>
+              )}
+              <div className="border-t border-primary-200/50 pt-2 flex justify-between items-center">
+                <span className="text-gray-500 font-medium">お支払い金額</span>
+                <span className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+                  ¥{finalPrice.toLocaleString()}
+                </span>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* クーポンコード入力 */}
+        <div className="mt-6 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+            <FiTag className="w-4 h-4 text-primary-500" />
+            クーポンコード
+          </h3>
+          {couponCode ? (
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+              <FiCheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+              <span className="flex-1 font-semibold text-emerald-700">{couponCode}</span>
+              <button
+                onClick={handleRemoveCoupon}
+                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder="クーポンコードを入力"
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-100 focus:border-primary-300 focus:outline-none text-sm transition-colors"
+              />
+              <button
+                onClick={handleApplyCoupon}
+                disabled={!couponInput.trim() || couponLoading}
+                className="px-5 py-3 bg-gradient-to-r from-primary-500 to-primary-400 text-white rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
+              >
+                {couponLoading ? '...' : '適用'}
+              </button>
+            </div>
+          )}
+          {couponMessage && (
+            <p className={`mt-2 text-xs ${couponMessage.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+              {couponMessage.text}
+            </p>
+          )}
         </div>
 
         {/* 注意事項 */}
         <div className="mt-6 p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
           <h3 className="font-bold text-amber-800 mb-3 flex items-center gap-2">
-            <span className="text-lg">💡</span>
+            <span className="text-lg">&#x1F4A1;</span>
             ご利用にあたって
           </h3>
           <ul className="text-sm text-amber-700 space-y-2">
@@ -191,6 +320,12 @@ export const PaymentPage: React.FC = () => {
 
       {/* 固定フッター */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-gray-500 text-sm">お支払い金額</span>
+          <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
+            ¥{finalPrice.toLocaleString()}
+          </span>
+        </div>
         <Button
           fullWidth
           loading={isLoading}

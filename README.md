@@ -1,37 +1,47 @@
-# みんなの体育館ASP - チェックインアプリ
+# みんなの体育館 - チェックインアプリ
 
-施設のオンライン予約・チェックインシステム。LINE Payで決済後、4桁の暗証番号が発行され、電子ロックで入館できます。
+施設のオンライン予約・チェックインシステム。Stripe決済後、4桁の暗証番号が発行され、RemoteLockスマートロックで入館できます。
+
+## 対応拠点
+
+- **ASP** (みんなの体育館ASP)
+- **YABASE** (みんなの体育館やばせ)
 
 ## 機能
 
-- 施設選択（体育館 / トレーニングジム）
+- 拠点選択（ASP / やばせ）
+- 施設選択（体育館 / トレーニングジム / 個室トレーニング）
 - 日時・利用時間選択
-- リアルタイム料金計算
-- LINE Pay決済
-- 4桁暗証番号発行
-- 予約履歴確認・キャンセル
+- リアルタイム料金計算（平日昼・夜・土日祝で変動）
+- クーポンコード適用
+- 会員種別による料金割引
+- Stripe Checkout決済
+- RemoteLockスマートロック 暗証番号自動発行
+- レビュー投稿
 
 ## 料金表（税込）
 
-### 体育館
-| 時間帯 | 平日 | 土日祝 |
-|--------|------|--------|
-| 07:00-17:00 | ¥2,750/h | ¥2,750/h |
-| 17:00-21:00 | ¥2,200/h | ¥2,750/h |
+### ASP
+| 施設 | 平日昼(8-17時) | 平日夜(17-21時) | 土日祝 |
+|------|---------------|----------------|--------|
+| 体育館 | ¥2,200/h | ¥2,750/h | ¥2,750/h |
+| 個室トレーニング | ¥2,200/h | ¥2,200/h | ¥2,200/h |
+| 共用トレーニング | ¥550/人 | ¥550/人 | ¥550/人 |
 
-### トレーニングジム
-| 時間帯 | 全日 |
-|--------|------|
-| 07:00-21:00 | ¥2,200/h |
+### やばせ
+| 施設 | 平日昼(7-17時) | 平日夜(17-21時) | 土日祝 |
+|------|---------------|----------------|--------|
+| 体育館 | ¥1,650/h | ¥2,200/h | ¥2,200/h |
 
 ## 技術スタック
 
-- **フロントエンド**: React + TypeScript + Vite
+- **フロントエンド**: React 18 + TypeScript + Vite
 - **スタイリング**: Tailwind CSS
 - **状態管理**: Zustand
 - **バックエンド**: Vercel Serverless Functions
-- **データベース**: Neon PostgreSQL + Prisma
-- **決済**: LINE Pay
+- **データベース**: Firebase Firestore
+- **決済**: Stripe Checkout
+- **スマートロック**: RemoteLock API
 
 ## セットアップ
 
@@ -49,11 +59,15 @@ npm install
 cp .env.example .env
 ```
 
-### 3. データベースセットアップ
+### 3. Firebase設定
+
+1. Firebase Consoleでプロジェクト作成
+2. Firestoreデータベースを有効化
+3. サービスアカウントキーをダウンロード
+4. Base64エンコードして `FIREBASE_SERVICE_ACCOUNT_KEY` に設定
 
 ```bash
-npx prisma generate
-npx prisma db push
+cat your-service-account.json | base64 | tr -d '\n' | pbcopy
 ```
 
 ### 4. 開発サーバー起動
@@ -62,34 +76,36 @@ npx prisma db push
 npm run dev
 ```
 
-http://localhost:3000 でアクセス
-
 ## 環境変数
 
 | 変数名 | 説明 |
 |--------|------|
-| `VITE_LIFF_ID` | LIFF ID |
-| `DATABASE_URL` | PostgreSQL接続URL（Pooled） |
-| `DATABASE_URL_UNPOOLED` | PostgreSQL接続URL（Direct） |
-| `LINE_PAY_CHANNEL_ID` | LINE Pay Channel ID |
-| `LINE_PAY_CHANNEL_SECRET` | LINE Pay Channel Secret |
-| `LINE_PAY_SANDBOX` | Sandbox環境使用（true/false） |
-| `NEXT_PUBLIC_BASE_URL` | アプリのベースURL |
+| `VITE_LIFF_ID` | LINE LIFF ID |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | Firebase サービスアカウントJSON（Base64） |
+| `STRIPE_SECRET_KEY` | Stripe シークレットキー |
+| `STRIPE_WEBHOOK_SECRET` | Stripe Webhook シークレット |
+| `REMOTELOCK_CLIENT_ID` | RemoteLock OAuth Client ID |
+| `REMOTELOCK_CLIENT_SECRET` | RemoteLock OAuth Client Secret |
+| `REMOTELOCK_DEVICE_ID_ENTRANCE` | RemoteLock 玄関デバイスID |
+| `REMOTELOCK_DEVICE_ID_GYM` | RemoteLock 体育館デバイスID |
+| `REMOTELOCK_DEVICE_ID_TRAINING` | RemoteLock トレーニング室デバイスID |
+| `VITE_APP_URL` | アプリのベースURL |
 
 ## デプロイ
 
 1. GitHubにプッシュ
 2. Vercelでインポート
-3. Neon PostgreSQLを追加（Storage → Neon）
-4. 環境変数を設定
-5. デプロイ完了
+3. 環境変数を設定（上記参照）
+4. デプロイ完了
 
-## フロー
+## Firestoreコレクション
 
-```
-1. アプリ起動 → 施設選択
-2. 日時・利用時間を選択
-3. 料金確認 → LINE Pay決済
-4. 決済完了 → 4桁暗証番号発行
-5. 施設入口で暗証番号入力 → 入館
-```
+| コレクション | 用途 |
+|-------------|------|
+| `users` | ユーザー情報 |
+| `checkins` | チェックイン・予約データ |
+| `coupons` | クーポンマスタ |
+| `couponRedemptions` | クーポン利用履歴 |
+| `memberTypes` | 会員種別マスタ |
+| `userMemberships` | ユーザー会員紐付け |
+| `reviews` | レビュー |

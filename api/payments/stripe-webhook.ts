@@ -1,9 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { PrismaClient } from '@prisma/client';
 import Stripe from 'stripe';
+import { getDb, COLLECTIONS } from '../lib/firebase.js';
 import { createBooking, isRemoteLockConfigured } from '../lib/remotelock.js';
-
-const prisma = new PrismaClient();
 
 function generatePinCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -54,17 +52,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ received: true });
       }
 
-      // チェックイン取得
-      const checkin = await prisma.checkin.findUnique({
-        where: { id: checkinId },
-      });
+      const db = getDb();
+      const checkinDoc = await db.collection(COLLECTIONS.CHECKINS).doc(checkinId).get();
 
-      if (!checkin) {
+      if (!checkinDoc.exists) {
         console.error(`Webhook: Checkin ${checkinId} not found`);
         return res.status(200).json({ received: true });
       }
 
-      // 既にPAID済みならスキップ（callbackで処理済み）
+      const checkin = checkinDoc.data()!;
+
+      // 既にPAID済みならスキップ
       if (checkin.status === 'PAID') {
         return res.status(200).json({ received: true, already_processed: true });
       }
@@ -76,7 +74,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           const startHour = parseInt(checkin.startTime.split(':')[0], 10);
           const endHour = startHour + checkin.duration;
-          const dateStr = checkin.date.toISOString().split('T')[0];
+          const parsedDate = new Date(checkin.date);
+          const dateStr = parsedDate.toISOString().split('T')[0];
 
           const startsAt = `${dateStr}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
           const endsAt = `${dateStr}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
@@ -86,6 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name: `Checkin ${checkinId}`,
             startsAt,
             endsAt,
+            location: checkin.location,
             facilityType: checkin.facilityType,
           });
           pinCode = result.pinCode;
@@ -97,15 +97,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pinCode = generatePinCode();
       }
 
-      // DB更新
-      await prisma.checkin.update({
-        where: { id: checkinId },
-        data: {
-          status: 'PAID',
-          pinCode,
-          paymentId: session.id,
-        },
+      await checkinDoc.ref.update({
+        status: 'PAID',
+        pinCode,
+        paymentId: session.id,
+        updatedAt: new Date().toISOString(),
       });
+
+      // クーポン使用回数を更新
+      if (checkin.couponId) {
+        try {
+          const couponRef = db.collection('coupons').doc(checkin.couponId);
+          const { FieldValue } = await import('firebase-admin/firestore');
+          await couponRef.update({ usedCount: FieldValue.increment(1) });
+
+          await db.collection('couponRedemptions').add({
+            couponId: checkin.couponId,
+            userId: checkin.userId,
+            checkinId,
+            discount: checkin.couponDiscount || 0,
+            createdAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.error('Coupon usage update error:', e);
+        }
+      }
 
       console.log(`Webhook: Checkin ${checkinId} processed successfully`);
     }

@@ -1,46 +1,56 @@
-import { FacilityType } from './api';
+import { FacilityType, LocationId } from './api';
 
-// 料金表（スポット利用のみ）
-export const PRICE_TABLE = {
-  GYM: {
-    WEEKDAY: {
-      DAYTIME: 2750,   // 07:00-17:00
-      EVENING: 2200,   // 17:00-21:00
+// 拠点別料金表（税込）
+export const PRICE_TABLE: Record<LocationId, Record<string, Record<string, Record<string, number>>>> = {
+  ASP: {
+    GYM: {
+      WEEKDAY: {
+        DAYTIME: 2200,   // 08:00-17:00
+        EVENING: 2750,   // 17:00-21:00
+      },
+      WEEKEND: {
+        DAYTIME: 2750,
+        EVENING: 2750,
+      },
     },
-    WEEKEND: {
-      DAYTIME: 2750,   // 07:00-17:00
-      EVENING: 2750,   // 17:00-21:00
+    TRAINING_PRIVATE: {
+      WEEKDAY: { ALLDAY: 2200 },
+      WEEKEND: { ALLDAY: 2200 },
+    },
+    TRAINING_SHARED: {
+      WEEKDAY: { ALLDAY: 550 },
+      WEEKEND: { ALLDAY: 550 },
     },
   },
-  TRAINING: {
-    WEEKDAY: {
-      ALLDAY: 2200,    // 07:00-21:00
-    },
-    WEEKEND: {
-      ALLDAY: 2200,    // 07:00-21:00
+  YABASE: {
+    GYM: {
+      WEEKDAY: {
+        DAYTIME: 1650,   // 07:00-17:00
+        EVENING: 2200,   // 17:00-21:00
+      },
+      WEEKEND: {
+        DAYTIME: 2200,
+        EVENING: 2200,
+      },
     },
   },
-} as const;
+};
 
-// 施設情報
-export const FACILITIES = [
-  {
-    id: 'GYM',
-    name: '体育館',
-    description: 'バスケットボール・バレーボール等',
-    iconName: 'basketball' as const,
-    operatingHours: '07:00 - 21:00',
-  },
-  {
-    id: 'TRAINING',
-    name: 'トレーニングジム',
-    description: 'ウェイトトレーニング・有酸素運動',
-    iconName: 'dumbbell' as const,
-    operatingHours: '07:00 - 21:00',
-  },
-] as const;
+// 拠点別の利用可能時間枠
+export const LOCATION_TIME_SLOTS: Record<LocationId, string[]> = {
+  ASP: [
+    '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+    '19:00', '20:00',
+  ],
+  YABASE: [
+    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+    '19:00', '20:00',
+  ],
+};
 
-// 利用可能時間枠
+// デフォルト時間枠（後方互換）
 export const TIME_SLOTS = [
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
   '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
@@ -61,8 +71,9 @@ export const getTimeSlot = (hour: number): 'DAYTIME' | 'EVENING' => {
   return hour < 17 ? 'DAYTIME' : 'EVENING';
 };
 
-// 料金計算
+// 料金計算（拠点対応）
 export const calculatePrice = (
+  location: LocationId,
   facilityType: FacilityType,
   date: Date,
   startTime: string,
@@ -72,6 +83,13 @@ export const calculatePrice = (
   const dayType = isWeekendDay ? 'WEEKEND' : 'WEEKDAY';
   const startHour = parseInt(startTime.split(':')[0], 10);
 
+  const locationPrices = PRICE_TABLE[location];
+  const facilityPrices = locationPrices?.[facilityType];
+
+  if (!facilityPrices) {
+    throw new Error(`No price table for ${location}/${facilityType}`);
+  }
+
   const breakdown: { hour: number; price: number }[] = [];
   let totalPrice = 0;
 
@@ -79,11 +97,12 @@ export const calculatePrice = (
     const currentHour = startHour + i;
     let price: number;
 
-    if (facilityType === 'TRAINING') {
-      price = PRICE_TABLE.TRAINING[dayType].ALLDAY;
+    const dayPrices = facilityPrices[dayType];
+    if ('ALLDAY' in dayPrices) {
+      price = dayPrices.ALLDAY;
     } else {
       const timeSlot = getTimeSlot(currentHour);
-      price = PRICE_TABLE.GYM[dayType][timeSlot];
+      price = dayPrices[timeSlot];
     }
 
     breakdown.push({ hour: currentHour, price });

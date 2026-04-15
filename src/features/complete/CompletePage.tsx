@@ -2,13 +2,14 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCheckCircle, FiCopy, FiHome, FiAlertTriangle } from 'react-icons/fi';
+import { FiCheckCircle, FiCopy, FiHome, FiAlertTriangle, FiStar } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { checkinApi, Checkin } from '../../lib/api';
-import { FACILITIES, calculateEndTime } from '../../lib/price';
+import { checkinApi, Checkin, LocationId } from '../../lib/api';
+import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
+import { calculateEndTime } from '../../lib/price';
 import { useCheckinStore } from '../../stores/checkinStore';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
@@ -21,6 +22,24 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
       return null;
   }
 };
+
+// 拠点別の入館手順
+function getEntrySteps(location: LocationId, facilityType: string): string[] {
+  if (location === 'YABASE') {
+    return [
+      '施設入口の電子ロックに向かう',
+      '上記の4桁暗証番号を入力',
+      'ロックが解除されたら入館',
+    ];
+  }
+  // ASP: 玄関扉 + 施設別ロック（2段階）
+  const facilityName = facilityType === 'GYM' ? '体育館' : 'トレーニングルーム';
+  return [
+    '玄関扉の電子ロックに暗証番号を入力して入館',
+    `${facilityName}の電子ロックに同じ暗証番号を入力`,
+    'ロックが解除されたらご利用開始',
+  ];
+}
 
 export const CompletePage: React.FC = () => {
   const navigate = useNavigate();
@@ -79,7 +98,11 @@ export const CompletePage: React.FC = () => {
     );
   }
 
-  const facility = FACILITIES.find((f) => f.id === checkin.facilityType);
+  const loc = (checkin.location || 'ASP') as LocationId;
+  const locationName = getLocationName(loc);
+  const facilities = LOCATION_FACILITIES[loc] || [];
+  const facility = facilities.find((f) => f.id === checkin.facilityType);
+  const entrySteps = getEntrySteps(loc, checkin.facilityType);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
@@ -101,10 +124,9 @@ export const CompletePage: React.FC = () => {
 
         {/* 暗証番号カード */}
         <div className="bg-gradient-to-br from-primary-500 via-primary-500 to-primary-400 rounded-2xl p-6 text-white shadow-lg mb-6 animate-fade-in-up relative overflow-hidden" style={{ animationDelay: '0.1s' }}>
-          {/* 装飾的な円 */}
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full"></div>
           <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full"></div>
-          
+
           <p className="text-primary-100 text-sm mb-3 relative">入館用暗証番号</p>
           <div className="flex items-center justify-center gap-3 relative">
             <div className="flex gap-2.5">
@@ -135,11 +157,7 @@ export const CompletePage: React.FC = () => {
             入館方法
           </h3>
           <ol className="space-y-4 text-sm">
-            {[
-              '施設入口の電子ロックに向かう',
-              '上記の4桁暗証番号を入力',
-              'ロックが解除されたら入館',
-            ].map((text, i) => (
+            {entrySteps.map((text, i) => (
               <li key={i} className="flex gap-3 items-start">
                 <span className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-lg flex items-center justify-center text-xs font-bold shadow-sm">
                   {i + 1}
@@ -155,12 +173,19 @@ export const CompletePage: React.FC = () => {
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-xl flex items-center justify-center shadow-sm">
-                <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
+                <FacilityIcon name={facility?.iconName || 'basketball'} className="w-5 h-5" />
               </div>
-              <p className="font-bold text-gray-900">{facility?.name}</p>
+              <div>
+                <p className="text-xs text-primary-400">{locationName}</p>
+                <p className="font-bold text-gray-900">{facility?.name || checkin.facilityType}</p>
+              </div>
             </div>
           </div>
           <div className="p-4 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-400">拠点</span>
+              <span className="font-semibold text-gray-700">{locationName}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-gray-400">利用日</span>
               <span className="font-semibold text-gray-700">
@@ -192,7 +217,14 @@ export const CompletePage: React.FC = () => {
       </main>
 
       {/* 固定フッター */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30 space-y-2">
+        <Button
+          fullWidth
+          onClick={() => navigate(`/review?checkinId=${checkinId}`)}
+        >
+          <FiStar className="w-5 h-5" />
+          レビューを書く
+        </Button>
         <Button variant="secondary" fullWidth onClick={handleBackHome}>
           <FiHome className="w-5 h-5" />
           ホームに戻る

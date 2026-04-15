@@ -1,16 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// 料金表
-const PRICE_TABLE = {
-  GYM: {
-    WEEKDAY: { DAYTIME: 2750, EVENING: 2200 },
-    WEEKEND: { DAYTIME: 2750, EVENING: 2750 },
+// 拠点別料金表
+const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
+  ASP: {
+    GYM: {
+      WEEKDAY: { DAYTIME: 2200, EVENING: 2750 },
+      WEEKEND: { DAYTIME: 2750, EVENING: 2750 },
+    },
+    TRAINING_PRIVATE: {
+      WEEKDAY: { ALLDAY: 2200 },
+      WEEKEND: { ALLDAY: 2200 },
+    },
+    TRAINING_SHARED: {
+      WEEKDAY: { ALLDAY: 550 },
+      WEEKEND: { ALLDAY: 550 },
+    },
   },
-  TRAINING: {
-    WEEKDAY: { ALLDAY: 2200 },
-    WEEKEND: { ALLDAY: 2200 },
+  YABASE: {
+    GYM: {
+      WEEKDAY: { DAYTIME: 1650, EVENING: 2200 },
+      WEEKEND: { DAYTIME: 2200, EVENING: 2200 },
+    },
   },
-} as const;
+};
+
+const VALID_LOCATIONS = ['ASP', 'YABASE'];
+const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
 
 // 曜日判定
 function isWeekend(date: Date): boolean {
@@ -33,15 +48,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { facilityType, date, startTime, duration } = req.body;
+    const { location, facilityType, date, startTime, duration } = req.body;
 
     // バリデーション
     if (!facilityType || !date || !startTime || !duration) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    if (!['GYM', 'TRAINING'].includes(facilityType)) {
+    const loc = location || 'ASP';
+    if (!VALID_LOCATIONS.includes(loc)) {
+      return res.status(400).json({ error: 'Invalid location' });
+    }
+
+    if (!VALID_FACILITY_TYPES.includes(facilityType)) {
       return res.status(400).json({ error: 'Invalid facility type' });
+    }
+
+    const facilityPrices = PRICE_TABLE[loc]?.[facilityType];
+    if (!facilityPrices) {
+      return res.status(400).json({ error: `Facility type ${facilityType} is not available at ${loc}` });
     }
 
     const parsedDate = new Date(date);
@@ -55,11 +80,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const currentHour = startHour + i;
       let price: number;
 
-      if (facilityType === 'TRAINING') {
-        price = PRICE_TABLE.TRAINING[dayType].ALLDAY;
+      const dayPrices = facilityPrices[dayType];
+      if ('ALLDAY' in dayPrices) {
+        price = dayPrices.ALLDAY;
       } else {
         const timeSlot = getTimeSlot(currentHour);
-        price = PRICE_TABLE.GYM[dayType][timeSlot];
+        price = dayPrices[timeSlot];
       }
 
       breakdown.push({ hour: currentHour, price });

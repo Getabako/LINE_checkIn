@@ -56,8 +56,8 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.accessToken;
 }
 
-// 施設タイプに応じて解錠するデバイスIDのリストを取得
-function getDeviceIds(facilityType: string): string[] {
+// 拠点・施設タイプに応じて解錠するデバイスIDのリストを取得
+function getDeviceIds(location: string, facilityType: string): string[] {
   const entranceId = process.env.REMOTELOCK_DEVICE_ID_ENTRANCE;
   const gymId = process.env.REMOTELOCK_DEVICE_ID_GYM;
   const trainingId = process.env.REMOTELOCK_DEVICE_ID_TRAINING;
@@ -65,7 +65,7 @@ function getDeviceIds(facilityType: string): string[] {
 
   const deviceIds: string[] = [];
 
-  if (facilityType === 'YABASE') {
+  if (location === 'YABASE') {
     // 八橋体育館はロック1つのみ
     if (yabaseId) deviceIds.push(yabaseId);
   } else {
@@ -73,7 +73,8 @@ function getDeviceIds(facilityType: string): string[] {
     if (entranceId) deviceIds.push(entranceId);
     if (facilityType === 'GYM' && gymId) {
       deviceIds.push(gymId);
-    } else if (facilityType === 'TRAINING' && trainingId) {
+    } else if ((facilityType === 'TRAINING_PRIVATE' || facilityType === 'TRAINING_SHARED') && trainingId) {
+      // 貸切・相席ともに同じトレーニングルームのロック
       deviceIds.push(trainingId);
     }
   }
@@ -92,10 +93,11 @@ export async function createBooking(params: {
   name: string;
   startsAt: string; // ISO8601 (例: "2026-03-04T09:00:00")
   endsAt: string;
+  location: string;
   facilityType: string;
 }): Promise<BookingResult> {
   const accessToken = await getAccessToken();
-  const deviceIds = getDeviceIds(params.facilityType);
+  const deviceIds = getDeviceIds(params.location, params.facilityType);
 
   if (deviceIds.length === 0) {
     throw new Error('No RemoteLock device IDs configured for this facility type');

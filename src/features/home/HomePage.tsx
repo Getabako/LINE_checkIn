@@ -5,7 +5,8 @@ import { FiClock, FiMapPin } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { FACILITIES } from '../../lib/price';
+import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
+import { PRICE_TABLE } from '../../lib/price';
 import { FacilityType } from '../../lib/api';
 import clsx from 'clsx';
 
@@ -22,11 +23,19 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { facilityType, setFacilityType, reset } = useCheckinStore();
+  const { location, facilityType, setFacilityType } = useCheckinStore();
 
   React.useEffect(() => {
-    reset();
-  }, [reset]);
+    if (!location) {
+      navigate('/');
+    }
+  }, [location, navigate]);
+
+  if (!location) return null;
+
+  const facilities = LOCATION_FACILITIES[location] || [];
+  const locationName = getLocationName(location);
+  const locationPrices = PRICE_TABLE[location];
 
   const handleFacilitySelect = (type: FacilityType) => {
     setFacilityType(type);
@@ -40,7 +49,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-      <Header title="みんなの体育館ASP" />
+      <Header title={locationName} showBack />
 
       <main className="p-4 pb-28">
         {/* ヒーローセクション */}
@@ -58,10 +67,10 @@ export const HomePage: React.FC = () => {
 
         {/* 施設カード */}
         <div className="space-y-4 stagger-children">
-          {FACILITIES.map((facility) => (
+          {facilities.map((facility) => (
             <button
               key={facility.id}
-              onClick={() => handleFacilitySelect(facility.id as FacilityType)}
+              onClick={() => handleFacilitySelect(facility.id)}
               className={clsx(
                 'w-full p-5 rounded-2xl border-2 text-left transition-all duration-300 transform hover:-translate-y-1',
                 facilityType === facility.id
@@ -112,41 +121,63 @@ export const HomePage: React.FC = () => {
           </h3>
 
           <div className="space-y-5">
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
-                  <FaBasketballBall className="w-3.5 h-3.5 text-primary-500" />
-                </div>
-                体育館
-              </h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
-                  <p className="text-gray-400 text-xs mb-1">平日 07:00-17:00</p>
-                  <p className="font-bold text-primary-700">¥2,750<span className="text-xs font-normal text-gray-400">/h</span></p>
-                </div>
-                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
-                  <p className="text-gray-400 text-xs mb-1">平日 17:00-21:00</p>
-                  <p className="font-bold text-primary-700">¥2,200<span className="text-xs font-normal text-gray-400">/h</span></p>
-                </div>
-                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 col-span-2">
-                  <p className="text-gray-400 text-xs mb-1">土日祝（終日）</p>
-                  <p className="font-bold text-primary-700">¥2,750<span className="text-xs font-normal text-gray-400">/h</span></p>
+            {/* 体育館料金 */}
+            {locationPrices.GYM && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
+                    <FaBasketballBall className="w-3.5 h-3.5 text-primary-500" />
+                  </div>
+                  体育館
+                </h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
+                    <p className="text-gray-400 text-xs mb-1">平日 {location === 'ASP' ? '08' : '07'}:00-17:00</p>
+                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
+                  </div>
+                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
+                    <p className="text-gray-400 text-xs mb-1">平日 17:00-21:00</p>
+                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
+                  </div>
+                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 col-span-2">
+                    <p className="text-gray-400 text-xs mb-1">土日祝（終日）</p>
+                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
-                  <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
+            {/* トレーニングルーム（貸切）料金 */}
+            {locationPrices.TRAINING_PRIVATE && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
+                    <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
+                  </div>
+                  トレーニングルーム（貸切）
+                </h4>
+                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 text-sm">
+                  <p className="text-gray-400 text-xs mb-1">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</p>
+                  <p className="font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
                 </div>
-                トレーニングジム
-              </h4>
-              <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 text-sm">
-                <p className="text-gray-400 text-xs mb-1">全日 07:00-21:00</p>
-                <p className="font-bold text-primary-700">¥2,200<span className="text-xs font-normal text-gray-400">/h</span></p>
               </div>
-            </div>
+            )}
+
+            {/* トレーニングルーム（相席）料金 */}
+            {locationPrices.TRAINING_SHARED && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
+                    <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
+                  </div>
+                  トレーニングルーム（相席）
+                </h4>
+                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 text-sm">
+                  <p className="text-gray-400 text-xs mb-1">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</p>
+                  <p className="font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>

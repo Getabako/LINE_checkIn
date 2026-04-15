@@ -6,9 +6,9 @@ import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
+import { LOCATION_FACILITIES } from '../../lib/locations';
 import {
-  TIME_SLOTS,
-  FACILITIES,
+  LOCATION_TIME_SLOTS,
   calculatePrice,
   calculateEndTime,
   getAvailableDurations,
@@ -29,6 +29,7 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 export const CheckinPage: React.FC = () => {
   const navigate = useNavigate();
   const {
+    location,
     facilityType,
     date,
     startTime,
@@ -40,19 +41,19 @@ export const CheckinPage: React.FC = () => {
   } = useCheckinStore();
 
   React.useEffect(() => {
-    if (!facilityType) {
+    if (!location || !facilityType) {
       navigate('/');
     }
-  }, [facilityType, navigate]);
+  }, [location, facilityType, navigate]);
 
   const dateOptions = React.useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => addDays(new Date(), i));
   }, []);
 
   const priceInfo = React.useMemo(() => {
-    if (!facilityType || !date || !startTime) return null;
-    return calculatePrice(facilityType, date, startTime, duration);
-  }, [facilityType, date, startTime, duration]);
+    if (!location || !facilityType || !date || !startTime) return null;
+    return calculatePrice(location, facilityType, date, startTime, duration);
+  }, [location, facilityType, date, startTime, duration]);
 
   const availableDurations = React.useMemo(() => {
     if (!startTime) return [1, 2, 3, 4];
@@ -65,7 +66,7 @@ export const CheckinPage: React.FC = () => {
     }
   }, [startTime, duration, availableDurations, setDuration]);
 
-  const facility = FACILITIES.find((f) => f.id === facilityType);
+  const facility = location ? LOCATION_FACILITIES[location]?.find((f) => f.id === facilityType) : null;
 
   const formatDateLabel = (d: Date) => {
     if (isToday(d)) return '今日';
@@ -132,7 +133,7 @@ export const CheckinPage: React.FC = () => {
             開始時間
           </h3>
           <div className="grid grid-cols-4 gap-2 stagger-children">
-            {TIME_SLOTS.map((time) => (
+            {(location ? LOCATION_TIME_SLOTS[location] : []).map((time) => (
               <button
                 key={time}
                 onClick={() => setStartTime(time)}
