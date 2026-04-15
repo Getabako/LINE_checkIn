@@ -110,6 +110,12 @@ export const PaymentPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
+    // 決済OFFの場合: APIを呼ばず直接完了画面へ
+    if (!paymentEnabled) {
+      navigate(`/complete?mock=true`);
+      return;
+    }
+
     try {
       const response = await api.post<{
         checkoutUrl?: string;
@@ -122,7 +128,6 @@ export const PaymentPage: React.FC = () => {
         startTime,
         duration,
         couponCode: couponCode || undefined,
-        skipPayment: !paymentEnabled,
         skipRemoteLock: !remoteLockEnabled,
       });
 

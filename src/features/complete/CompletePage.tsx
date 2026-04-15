@@ -45,7 +45,9 @@ export const CompletePage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const checkinId = searchParams.get('checkinId');
-  const { reset } = useCheckinStore();
+  const isMock = searchParams.get('mock') === 'true';
+  const store = useCheckinStore();
+  const { reset } = store;
 
   const [checkin, setCheckin] = React.useState<Checkin | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -53,6 +55,24 @@ export const CompletePage: React.FC = () => {
   const [copied, setCopied] = React.useState(false);
 
   React.useEffect(() => {
+    // モックモード: ストアのデータからモックcheckinを作成
+    if (isMock && store.location && store.date && store.startTime) {
+      const mockPin = Math.floor(1000 + Math.random() * 9000).toString();
+      setCheckin({
+        id: 'mock-' + Date.now(),
+        location: store.location,
+        facilityType: store.facilityType || 'GYM',
+        date: store.date.toISOString().split('T')[0],
+        startTime: store.startTime,
+        duration: store.duration,
+        totalPrice: Math.max(0, store.totalPrice - store.couponDiscount - store.memberDiscount),
+        pinCode: mockPin,
+        status: 'PAID',
+      } as Checkin);
+      setIsLoading(false);
+      return;
+    }
+
     if (!checkinId) {
       setError('予約情報が見つかりません');
       setIsLoading(false);
@@ -68,7 +88,7 @@ export const CompletePage: React.FC = () => {
         setError('予約情報が見つかりません');
         setIsLoading(false);
       });
-  }, [checkinId]);
+  }, [checkinId, isMock]);
 
   const handleCopyPin = async () => {
     if (checkin?.pinCode) {
