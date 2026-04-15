@@ -240,7 +240,7 @@ export const CompletePage: React.FC = () => {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30 space-y-2">
         <Button
           fullWidth
-          onClick={() => navigate(`/review?checkinId=${checkinId}`)}
+          onClick={() => navigate(`/review?checkinId=${checkinId || checkin?.id || ''}&mock=${isMock}`)}
         >
           <FiStar className="w-5 h-5" />
           レビューを書く

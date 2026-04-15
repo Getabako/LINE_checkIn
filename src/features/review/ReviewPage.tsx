@@ -11,6 +11,7 @@ export const ReviewPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const checkinId = searchParams.get('checkinId');
+  const isMock = searchParams.get('mock') === 'true';
 
   const [rating, setRating] = React.useState(0);
   const [comment, setComment] = React.useState('');
@@ -21,7 +22,7 @@ export const ReviewPage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!checkinId) {
+    if (isMock || !checkinId) {
       setIsCheckingExisting(false);
       return;
     }
@@ -38,10 +39,18 @@ export const ReviewPage: React.FC = () => {
       .catch(() => {
         setIsCheckingExisting(false);
       });
-  }, [checkinId]);
+  }, [checkinId, isMock]);
 
   const handleSubmit = async () => {
-    if (!checkinId || rating === 0) return;
+    if (rating === 0) return;
+
+    // モックモード: API呼ばず成功扱い
+    if (isMock) {
+      setSubmitted(true);
+      return;
+    }
+
+    if (!checkinId) return;
 
     setIsLoading(true);
     setError(null);
@@ -61,7 +70,7 @@ export const ReviewPage: React.FC = () => {
     return <Loading fullScreen text="読み込み中..." />;
   }
 
-  if (!checkinId) {
+  if (!checkinId && !isMock) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white flex items-center justify-center p-4">
         <div className="text-center">
