@@ -47,50 +47,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // 公開イベント一覧
       if (type === 'events') {
+        // 複合インデックス回避のため isActive のみで取得しメモリでソート
         const snapshot = await db.collection(COLLECTIONS.EVENTS)
           .where('isActive', '==', true)
-          .orderBy('date', 'asc')
           .get();
-        const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const events = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; date?: string }))
+          .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         return res.status(200).json(events);
       }
 
-      // 公開ス���ール一覧
+      // 公開スクール一覧
       if (type === 'schools') {
         const snapshot = await db.collection(COLLECTIONS.SCHOOLS)
           .where('isActive', '==', true)
-          .orderBy('createdAt', 'desc')
           .get();
-        const schools = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const schools = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
         return res.status(200).json(schools);
       }
       const { groupId } = req.query;
 
       // groupIdでフィルタ
       if (groupId && typeof groupId === 'string') {
+        // 複合インデックス回避のため userId のみで取得しメモリで絞り込み＆ソート
         const snapshot = await checkinsRef
           .where('userId', '==', userId)
-          .where('groupId', '==', groupId)
-          .orderBy('date', 'asc')
           .get();
 
-        const checkins = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const checkins = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; groupId?: string; date?: string }))
+          .filter((c) => c.groupId === groupId)
+          .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
         return res.status(200).json(checkins);
       }
 
       const snapshot = await checkinsRef
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
         .get();
 
-      const checkins = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const checkins = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
       return res.status(200).json(checkins);
     }

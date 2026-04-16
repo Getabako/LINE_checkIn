@@ -89,10 +89,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'events' && req.method === 'GET') {
-      const snapshot = await db.collection(COLLECTIONS.EVENTS)
-        .orderBy('date', 'desc')
-        .get();
-      const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await db.collection(COLLECTIONS.EVENTS).get();
+      const events = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; date?: string }))
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
       return res.status(200).json(events);
     }
 
@@ -142,10 +142,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'schools' && req.method === 'GET') {
-      const snapshot = await db.collection(COLLECTIONS.SCHOOLS)
-        .orderBy('createdAt', 'desc')
-        .get();
-      const schools = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await db.collection(COLLECTIONS.SCHOOLS).get();
+      const schools = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(schools);
     }
 
@@ -157,21 +157,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const year = req.query.year as string;
       const groupBy = req.query.groupBy as string;
 
-      let query = db.collection(COLLECTIONS.CHECKINS)
-        .where('status', '==', 'PAID') as FirebaseFirestore.Query;
-
-      if (from) {
-        query = query.where('date', '>=', from);
-      }
-      if (to) {
-        query = query.where('date', '<=', to);
-      }
-      if (year && !from) {
-        query = query.where('date', '>=', `${year}-01-01`).where('date', '<=', `${year}-12-31`);
-      }
+      // 複合インデックス回避のため date 範囲のみでクエリし status はメモリでフィルタ
+      let query = db.collection(COLLECTIONS.CHECKINS) as FirebaseFirestore.Query;
+      const effectiveFrom = from || (year ? `${year}-01-01` : '');
+      const effectiveTo = to || (year ? `${year}-12-31` : '');
+      if (effectiveFrom) query = query.where('date', '>=', effectiveFrom);
+      if (effectiveTo) query = query.where('date', '<=', effectiveTo);
 
       const snapshot = await query.get();
-      const checkins = snapshot.docs.map((doc) => doc.data());
+      const checkins = snapshot.docs
+        .map((doc) => doc.data())
+        .filter((c) => c.status === 'PAID');
 
       // 集計
       const sales: Record<string, { count: number; total: number }> = {};
@@ -270,9 +266,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
       const snapshot = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
         .where('eventId', '==', eventId)
-        .orderBy('createdAt', 'desc')
         .get();
-      const regs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const regs = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(regs);
     }
 
@@ -281,9 +278,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
       const snapshot = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS)
         .where('schoolId', '==', schoolId)
-        .orderBy('createdAt', 'desc')
         .get();
-      const regs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const regs = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(regs);
     }
 
