@@ -156,7 +156,12 @@ export const PaymentPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Payment error:', err);
-      setError('決済処理中にエラーが発生しました。もう一度お試しください。');
+      const msg = err instanceof Error ? err.message : '';
+      if (msg && (msg.includes('既に予約') || msg.includes('定員'))) {
+        setError(msg);
+      } else {
+        setError('決済処理中にエラーが発生しました。もう一度お試しください。');
+      }
       setIsLoading(false);
     }
   };

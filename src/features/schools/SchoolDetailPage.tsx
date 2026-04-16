@@ -1,15 +1,31 @@
 import React from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { FiMapPin, FiUsers, FiClock, FiCheckCircle, FiBook } from 'react-icons/fi';
+import { FiMapPin, FiUsers, FiClock, FiCheckCircle, FiBook, FiCalendar } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { schoolApi, School } from '../../lib/api';
 import { getLocationName } from '../../lib/locations';
+import { buildGoogleCalendarUrl, buildWeeklyRecurRule } from '../../lib/gcal';
 
 const DAY_NAMES: Record<string, string> = {
   MON: '月', TUE: '火', WED: '水', THU: '木', FRI: '金', SAT: '土', SUN: '日',
 };
+
+const DAY_TO_NUM: Record<string, number> = {
+  SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
+};
+
+/** スクールの初回開催日（YYYY-MM-DD）を算出 */
+function resolveFirstSessionDate(school: School): string {
+  const target = DAY_TO_NUM[school.dayOfWeek] ?? 1;
+  const base = school.startDate ? new Date(school.startDate) : new Date();
+  // base 当日が target 曜日なら当日、そうでなければ次の該当曜日
+  const diff = (target - base.getDay() + 7) % 7;
+  const d = new Date(base);
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
 
 export const SchoolDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -76,8 +92,27 @@ export const SchoolDetailPage: React.FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">申込み完了</h2>
             <p className="text-gray-400 text-sm">スクールへの参加登録が完了しました</p>
-            <div className="mt-8">
-              <Button onClick={() => navigate('/')}>ホームに戻る</Button>
+            <div className="mt-8 space-y-2 max-w-xs mx-auto">
+              <Button
+                fullWidth
+                variant="secondary"
+                onClick={() => {
+                  const firstDate = resolveFirstSessionDate(school);
+                  const url = buildGoogleCalendarUrl({
+                    title: school.title,
+                    startJst: `${firstDate}T${school.startTime}:00`,
+                    endJst: `${firstDate}T${school.endTime}:00`,
+                    description: school.description || undefined,
+                    location: getLocationName(school.location),
+                    recur: buildWeeklyRecurRule(school.dayOfWeek, school.totalSessions || 8),
+                  });
+                  window.open(url, '_blank');
+                }}
+              >
+                <FiCalendar className="w-5 h-5" />
+                Googleカレンダーに追加
+              </Button>
+              <Button fullWidth onClick={() => navigate('/')}>ホームに戻る</Button>
             </div>
           </div>
         ) : (

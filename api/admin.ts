@@ -232,6 +232,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ============ 予約一覧（カレンダー用） ============
+    if (action === 'checkins' && req.method === 'GET') {
+      const from = req.query.from as string;
+      const to = req.query.to as string;
+
+      let query = db.collection(COLLECTIONS.CHECKINS)
+        .where('status', 'in', ['PENDING', 'PAID']) as FirebaseFirestore.Query;
+      if (from) query = query.where('date', '>=', from);
+      if (to) query = query.where('date', '<=', to);
+
+      const snapshot = await query.get();
+      const checkins = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Array<Record<string, unknown>>;
+
+      // ユーザー名を付与
+      const userIds = [...new Set(checkins.map((c) => c.userId as string).filter(Boolean))];
+      const userDocs = await Promise.all(
+        userIds.map((id) => db.collection(COLLECTIONS.USERS).doc(id).get())
+      );
+      const userMap = new Map(userDocs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
+
+      const enriched = checkins.map((c) => ({
+        ...c,
+        displayName: userMap.get(c.userId as string)?.displayName || '不明',
+      }));
+
+      return res.status(200).json(enriched);
+    }
+
     // ============ 登録一覧 ============
     if (action === 'eventRegistrations' && req.method === 'GET') {
       const eventId = req.query.eventId as string;

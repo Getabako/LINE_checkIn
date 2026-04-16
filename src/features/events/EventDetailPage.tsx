@@ -8,6 +8,7 @@ import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { eventApi, Event } from '../../lib/api';
 import { getLocationName } from '../../lib/locations';
+import { buildGoogleCalendarUrl } from '../../lib/gcal';
 
 export const EventDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -73,8 +74,25 @@ export const EventDetailPage: React.FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">申込み完了</h2>
             <p className="text-gray-400 text-sm">イベントへの参加登録が完了しました</p>
-            <div className="mt-8">
-              <Button onClick={() => navigate('/')}>ホームに戻る</Button>
+            <div className="mt-8 space-y-2 max-w-xs mx-auto">
+              <Button
+                fullWidth
+                variant="secondary"
+                onClick={() => {
+                  const url = buildGoogleCalendarUrl({
+                    title: event.title,
+                    startJst: `${event.date}T${event.startTime}:00`,
+                    endJst: `${event.date}T${event.endTime}:00`,
+                    description: event.description || undefined,
+                    location: getLocationName(event.location),
+                  });
+                  window.open(url, '_blank');
+                }}
+              >
+                <FiCalendar className="w-5 h-5" />
+                Googleカレンダーに追加
+              </Button>
+              <Button fullWidth onClick={() => navigate('/')}>ホームに戻る</Button>
             </div>
           </div>
         ) : (

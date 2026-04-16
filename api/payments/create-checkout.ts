@@ -157,6 +157,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isMultiDate = allDates.length > 1;
     const groupId = isMultiDate ? crypto.randomUUID() : null;
 
+    // 重複チェック（体育館・貸切トレは同時間帯1組のみ、相席トレは定員内OK）
+    const SHARED_CAPACITY = 10;
+    const newStart = parseInt(startTime.split(':')[0], 10);
+    const newEnd = newStart + duration;
+
+    for (const d of allDates) {
+      const existingSnapshot = await db.collection(COLLECTIONS.CHECKINS)
+        .where('location', '==', location)
+        .where('facilityType', '==', facilityType)
+        .where('date', '==', d)
+        .where('status', 'in', ['PENDING', 'PAID'])
+        .get();
+
+      const overlapping = existingSnapshot.docs.filter((doc) => {
+        const ex = doc.data();
+        const exStart = parseInt(ex.startTime.split(':')[0], 10);
+        const exEnd = exStart + ex.duration;
+        return newStart < exEnd && exStart < newEnd;
+      });
+
+      if (facilityType === 'TRAINING_SHARED') {
+        if (overlapping.length >= SHARED_CAPACITY) {
+          return res.status(409).json({ error: `${d} ${startTime}〜は定員に達しています` });
+        }
+      } else {
+        if (overlapping.length > 0) {
+          return res.status(409).json({ error: `${d} ${startTime}〜は既に予約されています` });
+        }
+      }
+    }
+
     // 各日の料金を計算
     let grandTotalPrice = 0;
     const perDatePrices: { date: string; price: number }[] = [];

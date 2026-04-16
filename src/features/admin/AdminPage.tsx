@@ -1,14 +1,15 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { adminApi, Event, School, SalesData } from '../../lib/api';
+import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
 
-type Tab = 'events' | 'schools' | 'sales';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales';
 
 const DAY_OPTIONS = [
   { value: 'MON', label: '月' },
@@ -342,7 +343,7 @@ const SalesTab: React.FC = () => {
 
 // ============ メインの管理画面 ============
 export const AdminPage: React.FC = () => {
-  const [activeTab, setActiveTab] = React.useState<Tab>('events');
+  const [activeTab, setActiveTab] = React.useState<Tab>('calendar');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
@@ -352,6 +353,7 @@ export const AdminPage: React.FC = () => {
         {/* タブ切り替え */}
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           {([
+            { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
             { key: 'schools', icon: FiBook, label: 'スクール' },
             { key: 'sales', icon: FiBarChart2, label: '売上' },
@@ -360,7 +362,7 @@ export const AdminPage: React.FC = () => {
               key={key}
               onClick={() => setActiveTab(key)}
               className={clsx(
-                'flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5',
+                'flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1',
                 activeTab === key
                   ? 'bg-white text-primary-700 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -372,6 +374,7 @@ export const AdminPage: React.FC = () => {
           ))}
         </div>
 
+        {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'events' && <EventsTab />}
         {activeTab === 'schools' && <SchoolsTab />}
         {activeTab === 'sales' && <SalesTab />}

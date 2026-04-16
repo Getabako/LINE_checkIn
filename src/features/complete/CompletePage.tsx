@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCheckCircle, FiCopy, FiHome, FiAlertTriangle, FiStar, FiFileText, FiLoader } from 'react-icons/fi';
+import { FiCheckCircle, FiCopy, FiHome, FiAlertTriangle, FiStar, FiFileText, FiLoader, FiCalendar } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
@@ -11,6 +11,7 @@ import { checkinApi, Checkin, LocationId } from '../../lib/api';
 import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
 import { calculateEndTime } from '../../lib/price';
 import { useCheckinStore } from '../../stores/checkinStore';
+import { buildGoogleCalendarUrl } from '../../lib/gcal';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
@@ -175,6 +176,20 @@ export const CompletePage: React.FC = () => {
     navigate('/');
   };
 
+  const handleAddToGCal = (c: Checkin) => {
+    const locName = getLocationName((c.location || 'ASP') as LocationId);
+    const fac = (LOCATION_FACILITIES[(c.location || 'ASP') as LocationId] || []).find((f) => f.id === c.facilityType);
+    const endTime = calculateEndTime(c.startTime, c.duration);
+    const url = buildGoogleCalendarUrl({
+      title: `${locName} ${fac?.name || ''}`.trim(),
+      startJst: `${c.date}T${c.startTime}:00`,
+      endJst: `${c.date}T${endTime}:00`,
+      description: c.pinCode ? `入館PIN: ${c.pinCode}` : undefined,
+      location: locName,
+    });
+    window.open(url, '_blank');
+  };
+
   if (isLoading) {
     return <Loading fullScreen text="読み込み中..." />;
   }
@@ -256,6 +271,13 @@ export const CompletePage: React.FC = () => {
                   <FiCopy className="w-3.5 h-3.5" />
                   <span className="font-medium">{copied === c.id ? 'コピーしました！' : 'コピーする'}</span>
                 </button>
+                <button
+                  onClick={() => handleAddToGCal(c)}
+                  className="mt-2 flex items-center justify-center gap-2 w-full py-2 bg-white/15 backdrop-blur-sm rounded-xl hover:bg-white/25 transition-all duration-300 border border-white/10 relative text-sm"
+                >
+                  <FiCalendar className="w-3.5 h-3.5" />
+                  <span className="font-medium">Googleカレンダーに追加</span>
+                </button>
               </div>
             ))}
           </div>
@@ -285,6 +307,13 @@ export const CompletePage: React.FC = () => {
             >
               <FiCopy className="w-4 h-4" />
               <span className="text-sm font-medium">{copied === checkin.id ? 'コピーしました！' : 'コピーする'}</span>
+            </button>
+            <button
+              onClick={() => handleAddToGCal(checkin)}
+              className="mt-2 flex items-center justify-center gap-2 w-full py-2.5 bg-white/15 backdrop-blur-sm rounded-xl hover:bg-white/25 transition-all duration-300 border border-white/10 relative"
+            >
+              <FiCalendar className="w-4 h-4" />
+              <span className="text-sm font-medium">Googleカレンダーに追加</span>
             </button>
           </div>
         )}

@@ -307,4 +307,13 @@ export const adminApi = {
 
   // 領収書
   generateReceipt: (checkinId: string) => api.post<{ pdf: string }>('/admin?action=receipt', { checkinId }),
+
+  // 予約一覧（カレンダー用）
+  getCheckins: (params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams();
+    qs.set('action', 'checkins');
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    return api.get<Array<Checkin & { displayName?: string; userId?: string }>>(`/admin?${qs.toString()}`);
+  },
 };
