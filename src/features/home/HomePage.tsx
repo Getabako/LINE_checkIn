@@ -141,7 +141,7 @@ export const HomePage: React.FC = () => {
                   <tbody>
                     <tr>
                       <td className="px-3 py-2 border border-sky-100 text-gray-700">平日</td>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">{location === 'ASP' ? '08' : '07'}:00-17:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">07:00-17:00</td>
                       <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
                     </tr>
                     <tr className="bg-gray-50/50">
@@ -177,7 +177,7 @@ export const HomePage: React.FC = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 07:00-21:00</td>
                       <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
                     </tr>
                   </tbody>
@@ -203,7 +203,7 @@ export const HomePage: React.FC = () => {
                   </thead>
                   <tbody>
                     <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 07:00-21:00</td>
                       <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/人</span></td>
                     </tr>
                   </tbody>
