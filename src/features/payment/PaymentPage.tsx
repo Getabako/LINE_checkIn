@@ -111,14 +111,9 @@ export const PaymentPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
 
-    // 決済OFFの場合: APIを呼ばず直接完了画面へ
-    if (!paymentEnabled) {
-      navigate(`/complete?mock=true`);
-      return;
-    }
-
     try {
       const isMulti = multiDateMode && dates.length > 0;
+      // Pay=OFF のときは skipPayment=true で Stripe を呼ばずに Firestore へ PAID 保存（テスト用）
       const payload: Record<string, unknown> = {
         location,
         facilityType,
@@ -127,6 +122,7 @@ export const PaymentPage: React.FC = () => {
         duration,
         couponCode: couponCode || undefined,
         skipRemoteLock: !remoteLockEnabled,
+        skipPayment: !paymentEnabled,
       };
 
       if (isMulti) {
