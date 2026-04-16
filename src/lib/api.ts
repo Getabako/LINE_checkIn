@@ -316,4 +316,21 @@ export const adminApi = {
     if (params?.to) qs.set('to', params.to);
     return api.get<Array<Checkin & { displayName?: string; userId?: string }>>(`/admin?${qs.toString()}`);
   },
+
+  // 予約登録（管理者）
+  createCheckin: (data: {
+    location: LocationId;
+    facilityType: FacilityType;
+    date: string;
+    startTime: string;
+    duration: number;
+    totalPrice?: number;
+    userId?: string;
+    displayName?: string;
+    skipRemoteLock?: boolean;
+  }) => api.post<Checkin>('/admin?action=createCheckin', data),
+
+  // 予約削除（管理者）
+  deleteCheckin: (checkinId: string) =>
+    api.delete<void>(`/admin?action=deleteCheckin&checkinId=${checkinId}`),
 };

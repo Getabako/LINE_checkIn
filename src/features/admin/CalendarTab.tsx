@@ -1,8 +1,9 @@
 import React from 'react';
-import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import { adminApi, Checkin, Event, School, LocationId } from '../../lib/api';
+import { FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { adminApi, Checkin, Event, School, LocationId, FacilityType } from '../../lib/api';
 import { Loading } from '../../components/common/Loading';
-import { getLocationName } from '../../lib/locations';
+import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
+import { calculatePrice, calculateEndTime, LOCATION_TIME_SLOTS, getAvailableDurations } from '../../lib/price';
 import clsx from 'clsx';
 
 type CheckinItem = Checkin & { displayName?: string };
@@ -70,6 +71,219 @@ function expandSchoolToDates(school: School, mStart: Date, mEnd: Date): string[]
   return dates;
 }
 
+// ================== 予約追加モーダル ==================
+interface CreateCheckinModalProps {
+  defaultDate: string;
+  onClose: () => void;
+  onCreated: () => void;
+}
+
+const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, onClose, onCreated }) => {
+  const [location, setLocation] = React.useState<LocationId>('ASP');
+  const [facilityType, setFacilityType] = React.useState<FacilityType>('GYM');
+  const [date, setDate] = React.useState(defaultDate);
+  const [startTime, setStartTime] = React.useState('10:00');
+  const [duration, setDuration] = React.useState(1);
+  const [displayName, setDisplayName] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const availableFacilities = LOCATION_FACILITIES[location];
+  const timeSlots = LOCATION_TIME_SLOTS[location];
+  const availableDurations = getAvailableDurations(startTime);
+
+  // 拠点変更時、facility を有効なものに自動調整
+  React.useEffect(() => {
+    if (!availableFacilities.some((f) => f.id === facilityType)) {
+      setFacilityType(availableFacilities[0].id);
+    }
+  }, [location, availableFacilities, facilityType]);
+
+  // 開始時刻変更で duration が無効になったら調整
+  React.useEffect(() => {
+    if (!availableDurations.includes(duration) && availableDurations.length > 0) {
+      setDuration(availableDurations[0]);
+    }
+  }, [startTime, availableDurations, duration]);
+
+  // 料金プレビュー
+  const totalPrice = React.useMemo(() => {
+    try {
+      const d = new Date(date);
+      return calculatePrice(location, facilityType, d, startTime, duration).totalPrice;
+    } catch {
+      return 0;
+    }
+  }, [location, facilityType, date, startTime, duration]);
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await adminApi.createCheckin({
+        location,
+        facilityType,
+        date,
+        startTime,
+        duration,
+        totalPrice,
+        displayName: displayName.trim() || undefined,
+        skipRemoteLock: true,
+      });
+      onCreated();
+      onClose();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '予約作成に失敗しました';
+      setError(msg);
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-900">予約を追加</h3>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+            <FiX className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* 拠点 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">拠点</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['ASP', 'YABASE'] as LocationId[]).map((loc) => (
+                <button
+                  key={loc}
+                  onClick={() => setLocation(loc)}
+                  className={clsx(
+                    'py-2 rounded-lg text-sm font-semibold border-2',
+                    location === loc
+                      ? 'bg-primary-50 border-primary-500 text-primary-700'
+                      : 'bg-white border-gray-200 text-gray-600',
+                  )}
+                >
+                  {getLocationName(loc)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 施設 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">施設</label>
+            <select
+              value={facilityType}
+              onChange={(e) => setFacilityType(e.target.value as FacilityType)}
+              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+            >
+              {availableFacilities.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 日付 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">日付</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+            />
+          </div>
+
+          {/* 開始時刻 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">開始時刻</label>
+            <select
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+            >
+              {timeSlots.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 利用時間 */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">利用時間</label>
+            <div className="grid grid-cols-4 gap-2">
+              {availableDurations.map((h) => (
+                <button
+                  key={h}
+                  onClick={() => setDuration(h)}
+                  className={clsx(
+                    'py-2 rounded-lg text-sm font-semibold border-2',
+                    duration === h
+                      ? 'bg-primary-50 border-primary-500 text-primary-700'
+                      : 'bg-white border-gray-200 text-gray-600',
+                  )}
+                >
+                  {h}h
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              {startTime}〜{calculateEndTime(startTime, duration)}
+            </p>
+          </div>
+
+          {/* 利用者名（任意） */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">
+              利用者名（任意：既存ユーザーの displayName で紐付け）
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="未入力の場合は管理者名義"
+              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+            />
+          </div>
+
+          {/* 料金 */}
+          <div className="p-3 bg-gradient-to-r from-sky-50 to-primary-50 rounded-lg border border-primary-100">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">料金</span>
+              <span className="text-xl font-bold text-primary-700">¥{totalPrice.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white p-4 border-t border-gray-100 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg border-2 border-gray-200 text-gray-600 font-semibold text-sm"
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 rounded-lg bg-gradient-to-r from-primary-500 to-primary-400 text-white font-semibold text-sm disabled:opacity-50"
+          >
+            {isSubmitting ? '作成中...' : '予約を登録'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ================== メインコンポーネント ==================
 export const CalendarTab: React.FC = () => {
   const today = new Date();
   const [year, setYear] = React.useState(today.getFullYear());
@@ -80,14 +294,15 @@ export const CalendarTab: React.FC = () => {
   const [events, setEvents] = React.useState<Event[]>([]);
   const [schools, setSchools] = React.useState<School[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [showCreateModal, setShowCreateModal] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const mStart = monthStart(year, month);
   const mEnd = monthEnd(year, month);
   const grid = buildMonthGrid(year, month);
 
-  React.useEffect(() => {
+  const loadData = React.useCallback(() => {
     setIsLoading(true);
-    setSelectedDate(null);
     const from = ymd(mStart);
     const to = ymd(mEnd);
     Promise.all([
@@ -101,7 +316,26 @@ export const CalendarTab: React.FC = () => {
         setSchools(s);
       })
       .finally(() => setIsLoading(false));
+  }, [mStart, mEnd]);
+
+  React.useEffect(() => {
+    setSelectedDate(null);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('この予約を削除しますか？')) return;
+    setDeletingId(id);
+    try {
+      await adminApi.deleteCheckin(id);
+      setCheckins((prev) => prev.filter((c) => c.id !== id));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '削除に失敗しました');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   /** 日付ごとのアイテム集約 */
   const itemsByDate = React.useMemo(() => {
@@ -173,17 +407,26 @@ export const CalendarTab: React.FC = () => {
         </button>
       </div>
 
-      {/* 凡例 */}
-      <div className="flex gap-3 text-xs">
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-blue-400" />予約
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-orange-400" />イベント
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-green-400" />スクール
-        </span>
+      {/* 凡例 + 追加ボタン */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-3 text-xs">
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-blue-400" />予約
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-orange-400" />イベント
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-3 h-3 rounded bg-green-400" />スクール
+          </span>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary-500 to-primary-400 text-white text-xs font-semibold shadow-sm"
+        >
+          <FiPlus className="w-3.5 h-3.5" />
+          予約を追加
+        </button>
       </div>
 
       {/* カレンダー本体 */}
@@ -269,33 +512,50 @@ export const CalendarTab: React.FC = () => {
       </div>
 
       {/* 選択日の詳細 */}
-      {selectedDate && selected && (
+      {selectedDate && (
         <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
-          <h3 className="font-bold text-gray-900 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full" />
-            {selectedDate} の予定
-          </h3>
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full" />
+              {selectedDate} の予定
+            </h3>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 text-xs font-semibold hover:bg-primary-100"
+            >
+              <FiPlus className="w-3 h-3" />
+              この日に追加
+            </button>
+          </div>
 
-          {selected.checkins.length === 0 && selected.events.length === 0 && selected.schools.length === 0 && (
+          {(!selected || (selected.checkins.length === 0 && selected.events.length === 0 && selected.schools.length === 0)) && (
             <p className="text-center text-gray-400 py-4 text-sm">この日は予定がありません</p>
           )}
 
-          {selected.checkins.length > 0 && (
+          {selected && selected.checkins.length > 0 && (
             <div>
               <p className="text-xs font-bold text-blue-600 mb-1">予約 ({selected.checkins.length}件)</p>
               <div className="space-y-1">
                 {selected.checkins.map((c) => (
                   <div key={c.id} className="text-sm bg-blue-50 rounded-lg p-2 border border-blue-100">
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-blue-800">
-                        {c.startTime}〜 {getLocationName((c.location || 'ASP') as LocationId)} / {c.facilityType}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {c.status === 'PENDING' ? '未決済' : '決済済'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-600 mt-0.5">
-                      {c.displayName || ''} ({c.duration}h)
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <div className="font-semibold text-blue-800">
+                          {c.startTime}〜 {getLocationName((c.location || 'ASP') as LocationId)} / {c.facilityType}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          {c.displayName || ''} ({c.duration}h) · {c.status === 'PENDING' ? '未決済' : '決済済'}
+                          {c.pinCode && <span className="ml-2 font-mono">PIN: {c.pinCode}</span>}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDelete(c.id)}
+                        disabled={deletingId === c.id}
+                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                        title="削除"
+                      >
+                        <FiTrash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -303,7 +563,7 @@ export const CalendarTab: React.FC = () => {
             </div>
           )}
 
-          {selected.events.length > 0 && (
+          {selected && selected.events.length > 0 && (
             <div>
               <p className="text-xs font-bold text-orange-600 mb-1">イベント ({selected.events.length}件)</p>
               <div className="space-y-1">
@@ -319,7 +579,7 @@ export const CalendarTab: React.FC = () => {
             </div>
           )}
 
-          {selected.schools.length > 0 && (
+          {selected && selected.schools.length > 0 && (
             <div>
               <p className="text-xs font-bold text-green-600 mb-1">スクール ({selected.schools.length}件)</p>
               <div className="space-y-1">
@@ -335,6 +595,15 @@ export const CalendarTab: React.FC = () => {
             </div>
           )}
         </div>
+      )}
+
+      {/* 予約作成モーダル */}
+      {showCreateModal && (
+        <CreateCheckinModal
+          defaultDate={selectedDate || ymd(today)}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={loadData}
+        />
       )}
     </div>
   );

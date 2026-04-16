@@ -228,6 +228,114 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ============ 予約作成（管理者） ============
+    if (action === 'createCheckin' && req.method === 'POST') {
+      const { location, facilityType, date, startTime, duration, totalPrice, userId, displayName, skipRemoteLock } = req.body;
+      if (!location || !facilityType || !date || !startTime || !duration) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // 重複チェック（TRAINING_SHARED は定員 10 まで OK）
+      const SHARED_CAPACITY = 10;
+      const newStart = parseInt(String(startTime).split(':')[0], 10);
+      const newEnd = newStart + Number(duration);
+      const existingSnapshot = await db.collection(COLLECTIONS.CHECKINS)
+        .where('date', '==', date)
+        .get();
+      const overlapping = existingSnapshot.docs.filter((doc) => {
+        const ex = doc.data();
+        if (ex.location !== location) return false;
+        if (ex.facilityType !== facilityType) return false;
+        if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
+        const exStart = parseInt(String(ex.startTime).split(':')[0], 10);
+        const exEnd = exStart + (ex.duration || 0);
+        return newStart < exEnd && exStart < newEnd;
+      });
+      if (facilityType === 'TRAINING_SHARED') {
+        if (overlapping.length >= SHARED_CAPACITY) {
+          return res.status(409).json({ error: `${date} ${startTime}〜は定員に達しています` });
+        }
+      } else {
+        if (overlapping.length > 0) {
+          return res.status(409).json({ error: `${date} ${startTime}〜は既に予約されています` });
+        }
+      }
+
+      // ユーザー解決（未指定なら管理者自身の userId を使う）
+      let targetUserId: string = userId || admin.userId;
+      if (!userId && displayName) {
+        // displayName が指定されている場合、マッチするユーザーを探す
+        const userSnap = await db.collection(COLLECTIONS.USERS)
+          .where('displayName', '==', displayName)
+          .limit(1)
+          .get();
+        if (!userSnap.empty) targetUserId = userSnap.docs[0].id;
+      }
+
+      // PIN コード生成（RemoteLock は管理者予約ではスキップ推奨）
+      let pinCode: string = Math.floor(1000 + Math.random() * 9000).toString();
+      if (!skipRemoteLock) {
+        try {
+          const { createBooking, isRemoteLockConfigured } = await import('../server-lib/remotelock.js');
+          if (isRemoteLockConfigured()) {
+            const startHour = newStart;
+            const endHour = startHour + Number(duration);
+            const startsAt = `${date}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
+            const endsAt = `${date}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
+            const now2 = new Date().toISOString();
+            // 仮ID付きで先に作成してから update する戦略だと煩雑なので、ID なしで name を付ける
+            const result = await createBooking({
+              checkinId: `admin-${now2}`,
+              name: `AdminCheckin ${date} ${startTime}`,
+              startsAt,
+              endsAt,
+              location,
+              facilityType,
+            });
+            pinCode = result.pinCode;
+          }
+        } catch (e) {
+          console.error('RemoteLock error (admin createCheckin):', e);
+        }
+      }
+
+      const now = new Date().toISOString();
+      const checkinData = {
+        userId: targetUserId,
+        location,
+        facilityType,
+        date,
+        startTime,
+        duration: Number(duration),
+        totalPrice: Number(totalPrice) || 0,
+        originalPrice: Number(totalPrice) || 0,
+        memberDiscount: 0,
+        memberTypeName: null,
+        couponCode: null,
+        couponId: null,
+        couponDiscount: 0,
+        pinCode,
+        status: 'PAID',
+        paymentId: null,
+        skipRemoteLock: skipRemoteLock || false,
+        groupId: null,
+        recurringType: null,
+        createdByAdmin: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
+      return res.status(201).json({ id: ref.id, ...checkinData });
+    }
+
+    // ============ 予約削除（管理者） ============
+    if (action === 'deleteCheckin' && req.method === 'DELETE') {
+      const checkinId = req.query.checkinId as string;
+      if (!checkinId) return res.status(400).json({ error: 'Missing checkinId' });
+      await db.collection(COLLECTIONS.CHECKINS).doc(checkinId).delete();
+      return res.status(200).json({ message: 'Deleted' });
+    }
+
     // ============ 予約一覧（カレンダー用） ============
     if (action === 'checkins' && req.method === 'GET') {
       const from = req.query.from as string;
