@@ -237,13 +237,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const from = req.query.from as string;
       const to = req.query.to as string;
 
-      let query = db.collection(COLLECTIONS.CHECKINS)
-        .where('status', 'in', ['PENDING', 'PAID']) as FirebaseFirestore.Query;
+      // 複合インデックス回避のため date 範囲のみでクエリし、status はメモリ側でフィルタ
+      let query = db.collection(COLLECTIONS.CHECKINS) as FirebaseFirestore.Query;
       if (from) query = query.where('date', '>=', from);
       if (to) query = query.where('date', '<=', to);
 
       const snapshot = await query.get();
-      const checkins = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Array<Record<string, unknown>>;
+      const allCheckins = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Array<Record<string, unknown>>;
+
+      const checkins = allCheckins.filter((c) =>
+        c.status === 'PENDING' || c.status === 'PAID'
+      );
 
       // ユーザー名を付与
       const userIds = [...new Set(checkins.map((c) => c.userId as string).filter(Boolean))];

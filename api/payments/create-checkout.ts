@@ -158,22 +158,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const groupId = isMultiDate ? crypto.randomUUID() : null;
 
     // 重複チェック（体育館・貸切トレは同時間帯1組のみ、相席トレは定員内OK）
+    // 複合インデックス回避のため date のみでクエリし、他条件はメモリ側でフィルタ
     const SHARED_CAPACITY = 10;
     const newStart = parseInt(startTime.split(':')[0], 10);
     const newEnd = newStart + duration;
 
     for (const d of allDates) {
       const existingSnapshot = await db.collection(COLLECTIONS.CHECKINS)
-        .where('location', '==', location)
-        .where('facilityType', '==', facilityType)
         .where('date', '==', d)
-        .where('status', 'in', ['PENDING', 'PAID'])
         .get();
 
       const overlapping = existingSnapshot.docs.filter((doc) => {
         const ex = doc.data();
+        if (ex.location !== location) return false;
+        if (ex.facilityType !== facilityType) return false;
+        if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
         const exStart = parseInt(ex.startTime.split(':')[0], 10);
-        const exEnd = exStart + ex.duration;
+        const exEnd = exStart + (ex.duration || 0);
         return newStart < exEnd && exStart < newEnd;
       });
 

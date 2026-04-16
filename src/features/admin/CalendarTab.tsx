@@ -91,9 +91,9 @@ export const CalendarTab: React.FC = () => {
     const from = ymd(mStart);
     const to = ymd(mEnd);
     Promise.all([
-      adminApi.getCheckins({ from, to }).catch(() => []),
-      adminApi.getEvents().catch(() => []),
-      adminApi.getSchools().catch(() => []),
+      adminApi.getCheckins({ from, to }).catch((e) => { console.error('getCheckins failed', e); return []; }),
+      adminApi.getEvents().catch((e) => { console.error('getEvents failed', e); return []; }),
+      adminApi.getSchools().catch((e) => { console.error('getSchools failed', e); return []; }),
     ])
       .then(([c, e, s]) => {
         setCheckins(c);
