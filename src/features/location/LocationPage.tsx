@@ -1,20 +1,30 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiMapPin, FiCalendar, FiBook, FiSettings } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiBook, FiSettings, FiClock, FiUsers } from 'react-icons/fi';
+import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { LOCATIONS } from '../../lib/locations';
-import { LocationId } from '../../lib/api';
+import { LOCATIONS, getLocationName } from '../../lib/locations';
+import { LocationId, Event, School, eventApi, schoolApi } from '../../lib/api';
 import clsx from 'clsx';
 
 export const LocationPage: React.FC = () => {
   const navigate = useNavigate();
   const { location, setLocation, reset } = useCheckinStore();
+  const [events, setEvents] = React.useState<Event[]>([]);
+  const [schools, setSchools] = React.useState<School[]>([]);
 
   React.useEffect(() => {
     reset();
   }, [reset]);
+
+  React.useEffect(() => {
+    // イベント・スクール一覧を取得（失敗しても無視）
+    eventApi.getAll().then(setEvents).catch(() => setEvents([]));
+    schoolApi.getAll().then(setSchools).catch(() => setSchools([]));
+  }, []);
 
   const handleLocationSelect = (id: LocationId) => {
     setLocation(id);
@@ -25,6 +35,13 @@ export const LocationPage: React.FC = () => {
       navigate('/facility');
     }
   };
+
+  const upcomingEvents = events
+    .filter((e) => e.isActive && new Date(e.date) >= new Date(new Date().setHours(0, 0, 0, 0)))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 3);
+
+  const activeSchools = schools.filter((s) => s.isActive).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
@@ -89,30 +106,108 @@ export const LocationPage: React.FC = () => {
           ))}
         </div>
 
-        {/* イベント・スクール・管理画面リンク */}
-        <div className="mt-8 space-y-3 stagger-children">
-          <h3 className="font-bold text-primary-800 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            その他
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigate('/events')}
-              className="p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
-            >
-              <FiCalendar className="w-6 h-6 text-primary-500 mb-2" />
-              <p className="font-bold text-gray-900 text-sm">イベント</p>
-              <p className="text-xs text-gray-400">開催予定をチェック</p>
-            </button>
-            <button
-              onClick={() => navigate('/schools')}
-              className="p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5"
-            >
-              <FiBook className="w-6 h-6 text-primary-500 mb-2" />
-              <p className="font-bold text-gray-900 text-sm">スクール</p>
-              <p className="text-xs text-gray-400">定期レッスン</p>
-            </button>
+        {/* 開催予定のイベント */}
+        {upcomingEvents.length > 0 && (
+          <div className="mt-8 space-y-3 stagger-children">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-primary-800 flex items-center gap-2">
+                <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+                開催予定のイベント
+              </h3>
+              <button
+                onClick={() => navigate('/events')}
+                className="text-xs text-primary-500 font-semibold"
+              >
+                すべて見る →
+              </button>
+            </div>
+            <div className="space-y-2">
+              {upcomingEvents.map((event) => (
+                <button
+                  key={event.id}
+                  onClick={() => navigate(`/events/${event.id}`)}
+                  className="w-full p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm text-white">
+                      <FiCalendar className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{event.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {format(new Date(event.date), 'M/d(E)', { locale: ja })} {event.startTime}〜{event.endTime}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <FiMapPin className="w-3 h-3" />
+                          {getLocationName(event.location)}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <FiUsers className="w-3 h-3" />
+                          {event.currentCount}/{event.capacity}
+                        </span>
+                        <span className="font-bold text-primary-600">¥{event.price.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+
+        {/* スクール */}
+        {activeSchools.length > 0 && (
+          <div className="mt-6 space-y-3 stagger-children">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-primary-800 flex items-center gap-2">
+                <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+                開講中のスクール
+              </h3>
+              <button
+                onClick={() => navigate('/schools')}
+                className="text-xs text-primary-500 font-semibold"
+              >
+                すべて見る →
+              </button>
+            </div>
+            <div className="space-y-2">
+              {activeSchools.map((school) => (
+                <button
+                  key={school.id}
+                  onClick={() => navigate(`/schools/${school.id}`)}
+                  className="w-full p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-400 rounded-xl flex items-center justify-center shadow-sm text-white">
+                      <FiBook className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 text-sm truncate">{school.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        毎週{school.dayOfWeek}曜 {school.startTime}〜{school.endTime}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1">
+                          <FiMapPin className="w-3 h-3" />
+                          {getLocationName(school.location)}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <FiClock className="w-3 h-3" />
+                          全{school.totalSessions}回
+                        </span>
+                        <span className="font-bold text-primary-600">¥{school.pricePerSession.toLocaleString()}/回</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 管理画面リンク */}
+        <div className="mt-8">
           <button
             onClick={() => navigate('/admin')}
             className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-left flex items-center gap-3 hover:bg-gray-100 transition-colors"

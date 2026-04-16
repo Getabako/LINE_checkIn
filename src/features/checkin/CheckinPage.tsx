@@ -239,91 +239,115 @@ export const CheckinPage: React.FC = () => {
           </section>
         )}
 
-        {/* 日付選択 */}
-        <section className="mb-6 animate-fade-in-up">
-          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
+        {/* 日時選択セクション（まとめてスッキリ） */}
+        <section className="mb-6 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up">
+          <h3 className="font-bold text-primary-800 mb-4 flex items-center gap-2">
             <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            {multiDateMode && !recurringType ? '利用日（複数選択可）' : '利用日'}
+            日時選択
           </h3>
-          <div className="flex gap-2 overflow-x-auto pb-2 stagger-children">
-            {dateOptions.map((d) => (
-              <button
-                key={d.toISOString()}
-                onClick={() => handleDateClick(d)}
-                className={clsx(
-                  'flex-shrink-0 px-4 py-3 rounded-xl border-2 text-center min-w-[80px] transition-all duration-300 transform hover:-translate-y-0.5 relative',
-                  isDateSelected(d)
-                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
-                    : 'border-gray-100 bg-white text-gray-700 shadow-sm hover:border-primary-200 hover:shadow-card'
-                )}
-              >
-                {isDateSelected(d) && multiDateMode && (
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
-                    <FiCheck className="w-3 h-3 text-white" />
-                  </div>
-                )}
-                <p className="text-sm font-bold">{formatDateLabel(d)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {format(d, 'M/d', { locale: ja })}
-                </p>
-              </button>
-            ))}
-          </div>
-          {multiDateMode && dates.length > 0 && (
-            <p className="text-sm text-primary-500 mt-2 font-semibold">
-              {dates.length}日分を選択中
-            </p>
+
+          {/* 単日モード: 日付はドロップダウン */}
+          {!multiDateMode && (
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-600 mb-2">利用日</label>
+              <div className="relative">
+                <select
+                  value={date ? date.toISOString() : ''}
+                  onChange={(e) => setDate(new Date(e.target.value))}
+                  className="w-full px-4 py-3 pr-10 rounded-xl border-2 border-gray-100 bg-white text-gray-800 text-sm font-semibold appearance-none focus:border-primary-500 focus:outline-none shadow-sm"
+                >
+                  <option value="">日付を選択してください</option>
+                  {dateOptions.map((d) => (
+                    <option key={d.toISOString()} value={d.toISOString()}>
+                      {formatDateLabel(d)}（{format(d, 'M/d', { locale: ja })}）
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400">
+                  <FiCalendar className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
           )}
-        </section>
 
-        {/* 開始時間選択 */}
-        <section className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            開始時間
-          </h3>
-          <div className="grid grid-cols-4 gap-2 stagger-children">
-            {(location ? LOCATION_TIME_SLOTS[location] : []).map((time) => (
-              <button
-                key={time}
-                onClick={() => setStartTime(time)}
-                className={clsx(
-                  'py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 transform hover:-translate-y-0.5',
-                  startTime === time
-                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
-                    : 'border-gray-100 bg-white text-gray-600 shadow-sm hover:border-primary-200 hover:shadow-card'
-                )}
-              >
-                {time}
-              </button>
-            ))}
-          </div>
-        </section>
+          {/* 複数日モード: カレンダーグリッド */}
+          {multiDateMode && (
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-600 mb-2">
+                {recurringType ? '基準日を選択' : '利用日（複数選択可）'}
+              </label>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {dateOptions.map((d) => (
+                  <button
+                    key={d.toISOString()}
+                    onClick={() => handleDateClick(d)}
+                    className={clsx(
+                      'flex-shrink-0 px-3 py-2 rounded-lg border-2 text-center min-w-[72px] transition-all relative',
+                      isDateSelected(d)
+                        ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-sm'
+                        : 'border-gray-100 bg-white text-gray-700 hover:border-primary-200'
+                    )}
+                  >
+                    {isDateSelected(d) && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
+                        <FiCheck className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    )}
+                    <p className="text-xs font-bold">{formatDateLabel(d)}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {format(d, 'M/d', { locale: ja })}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              {dates.length > 0 && (
+                <p className="text-sm text-primary-500 mt-2 font-semibold">
+                  {dates.length}日分を選択中
+                </p>
+              )}
+            </div>
+          )}
 
-        {/* 利用時間選択 */}
-        <section className="mb-6 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            利用時間
-          </h3>
-          <div className="flex gap-2">
-            {availableDurations.map((d) => (
-              <button
-                key={d}
-                onClick={() => setDuration(d)}
-                className={clsx(
-                  'flex-1 py-3 rounded-xl border-2 text-sm font-semibold transition-all duration-300 transform hover:-translate-y-0.5',
-                  duration === d
-                    ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
-                    : 'border-gray-100 bg-white text-gray-600 shadow-sm hover:border-primary-200 hover:shadow-card'
-                )}
-              >
-                {d}時間
-              </button>
-            ))}
+          {/* 開始時間・利用時間を横並びに */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">開始時間</label>
+              <div className="relative">
+                <select
+                  value={startTime || ''}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full px-4 py-3 pr-10 rounded-xl border-2 border-gray-100 bg-white text-gray-800 text-sm font-semibold appearance-none focus:border-primary-500 focus:outline-none shadow-sm"
+                >
+                  <option value="">選択</option>
+                  {(location ? LOCATION_TIME_SLOTS[location] : []).map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400 text-xs">▼</div>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-2">利用時間</label>
+              <div className="relative">
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-full px-4 py-3 pr-10 rounded-xl border-2 border-gray-100 bg-white text-gray-800 text-sm font-semibold appearance-none focus:border-primary-500 focus:outline-none shadow-sm"
+                >
+                  {availableDurations.map((d) => (
+                    <option key={d} value={d}>
+                      {d}時間
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400 text-xs">▼</div>
+              </div>
+            </div>
           </div>
           {startTime && (
-            <p className="text-sm text-primary-400 mt-2 ml-1">
+            <p className="text-sm text-primary-500 mt-3 font-semibold text-center">
               {startTime} 〜 {calculateEndTime(startTime, duration)}
             </p>
           )}

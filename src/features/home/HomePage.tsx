@@ -120,62 +120,94 @@ export const HomePage: React.FC = () => {
             料金表（税込）
           </h3>
 
-          <div className="space-y-5">
+          <div className="space-y-6">
             {/* 体育館料金 */}
             {locationPrices.GYM && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
                     <FaBasketballBall className="w-3.5 h-3.5 text-primary-500" />
                   </div>
                   体育館
                 </h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
-                    <p className="text-gray-400 text-xs mb-1">平日 {location === 'ASP' ? '08' : '07'}:00-17:00</p>
-                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
-                  </div>
-                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100">
-                    <p className="text-gray-400 text-xs mb-1">平日 17:00-21:00</p>
-                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
-                  </div>
-                  <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 col-span-2">
-                    <p className="text-gray-400 text-xs mb-1">土日祝（終日）</p>
-                    <p className="font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
-                  </div>
-                </div>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-sky-50 text-gray-600">
+                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">区分</th>
+                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
+                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-700">平日</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">{location === 'ASP' ? '08' : '07'}:00-17:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                    </tr>
+                    <tr className="bg-gray-50/50">
+                      <td className="px-3 py-2 border border-sky-100 text-gray-700">平日</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">17:00-21:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                    </tr>
+                    <tr>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-700">土日祝</td>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">終日</td>
+                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
 
             {/* トレーニングルーム（貸切）料金 */}
             {locationPrices.TRAINING_PRIVATE && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
                     <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
                   </div>
                   トレーニングルーム（貸切）
                 </h4>
-                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 text-sm">
-                  <p className="text-gray-400 text-xs mb-1">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</p>
-                  <p className="font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
-                </div>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-sky-50 text-gray-600">
+                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
+                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
 
             {/* トレーニングルーム（相席）料金 */}
             {locationPrices.TRAINING_SHARED && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                   <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
                     <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
                   </div>
                   トレーニングルーム（相席）
                 </h4>
-                <div className="bg-gradient-to-br from-sky-50 to-white p-3 rounded-xl border border-sky-100 text-sm">
-                  <p className="text-gray-400 text-xs mb-1">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</p>
-                  <p className="font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></p>
-                </div>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-sky-50 text-gray-600">
+                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
+                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-3 py-2 border border-sky-100 text-gray-500">全日 {location === 'ASP' ? '08' : '07'}:00-21:00</td>
+                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/人</span></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
