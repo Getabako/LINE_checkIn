@@ -95,6 +95,7 @@ export async function createBooking(params: {
   endsAt: string;
   location: string;
   facilityType: string;
+  pin?: string; // グループ予約で同一PINを指定する場合
 }): Promise<BookingResult> {
   const accessToken = await getAccessToken();
   const deviceIds = getDeviceIds(params.location, params.facilityType);
@@ -113,6 +114,10 @@ export async function createBooking(params: {
       ? `${params.checkinId}-${i + 1}`
       : params.checkinId;
 
+    // グループ予約でPIN指定がある場合は全デバイスに適用、それ以外は2台目以降に適用
+    const shouldSetPin = params.pin || (i > 0 && pinCode);
+    const pinToUse = params.pin || pinCode;
+
     const body: Record<string, unknown> = {
       type: 'booking',
       id: bookingId,
@@ -122,8 +127,7 @@ export async function createBooking(params: {
         starts_at: params.startsAt,
         ends_at: params.endsAt,
         validation: false,
-        // 2台目以降は1台目と同じPINを指定
-        ...(i > 0 && pinCode ? { pin: pinCode } : {}),
+        ...(shouldSetPin && pinToUse ? { pin: pinToUse } : {}),
       },
     };
 

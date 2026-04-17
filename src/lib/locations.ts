@@ -23,14 +23,14 @@ export const LOCATIONS: LocationInfo[] = [
     name: 'みんなの体育館 ASP',
     shortName: 'ASP',
     description: '体育館・トレーニングルーム',
-    address: '秋田市',
+    address: '秋田県秋田市八橋大畑1丁目3-20',
   },
   {
     id: 'YABASE',
     name: 'みんなの体育館 やばせ',
     shortName: 'やばせ',
     description: '体育館',
-    address: '秋田市八橋',
+    address: '秋田県秋田市八橋南2丁目8-2',
   },
 ];
 

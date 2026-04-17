@@ -15,6 +15,7 @@ import { EventDetailPage } from './features/events/EventDetailPage';
 import { SchoolListPage } from './features/schools/SchoolListPage';
 import { SchoolDetailPage } from './features/schools/SchoolDetailPage';
 import { AdminPage } from './features/admin/AdminPage';
+import { ReservationsPage } from './features/reservations/ReservationsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +82,7 @@ const App: React.FC = () => {
           <Route path="/events/:id" element={<EventDetailPage />} />
           <Route path="/schools" element={<SchoolListPage />} />
           <Route path="/schools/:id" element={<SchoolDetailPage />} />
+          <Route path="/reservations" element={<ReservationsPage />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </BrowserRouter>

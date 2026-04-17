@@ -56,7 +56,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const checkinIdsStr = session.metadata?.checkinIds || checkinId;
     const allCheckinIds = checkinIdsStr.split(',').filter(Boolean);
 
-    // 各checkinにPINを発行
+    // 各checkinにPINを発行（グループ内は同一PINを使用）
+    const isMultiDate = allCheckinIds.length > 1;
+    let groupPinCode: string | null = null;
+
     for (const cId of allCheckinIds) {
       const cDoc = await db.collection(COLLECTIONS.CHECKINS).doc(cId).get();
       if (!cDoc.exists) continue;
@@ -82,14 +85,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             endsAt,
             location: cData.location,
             facilityType: cData.facilityType,
+            pin: groupPinCode || undefined,
           });
           pinCode = result.pinCode;
         } catch (error) {
           console.error('RemoteLock API error, falling back to random PIN:', error);
-          pinCode = generatePinCode();
+          pinCode = groupPinCode || generatePinCode();
         }
       } else {
-        pinCode = generatePinCode();
+        pinCode = groupPinCode || generatePinCode();
+      }
+
+      // グループ内は最初のPINを共有
+      if (!groupPinCode && isMultiDate) {
+        groupPinCode = pinCode;
       }
 
       await cDoc.ref.update({

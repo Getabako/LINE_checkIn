@@ -308,7 +308,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const primaryCheckinId = checkinIds[0];
 
     if (skipPayment) {
-      // 各日付のcheckinにPINを発行
+      // 各日付のcheckinにPINを発行（グループ内は同一PINを使用）
+      let groupPinCode: string | null = null;
+
       for (let i = 0; i < checkinIds.length; i++) {
         const cId = checkinIds[i];
         const d = allDates[i];
@@ -330,14 +332,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               endsAt,
               location,
               facilityType,
+              pin: groupPinCode || undefined,
             });
             pinCode = result.pinCode;
           } catch (error) {
             console.error('RemoteLock API error, falling back to random PIN:', error);
-            pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+            pinCode = groupPinCode || Math.floor(1000 + Math.random() * 9000).toString();
           }
         } else {
-          pinCode = Math.floor(1000 + Math.random() * 9000).toString();
+          pinCode = groupPinCode || Math.floor(1000 + Math.random() * 9000).toString();
+        }
+
+        // グループ内は最初のPINを共有
+        if (!groupPinCode && isMultiDate) {
+          groupPinCode = pinCode;
         }
 
         await db.collection(COLLECTIONS.CHECKINS).doc(cId).update({
@@ -388,7 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'paypay'] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
       line_items: [
         {
           price_data: {

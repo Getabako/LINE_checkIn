@@ -41,9 +41,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const db = getDb();
     const checkinsRef = db.collection(COLLECTIONS.CHECKINS);
 
-    // GET: チェックイン一覧 or イベント/スクール取得
+    // GET: チェックイン一覧 or イベント/スクール取得 or 空き状況
     if (req.method === 'GET') {
       const type = req.query.type as string;
+
+      // 空き状況チェック
+      if (type === 'availability') {
+        const { location: loc, facilityType: ft, dates: datesParam, startTime: st, duration: dur } = req.query;
+        if (!loc || !ft || !datesParam) {
+          return res.status(400).json({ error: 'Missing location, facilityType, dates' });
+        }
+
+        const dateList = (datesParam as string).split(',');
+        const SHARED_CAPACITY = 10;
+
+        const result: Record<string, { status: 'available' | 'few' | 'full'; count: number; capacity: number }> = {};
+
+        for (const d of dateList) {
+          const existingSnapshot = await db.collection(COLLECTIONS.CHECKINS)
+            .where('date', '==', d)
+            .get();
+
+          // 指定された時間帯に重なる予約を数える
+          const parsedStartTime = st ? parseInt((st as string).split(':')[0], 10) : 7;
+          const parsedDuration = dur ? parseInt(dur as string, 10) : 1;
+          const newEnd = parsedStartTime + parsedDuration;
+
+          const overlapping = existingSnapshot.docs.filter((doc) => {
+            const ex = doc.data();
+            if (ex.location !== loc) return false;
+            if (ex.facilityType !== ft) return false;
+            if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
+            if (!st) return true; // 時間指定なしの場合はその日の全予約をカウント
+            const exStart = parseInt(ex.startTime.split(':')[0], 10);
+            const exEnd = exStart + (ex.duration || 0);
+            return parsedStartTime < exEnd && exStart < newEnd;
+          });
+
+          const capacity = ft === 'TRAINING_SHARED' ? SHARED_CAPACITY : 1;
+          const count = overlapping.length;
+          let status: 'available' | 'few' | 'full';
+
+          if (count >= capacity) {
+            status = 'full';
+          } else if (ft === 'TRAINING_SHARED' && count >= capacity * 0.7) {
+            status = 'few';
+          } else {
+            status = 'available';
+          }
+
+          result[d] = { status, count, capacity };
+        }
+
+        return res.status(200).json(result);
+      }
 
       // 公開イベント一覧
       if (type === 'events') {

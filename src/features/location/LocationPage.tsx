@@ -106,6 +106,14 @@ export const LocationPage: React.FC = () => {
           ))}
         </div>
 
+        {/* 施設間違い注意 */}
+        <div className="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2">
+          <span className="text-amber-500 mt-0.5 flex-shrink-0">&#x26A0;&#xFE0F;</span>
+          <p className="text-xs text-amber-700 font-medium leading-relaxed">
+            施設のお間違いにご注意ください。ASP（八橋大畑）とやばせ（八橋南）は異なる場所です。
+          </p>
+        </div>
+
         {/* 開催予定のイベント */}
         {upcomingEvents.length > 0 && (
           <div className="mt-8 space-y-3 stagger-children">
@@ -206,8 +214,18 @@ export const LocationPage: React.FC = () => {
           </div>
         )}
 
-        {/* 管理画面リンク */}
-        <div className="mt-8">
+        {/* マイ予約・管理画面リンク */}
+        <div className="mt-8 space-y-2">
+          <button
+            onClick={() => navigate('/reservations')}
+            className="w-full p-3 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border border-primary-200 text-left flex items-center gap-3 hover:from-primary-100 hover:to-sky-100 transition-colors"
+          >
+            <FiCalendar className="w-5 h-5 text-primary-500" />
+            <div>
+              <span className="text-sm font-semibold text-primary-700">マイ予約</span>
+              <p className="text-[10px] text-primary-400">予約の確認・キャンセル</p>
+            </div>
+          </button>
           <button
             onClick={() => navigate('/admin')}
             className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-left flex items-center gap-3 hover:bg-gray-100 transition-colors"

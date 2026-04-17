@@ -161,6 +161,12 @@ export const userApi = {
   getMe: () => api.get<User>('/users/me'),
 };
 
+export interface AvailabilityInfo {
+  status: 'available' | 'few' | 'full';
+  count: number;
+  capacity: number;
+}
+
 export const checkinApi = {
   create: (data: CreateCheckinRequest) =>
     api.post<CreateCheckinResponse>('/checkins', data),
@@ -169,6 +175,22 @@ export const checkinApi = {
   getByGroup: (groupId: string) => api.get<Checkin[]>(`/checkins?groupId=${groupId}`),
   cancel: (id: string) => api.delete<void>(`/checkins/${id}`),
   getReceipt: (id: string) => api.get<{ pdf: string }>(`/checkins/${id}?format=receipt`),
+  getAvailability: (params: {
+    location: LocationId;
+    facilityType: FacilityType;
+    dates: string[];
+    startTime?: string;
+    duration?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    qs.set('type', 'availability');
+    qs.set('location', params.location);
+    qs.set('facilityType', params.facilityType);
+    qs.set('dates', params.dates.join(','));
+    if (params.startTime) qs.set('startTime', params.startTime);
+    if (params.duration) qs.set('duration', params.duration.toString());
+    return api.get<Record<string, AvailabilityInfo>>(`/checkins?${qs.toString()}`);
+  },
 };
 
 export const priceApi = {

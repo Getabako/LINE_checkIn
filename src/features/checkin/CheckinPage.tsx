@@ -14,6 +14,7 @@ import {
   calculateEndTime,
   getAvailableDurations,
 } from '../../lib/price';
+import { checkinApi, AvailabilityInfo } from '../../lib/api';
 import clsx from 'clsx';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
@@ -101,6 +102,32 @@ export const CheckinPage: React.FC = () => {
     }
     setDates(generated);
   }, [recurringType, recurringCount, date, multiDateMode, setDates]);
+
+  // 空き状況の取得
+  const [availability, setAvailability] = React.useState<Record<string, AvailabilityInfo>>({});
+
+  React.useEffect(() => {
+    if (!location || !facilityType) return;
+    const dateStrs = dateOptions.map((d) => format(d, 'yyyy-MM-dd'));
+    checkinApi.getAvailability({
+      location,
+      facilityType,
+      dates: dateStrs,
+      startTime: startTime || undefined,
+      duration: startTime ? duration : undefined,
+    }).then(setAvailability).catch(() => setAvailability({}));
+  }, [location, facilityType, startTime, duration, dateOptions]);
+
+  const getAvailabilityLabel = (d: Date): { text: string; color: string } | null => {
+    const key = format(d, 'yyyy-MM-dd');
+    const info = availability[key];
+    if (!info) return null;
+    switch (info.status) {
+      case 'full': return { text: '×', color: 'text-red-500' };
+      case 'few': return { text: '△', color: 'text-amber-500' };
+      case 'available': return { text: '○', color: 'text-emerald-500' };
+    }
+  };
 
   const facility = location ? LOCATION_FACILITIES[location]?.find((f) => f.id === facilityType) : null;
 
@@ -257,11 +284,15 @@ export const CheckinPage: React.FC = () => {
                   className="w-full px-4 py-3 pr-10 rounded-xl border-2 border-gray-100 bg-white text-gray-800 text-sm font-semibold appearance-none focus:border-primary-500 focus:outline-none shadow-sm"
                 >
                   <option value="">日付を選択してください</option>
-                  {dateOptions.map((d) => (
-                    <option key={d.toISOString()} value={d.toISOString()}>
-                      {formatDateLabel(d)}（{format(d, 'M/d', { locale: ja })}）
-                    </option>
-                  ))}
+                  {dateOptions.map((d) => {
+                    const avail = getAvailabilityLabel(d);
+                    const isFull = avail?.text === '×';
+                    return (
+                      <option key={d.toISOString()} value={d.toISOString()} disabled={isFull}>
+                        {avail ? `${avail.text} ` : ''}{formatDateLabel(d)}（{format(d, 'M/d', { locale: ja })}）{isFull ? ' - 予約済み' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400">
                   <FiCalendar className="w-5 h-5" />
@@ -277,28 +308,38 @@ export const CheckinPage: React.FC = () => {
                 {recurringType ? '基準日を選択' : '利用日（複数選択可）'}
               </label>
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {dateOptions.map((d) => (
-                  <button
-                    key={d.toISOString()}
-                    onClick={() => handleDateClick(d)}
-                    className={clsx(
-                      'flex-shrink-0 px-3 py-2 rounded-lg border-2 text-center min-w-[72px] transition-all relative',
-                      isDateSelected(d)
-                        ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-sm'
-                        : 'border-gray-100 bg-white text-gray-700 hover:border-primary-200'
-                    )}
-                  >
-                    {isDateSelected(d) && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
-                        <FiCheck className="w-2.5 h-2.5 text-white" />
-                      </div>
-                    )}
-                    <p className="text-xs font-bold">{formatDateLabel(d)}</p>
-                    <p className="text-[10px] text-gray-400">
-                      {format(d, 'M/d', { locale: ja })}
-                    </p>
-                  </button>
-                ))}
+                {dateOptions.map((d) => {
+                  const avail = getAvailabilityLabel(d);
+                  const isFull = avail?.text === '×';
+                  return (
+                    <button
+                      key={d.toISOString()}
+                      onClick={() => !isFull && handleDateClick(d)}
+                      disabled={isFull}
+                      className={clsx(
+                        'flex-shrink-0 px-3 py-2 rounded-lg border-2 text-center min-w-[72px] transition-all relative',
+                        isFull
+                          ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                          : isDateSelected(d)
+                            ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-sm'
+                            : 'border-gray-100 bg-white text-gray-700 hover:border-primary-200'
+                      )}
+                    >
+                      {isDateSelected(d) && !isFull && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
+                          <FiCheck className="w-2.5 h-2.5 text-white" />
+                        </div>
+                      )}
+                      {avail && (
+                        <p className={clsx('text-xs font-bold', avail.color)}>{avail.text}</p>
+                      )}
+                      <p className="text-xs font-bold">{formatDateLabel(d)}</p>
+                      <p className="text-[10px] text-gray-400">
+                        {format(d, 'M/d', { locale: ja })}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
               {dates.length > 0 && (
                 <p className="text-sm text-primary-500 mt-2 font-semibold">

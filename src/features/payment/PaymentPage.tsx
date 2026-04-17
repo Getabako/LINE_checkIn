@@ -330,17 +330,30 @@ export const PaymentPage: React.FC = () => {
             <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
             お支払い方法
           </h3>
-          <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border-2 border-primary-300 transition-all duration-300">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm">
-              <FiCreditCard className="w-6 h-6 text-white" />
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border border-primary-200 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm">
+                <FiCreditCard className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900 text-sm">クレジットカード</p>
+              </div>
+              <FiCheckCircle className="w-5 h-5 text-primary-500" />
             </div>
-            <div className="flex-1">
-              <p className="font-bold text-gray-900">クレジットカード</p>
-              <p className="text-sm text-gray-400">Stripe決済</p>
+            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border border-red-200 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-400 rounded-xl flex items-center justify-center shadow-sm">
+                <span className="text-white font-bold text-xs">Pay</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-gray-900 text-sm">PayPay</p>
+              </div>
+              <FiCheckCircle className="w-5 h-5 text-red-500" />
             </div>
-            <FiCheckCircle className="w-6 h-6 text-primary-500" />
           </div>
-          <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-400">
+          <p className="text-[10px] text-gray-400 mt-3 text-center">
+            決済画面でお支払い方法を選択できます
+          </p>
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400 justify-center">
             <FiShield className="w-3.5 h-3.5" />
             <span>安全な暗号化通信で保護されています</span>
           </div>
@@ -376,7 +389,7 @@ export const PaymentPage: React.FC = () => {
           loading={isLoading}
           onClick={handlePayment}
         >
-          カードで支払う
+          お支払いへ進む
         </Button>
         <p className="text-xs text-gray-400 text-center mt-2">
           お支払い完了後、暗証番号が発行されます
