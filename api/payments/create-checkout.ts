@@ -396,7 +396,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card', 'paypay'] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
+      // Stripe Dashboard で有効化された決済方法（カード・PayPay 等）を自動表示
+      automatic_payment_methods: { enabled: true },
       line_items: [
         {
           price_data: {

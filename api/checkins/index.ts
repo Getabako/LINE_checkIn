@@ -67,27 +67,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const parsedDuration = dur ? parseInt(dur as string, 10) : 1;
           const newEnd = parsedStartTime + parsedDuration;
 
-          const overlapping = existingSnapshot.docs.filter((doc) => {
+          const sameFacilityDocs = existingSnapshot.docs.filter((doc) => {
             const ex = doc.data();
             if (ex.location !== loc) return false;
             if (ex.facilityType !== ft) return false;
             if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
-            if (!st) return true; // 時間指定なしの場合はその日の全予約をカウント
-            const exStart = parseInt(ex.startTime.split(':')[0], 10);
-            const exEnd = exStart + (ex.duration || 0);
-            return parsedStartTime < exEnd && exStart < newEnd;
+            return true;
           });
 
           const capacity = ft === 'TRAINING_SHARED' ? SHARED_CAPACITY : 1;
-          const count = overlapping.length;
           let status: 'available' | 'few' | 'full';
+          let count = 0;
 
-          if (count >= capacity) {
-            status = 'full';
-          } else if (ft === 'TRAINING_SHARED' && count >= capacity * 0.7) {
-            status = 'few';
+          if (!st) {
+            // 時間未指定：日全体で埋まっているかを判定（終日埋まっているときのみ full）
+            // ASP/やばせ共通の営業時間: 07:00-21:00 (14時間)
+            const OPEN_HOUR = 7;
+            const CLOSE_HOUR = 21;
+            const totalHours = CLOSE_HOUR - OPEN_HOUR;
+
+            if (ft === 'TRAINING_SHARED') {
+              // 共有: 時間別の最大同時利用数を見る
+              const hourCounts: number[] = new Array(totalHours).fill(0);
+              for (const doc of sameFacilityDocs) {
+                const ex = doc.data();
+                const exStart = parseInt(ex.startTime.split(':')[0], 10);
+                const exEnd = exStart + (ex.duration || 0);
+                for (let h = Math.max(exStart, OPEN_HOUR); h < Math.min(exEnd, CLOSE_HOUR); h++) {
+                  hourCounts[h - OPEN_HOUR]++;
+                }
+              }
+              const maxConcurrent = Math.max(0, ...hourCounts);
+              count = maxConcurrent;
+              if (maxConcurrent >= capacity) status = 'full';
+              else if (maxConcurrent >= capacity * 0.7) status = 'few';
+              else status = 'available';
+            } else {
+              // 定員1: 占有時間が営業時間をカバーし切っているかを見る
+              const occupied: boolean[] = new Array(totalHours).fill(false);
+              for (const doc of sameFacilityDocs) {
+                const ex = doc.data();
+                const exStart = parseInt(ex.startTime.split(':')[0], 10);
+                const exEnd = exStart + (ex.duration || 0);
+                for (let h = Math.max(exStart, OPEN_HOUR); h < Math.min(exEnd, CLOSE_HOUR); h++) {
+                  occupied[h - OPEN_HOUR] = true;
+                }
+              }
+              const occupiedHours = occupied.filter(Boolean).length;
+              count = sameFacilityDocs.length;
+              if (occupiedHours >= totalHours) status = 'full';
+              else if (occupiedHours > 0) status = 'few';
+              else status = 'available';
+            }
           } else {
-            status = 'available';
+            // 時間指定あり：指定時間帯に重なる予約数を判定
+            const overlapping = sameFacilityDocs.filter((doc) => {
+              const ex = doc.data();
+              const exStart = parseInt(ex.startTime.split(':')[0], 10);
+              const exEnd = exStart + (ex.duration || 0);
+              return parsedStartTime < exEnd && exStart < newEnd;
+            });
+            count = overlapping.length;
+            if (count >= capacity) status = 'full';
+            else if (ft === 'TRAINING_SHARED' && count >= capacity * 0.7) status = 'few';
+            else status = 'available';
           }
 
           result[d] = { status, count, capacity };
