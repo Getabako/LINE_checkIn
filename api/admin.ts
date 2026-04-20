@@ -422,6 +422,126 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(regs);
     }
 
+    // ============ 会員種別マスタ ============
+    if (action === 'memberTypes' && req.method === 'GET') {
+      const snapshot = await db.collection(COLLECTIONS.MEMBER_TYPES).get();
+      const items = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; sortOrder?: number }))
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+      return res.status(200).json(items);
+    }
+
+    if (action === 'createMemberType' && req.method === 'POST') {
+      const { code, name, description, discountType, discountValue, monthlyFee, sortOrder, isActive } = req.body;
+      if (!code || !name) return res.status(400).json({ error: 'Missing code or name' });
+      const now = new Date().toISOString();
+      const data = {
+        code,
+        name,
+        description: description || '',
+        discountType: discountType || 'NONE',
+        discountValue: Number(discountValue) || 0,
+        monthlyFee: Number(monthlyFee) || 0,
+        sortOrder: Number(sortOrder) || 0,
+        isActive: isActive !== false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.MEMBER_TYPES).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
+    if (action === 'updateMemberType' && req.method === 'PUT') {
+      const { memberTypeId, ...updates } = req.body;
+      if (!memberTypeId) return res.status(400).json({ error: 'Missing memberTypeId' });
+      updates.updatedAt = new Date().toISOString();
+      await db.collection(COLLECTIONS.MEMBER_TYPES).doc(memberTypeId).update(updates);
+      return res.status(200).json({ message: 'Updated' });
+    }
+
+    if (action === 'deleteMemberType' && req.method === 'DELETE') {
+      const memberTypeId = req.query.memberTypeId as string;
+      if (!memberTypeId) return res.status(400).json({ error: 'Missing memberTypeId' });
+      await db.collection(COLLECTIONS.MEMBER_TYPES).doc(memberTypeId).delete();
+      return res.status(200).json({ message: 'Deleted' });
+    }
+
+    // ============ ユーザー検索（会員付与用） ============
+    if (action === 'users' && req.method === 'GET') {
+      const search = ((req.query.search as string) || '').trim();
+      const snapshot = await db.collection(COLLECTIONS.USERS).limit(500).get();
+      let users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; lineUserId: string; displayName: string }));
+      if (search) {
+        const q = search.toLowerCase();
+        users = users.filter((u) =>
+          (u.displayName || '').toLowerCase().includes(q) ||
+          (u.lineUserId || '').toLowerCase().includes(q)
+        );
+      }
+      users = users.slice(0, 100);
+      return res.status(200).json(users);
+    }
+
+    // ============ ユーザー会員区分の管理 ============
+    if (action === 'memberships' && req.method === 'GET') {
+      const snapshot = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('isActive', '==', true)
+        .get();
+      const items = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Array<{ id: string; memberTypeId: string; createdAt?: string }>;
+
+      // memberType と user を join
+      const typeIds = [...new Set(items.map((i) => i.memberTypeId))];
+      const typeDocs = await Promise.all(typeIds.map((id) => db.collection(COLLECTIONS.MEMBER_TYPES).doc(id).get()));
+      const typeMap = new Map(typeDocs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
+
+      const enriched = items
+        .map((m) => ({
+          ...m,
+          memberTypeName: (typeMap.get(m.memberTypeId) as { name?: string } | undefined)?.name || '',
+        }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return res.status(200).json(enriched);
+    }
+
+    if (action === 'assignMembership' && req.method === 'POST') {
+      const { lineUserId, userId, displayName, memberTypeId, startDate, endDate } = req.body;
+      if (!lineUserId || !memberTypeId) return res.status(400).json({ error: 'Missing lineUserId or memberTypeId' });
+
+      // 既存のアクティブ会員を非アクティブ化（1ユーザー1会員）
+      const existing = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('lineUserId', '==', lineUserId)
+        .where('isActive', '==', true)
+        .get();
+      const batch = db.batch();
+      existing.docs.forEach((d) => batch.update(d.ref, { isActive: false, updatedAt: new Date().toISOString() }));
+      await batch.commit();
+
+      const now = new Date().toISOString();
+      const data = {
+        lineUserId,
+        userId: userId || null,
+        displayName: displayName || null,
+        memberTypeId,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.USER_MEMBERSHIPS).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
+    if (action === 'revokeMembership' && req.method === 'DELETE') {
+      const membershipId = req.query.membershipId as string;
+      if (!membershipId) return res.status(400).json({ error: 'Missing membershipId' });
+      await db.collection(COLLECTIONS.USER_MEMBERSHIPS).doc(membershipId).update({
+        isActive: false,
+        updatedAt: new Date().toISOString(),
+      });
+      return res.status(200).json({ message: 'Revoked' });
+    }
+
     // ============ お知らせ管理 ============
     if (action === 'announcements' && req.method === 'GET') {
       const snapshot = await db.collection(COLLECTIONS.ANNOUNCEMENTS).get();

@@ -127,22 +127,33 @@ export interface CouponValidationResult {
 }
 
 // 会員種別関連
+export type DiscountType = 'NONE' | 'PERCENTAGE' | 'FIXED_PER_HOUR' | 'FREE';
+
 export interface MemberType {
   id: string;
   code: string;
   name: string;
   description: string;
-  discounts: Record<string, number>; // { "ASP": -275, "YABASE": -250 } 等
+  discountType?: DiscountType;
+  discountValue?: number;            // PERCENTAGE→%値 / FIXED_PER_HOUR→円/時
+  monthlyFee?: number;               // 月額（任意・備考用 / 学生会員=3630）
+  discounts?: Record<string, number>; // 旧データ互換（拠点別）
   isActive: boolean;
   sortOrder: number;
 }
 
 export interface UserMembership {
   id: string;
+  userId?: string;
   lineUserId: string;
+  displayName?: string;
   memberTypeId: string;
+  memberTypeName?: string;
   isActive: boolean;
   memberType?: MemberType;
+  startDate?: string | null;
+  endDate?: string | null;
+  createdAt?: string;
 }
 
 // レビュー関連
@@ -388,4 +399,25 @@ export const adminApi = {
     api.put<void>('/admin?action=updateAnnouncement', { announcementId, ...data }),
   deleteAnnouncement: (announcementId: string) =>
     api.delete<void>(`/admin?action=deleteAnnouncement&announcementId=${announcementId}`),
+
+  // 会員種別マスタ管理
+  getMemberTypes: () => api.get<MemberType[]>('/admin?action=memberTypes'),
+  createMemberType: (data: Partial<MemberType>) =>
+    api.post<MemberType>('/admin?action=createMemberType', data),
+  updateMemberType: (memberTypeId: string, data: Partial<MemberType>) =>
+    api.put<void>('/admin?action=updateMemberType', { memberTypeId, ...data }),
+  deleteMemberType: (memberTypeId: string) =>
+    api.delete<void>(`/admin?action=deleteMemberType&memberTypeId=${memberTypeId}`),
+
+  // ユーザー会員区分の付与
+  getUsers: (search?: string) => {
+    const qs = new URLSearchParams({ action: 'users' });
+    if (search) qs.set('search', search);
+    return api.get<Array<{ id: string; lineUserId: string; displayName: string }>>(`/admin?${qs.toString()}`);
+  },
+  getMemberships: () => api.get<UserMembership[]>('/admin?action=memberships'),
+  assignMembership: (data: { lineUserId: string; userId: string; displayName?: string; memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
+    api.post<UserMembership>('/admin?action=assignMembership', data),
+  revokeMembership: (membershipId: string) =>
+    api.delete<void>(`/admin?action=revokeMembership&membershipId=${membershipId}`),
 };

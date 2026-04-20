@@ -1,11 +1,11 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType } from '../../lib/api';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -29,7 +29,23 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members';
+
+const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
+  NONE: '割引なし',
+  PERCENTAGE: '％割引',
+  FIXED_PER_HOUR: '時間あたり定額OFF',
+  FREE: '無料',
+};
+
+const formatDiscount = (m: MemberType): string => {
+  const t = m.discountType || 'NONE';
+  if (t === 'NONE') return '割引なし';
+  if (t === 'FREE') return '無料';
+  if (t === 'PERCENTAGE') return `${m.discountValue || 0}%OFF`;
+  if (t === 'FIXED_PER_HOUR') return `¥${(m.discountValue || 0).toLocaleString()}/h OFF`;
+  return '';
+};
 
 const PRIORITY_LABEL: Record<AnnouncementPriority, string> = {
   info: 'お知らせ',
@@ -642,6 +658,317 @@ const AnnouncementsTab: React.FC = () => {
   );
 };
 
+// ============ 会員管理タブ ============
+const MembersTab: React.FC = () => {
+  const [memberTypes, setMemberTypes] = React.useState<MemberType[]>([]);
+  const [memberships, setMemberships] = React.useState<UserMembership[]>([]);
+  const [users, setUsers] = React.useState<Array<{ id: string; lineUserId: string; displayName: string }>>([]);
+  const [search, setSearch] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [showTypeForm, setShowTypeForm] = React.useState(false);
+  const [showAssignForm, setShowAssignForm] = React.useState(false);
+  const emptyTypeForm = {
+    code: '',
+    name: '',
+    description: '',
+    discountType: 'NONE' as DiscountType,
+    discountValue: 0,
+    monthlyFee: 0,
+    sortOrder: 0,
+  };
+  const [typeForm, setTypeForm] = React.useState(emptyTypeForm);
+  const [assignForm, setAssignForm] = React.useState({
+    userId: '',
+    lineUserId: '',
+    displayName: '',
+    memberTypeId: '',
+    startDate: '',
+    endDate: '',
+  });
+
+  const load = () => {
+    Promise.all([adminApi.getMemberTypes(), adminApi.getMemberships()])
+      .then(([t, m]) => { setMemberTypes(t); setMemberships(m); })
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  };
+
+  React.useEffect(load, []);
+
+  const handleSearchUsers = async () => {
+    try {
+      const list = await adminApi.getUsers(search);
+      setUsers(list);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCreateType = async () => {
+    await adminApi.createMemberType(typeForm);
+    setShowTypeForm(false);
+    setTypeForm(emptyTypeForm);
+    load();
+  };
+
+  const handleDeleteType = async (id: string) => {
+    if (!confirm('削除しますか？')) return;
+    await adminApi.deleteMemberType(id);
+    load();
+  };
+
+  const handleToggleType = async (m: MemberType) => {
+    await adminApi.updateMemberType(m.id, { isActive: !m.isActive });
+    load();
+  };
+
+  const handleAssign = async () => {
+    if (!assignForm.lineUserId || !assignForm.memberTypeId) return;
+    await adminApi.assignMembership({
+      lineUserId: assignForm.lineUserId,
+      userId: assignForm.userId,
+      displayName: assignForm.displayName,
+      memberTypeId: assignForm.memberTypeId,
+      startDate: assignForm.startDate || null,
+      endDate: assignForm.endDate || null,
+    });
+    setShowAssignForm(false);
+    setAssignForm({ userId: '', lineUserId: '', displayName: '', memberTypeId: '', startDate: '', endDate: '' });
+    setUsers([]);
+    setSearch('');
+    load();
+  };
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('この会員区分を解除しますか？')) return;
+    await adminApi.revokeMembership(id);
+    load();
+  };
+
+  // クイック登録（要件に沿った既定値）
+  const handleSeedDefaults = async () => {
+    if (!confirm('5種類の会員区分（一般・TR-01／その他／S-01／TR-00／学生会員）を一括登録しますか？')) return;
+    const seeds: Array<Partial<MemberType>> = [
+      { code: 'GENERAL', name: '一般・TR-01', description: '基準料金', discountType: 'NONE', discountValue: 0, monthlyFee: 0, sortOrder: 1 },
+      { code: 'OTHER', name: 'その他', description: '30%OFF', discountType: 'PERCENTAGE', discountValue: 30, monthlyFee: 0, sortOrder: 2 },
+      { code: 'S-01', name: 'S-01（定期）', description: '時間あたり¥275 OFF', discountType: 'FIXED_PER_HOUR', discountValue: 275, monthlyFee: 0, sortOrder: 3 },
+      { code: 'TR-00', name: 'TR-00', description: '無料', discountType: 'FREE', discountValue: 0, monthlyFee: 0, sortOrder: 4 },
+      { code: 'STUDENT', name: '学生会員', description: '月額¥3,630（利用は無料）', discountType: 'FREE', discountValue: 0, monthlyFee: 3630, sortOrder: 5 },
+    ];
+    for (const s of seeds) {
+      await adminApi.createMemberType(s);
+    }
+    load();
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+
+  return (
+    <div className="space-y-6">
+      {/* 会員種別マスタ */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-primary-800 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            会員種別マスタ
+          </h3>
+          <div className="flex gap-2">
+            {memberTypes.length === 0 && (
+              <button
+                onClick={handleSeedDefaults}
+                className="text-xs text-primary-600 font-semibold underline"
+              >
+                既定値で一括登録
+              </button>
+            )}
+            <button
+              onClick={() => setShowTypeForm(!showTypeForm)}
+              className="text-xs text-primary-700 font-semibold flex items-center gap-1"
+            >
+              <FiPlus className="w-3 h-3" /> {showTypeForm ? '閉じる' : '追加'}
+            </button>
+          </div>
+        </div>
+
+        {showTypeForm && (
+          <div className="bg-white p-4 rounded-2xl shadow-card border border-gray-100 space-y-2 mb-3">
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="コード（例: S-01）" value={typeForm.code} onChange={(e) => setTypeForm({ ...typeForm, code: e.target.value })} className="px-3 py-2 border rounded-lg text-sm" />
+              <input placeholder="表示名" value={typeForm.name} onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} className="px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <input placeholder="説明（任意）" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+            <div className="grid grid-cols-2 gap-2">
+              <select value={typeForm.discountType} onChange={(e) => setTypeForm({ ...typeForm, discountType: e.target.value as DiscountType })} className="px-3 py-2 border rounded-lg text-sm">
+                {(['NONE', 'PERCENTAGE', 'FIXED_PER_HOUR', 'FREE'] as DiscountType[]).map((t) => (
+                  <option key={t} value={t}>{DISCOUNT_TYPE_LABEL[t]}</option>
+                ))}
+              </select>
+              <div>
+                <input
+                  type="number" placeholder="割引値" value={typeForm.discountValue}
+                  onChange={(e) => setTypeForm({ ...typeForm, discountValue: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  disabled={typeForm.discountType === 'NONE' || typeForm.discountType === 'FREE'}
+                />
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  {typeForm.discountType === 'PERCENTAGE' ? '%' : typeForm.discountType === 'FIXED_PER_HOUR' ? '円/h' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400">月額（任意・備考）</label>
+                <input type="number" value={typeForm.monthlyFee} onChange={(e) => setTypeForm({ ...typeForm, monthlyFee: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400">並び順</label>
+                <input type="number" value={typeForm.sortOrder} onChange={(e) => setTypeForm({ ...typeForm, sortOrder: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+            </div>
+            <Button fullWidth onClick={handleCreateType} disabled={!typeForm.code || !typeForm.name}>作成</Button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {memberTypes.length === 0 ? (
+            <p className="text-center text-gray-400 py-4 text-sm">会員種別が登録されていません</p>
+          ) : memberTypes.map((m) => (
+            <div key={m.id} className={clsx('bg-white p-3 rounded-xl border flex items-center justify-between', m.isActive ? 'border-gray-100' : 'border-gray-200 opacity-60')}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-900">{m.name}</span>
+                  <span className="text-[10px] text-gray-400">[{m.code}]</span>
+                </div>
+                <p className="text-xs text-primary-600 font-semibold mt-0.5">{formatDiscount(m)}</p>
+                {m.monthlyFee ? <p className="text-[10px] text-gray-500">月額¥{m.monthlyFee.toLocaleString()}</p> : null}
+                {m.description && <p className="text-[10px] text-gray-400 mt-0.5">{m.description}</p>}
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleToggleType(m)} className="text-xs text-primary-500 px-2">
+                  {m.isActive ? '無効化' : '有効化'}
+                </button>
+                <button onClick={() => handleDeleteType(m.id)} className="p-2 text-red-400 hover:text-red-600">
+                  <FiTrash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ユーザーへの会員区分付与 */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-primary-800 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            会員登録一覧
+          </h3>
+          <button
+            onClick={() => setShowAssignForm(!showAssignForm)}
+            className="text-xs text-primary-700 font-semibold flex items-center gap-1"
+          >
+            <FiPlus className="w-3 h-3" /> {showAssignForm ? '閉じる' : '会員を付与'}
+          </button>
+        </div>
+
+        {showAssignForm && (
+          <div className="bg-white p-4 rounded-2xl shadow-card border border-gray-100 space-y-3 mb-3">
+            {/* ユーザー検索 */}
+            <div>
+              <label className="text-xs text-gray-500">ユーザー検索（表示名 or LINEユーザーID）</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  placeholder="表示名で検索" value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                />
+                <button onClick={handleSearchUsers} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
+                  <FiSearch className="w-4 h-4" />
+                </button>
+              </div>
+              {users.length > 0 && (
+                <div className="mt-2 max-h-48 overflow-y-auto border rounded-lg divide-y">
+                  {users.map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => setAssignForm({ ...assignForm, userId: u.id, lineUserId: u.lineUserId, displayName: u.displayName })}
+                      className={clsx(
+                        'w-full px-3 py-2 text-left text-sm hover:bg-sky-50',
+                        assignForm.lineUserId === u.lineUserId && 'bg-sky-50 font-semibold'
+                      )}
+                    >
+                      <div className="text-gray-900">{u.displayName}</div>
+                      <div className="text-[10px] text-gray-400 truncate">{u.lineUserId}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {assignForm.lineUserId && (
+              <div className="p-2 bg-sky-50 rounded-lg text-xs">
+                <span className="text-gray-500">対象:</span> <span className="font-semibold text-primary-700">{assignForm.displayName}</span>
+              </div>
+            )}
+
+            {/* 会員種別選択 */}
+            <div>
+              <label className="text-xs text-gray-500">会員種別</label>
+              <select
+                value={assignForm.memberTypeId}
+                onChange={(e) => setAssignForm({ ...assignForm, memberTypeId: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+              >
+                <option value="">選択してください</option>
+                {memberTypes.filter((m) => m.isActive).map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}（{formatDiscount(m)}）</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-400">開始日（任意）</label>
+                <input type="date" value={assignForm.startDate} onChange={(e) => setAssignForm({ ...assignForm, startDate: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400">終了日（任意）</label>
+                <input type="date" value={assignForm.endDate} onChange={(e) => setAssignForm({ ...assignForm, endDate: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+            </div>
+
+            <Button fullWidth onClick={handleAssign} disabled={!assignForm.lineUserId || !assignForm.memberTypeId}>
+              この内容で付与
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {memberships.length === 0 ? (
+            <p className="text-center text-gray-400 py-4 text-sm">会員登録がありません</p>
+          ) : memberships.map((m) => (
+            <div key={m.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <FiUser className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="font-semibold text-gray-900">{m.displayName || '(名前未取得)'}</span>
+                </div>
+                <p className="text-xs text-primary-600 font-semibold mt-0.5">{m.memberTypeName}</p>
+                <p className="text-[10px] text-gray-400">
+                  {(m.startDate || '指定なし')} 〜 {(m.endDate || '指定なし')}
+                </p>
+              </div>
+              <button onClick={() => handleRevoke(m.id)} className="p-2 text-red-400 hover:text-red-600">
+                <FiTrash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};
+
 // ============ メインの管理画面 ============
 export const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<Tab>('calendar');
@@ -652,19 +979,20 @@ export const AdminPage: React.FC = () => {
 
       <main className="p-4 pb-8">
         {/* タブ切り替え */}
-        <div className="grid grid-cols-5 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="grid grid-cols-6 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           {([
             { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
             { key: 'schools', icon: FiBook, label: 'スクール' },
             { key: 'sales', icon: FiBarChart2, label: '売上' },
             { key: 'announcements', icon: FiBell, label: 'お知らせ' },
+            { key: 'members', icon: FiUser, label: '会員' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={clsx(
-                'py-2.5 rounded-lg text-[11px] font-semibold transition-all flex flex-col items-center justify-center gap-0.5',
+                'py-2.5 rounded-lg text-[10px] font-semibold transition-all flex flex-col items-center justify-center gap-0.5',
                 activeTab === key
                   ? 'bg-white text-primary-700 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -681,6 +1009,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'schools' && <SchoolsTab />}
         {activeTab === 'sales' && <SalesTab />}
         {activeTab === 'announcements' && <AnnouncementsTab />}
+        {activeTab === 'members' && <MembersTab />}
       </main>
     </div>
   );

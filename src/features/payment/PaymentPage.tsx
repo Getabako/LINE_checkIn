@@ -49,23 +49,35 @@ export const PaymentPage: React.FC = () => {
     }
   }, [location, facilityType, date, startTime, totalPrice, navigate]);
 
-  // 会員割引の自動適用
+  // 会員割引の自動適用（discountType に応じて算出。基準は totalPrice = 1日分の通常料金 × 日数）
   React.useEffect(() => {
-    if (!location || !duration) return;
+    if (!location || !duration || !totalPrice) return;
+    const dayCount = multiDateMode && dates.length > 0 ? dates.length : 1;
+    const dayBase = Math.floor(totalPrice / dayCount);
 
     membershipApi.get().then((res) => {
-      if (res.membership?.memberType) {
-        const mt = res.membership.memberType;
-        const discountPerHour = mt.discounts?.[location] || 0;
-        if (discountPerHour !== 0) {
-          const totalDiscount = Math.abs(discountPerHour) * duration;
-          setMemberDiscount(totalDiscount, mt.name);
-        }
+      const mt = res.membership?.memberType;
+      if (!mt) return;
+      const discountType = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+      const discountValue = Number(mt.discountValue) || 0;
+
+      let perDay = 0;
+      if (discountType === 'FREE') {
+        perDay = dayBase;
+      } else if (discountType === 'PERCENTAGE') {
+        perDay = Math.floor(dayBase * (discountValue / 100));
+      } else if (discountType === 'FIXED_PER_HOUR') {
+        perDay = Math.min(dayBase, Math.abs(discountValue) * duration);
+      } else if (mt.discounts) {
+        const legacy = Number(mt.discounts?.[location]) || 0;
+        if (legacy !== 0) perDay = Math.min(dayBase, Math.abs(legacy) * duration);
       }
+      const totalDiscount = perDay * dayCount;
+      if (totalDiscount > 0) setMemberDiscount(totalDiscount, mt.name);
     }).catch(() => {
       // 会員情報取得失敗は無視
     });
-  }, [location, duration, setMemberDiscount]);
+  }, [location, duration, totalPrice, multiDateMode, dates.length, setMemberDiscount]);
 
   const facility = location ? LOCATION_FACILITIES[location]?.find((f) => f.id === facilityType) : null;
   const locationName = location ? getLocationName(location) : '';

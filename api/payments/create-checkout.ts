@@ -199,9 +199,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       grandTotalPrice += price;
     }
 
-    // 会員割引の適用（全日分合算）
-    let memberDiscountPerDay = 0;
+    // 会員割引の適用（discountType に応じて1日料金から差し引く額を算出）
+    // perDatePrices[i].price がその日の通常料金（時間ぶん合計）
     let memberTypeName: string | null = null;
+    const memberDiscountPerDate: number[] = perDatePrices.map(() => 0);
     try {
       const membershipSnapshot = await db
         .collection('userMemberships')
@@ -215,10 +216,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const memberTypeDoc = await db.collection('memberTypes').doc(membership.memberTypeId).get();
         if (memberTypeDoc.exists) {
           const memberType = memberTypeDoc.data()!;
-          const discountPerHour = memberType.discounts?.[location] || 0;
-          if (discountPerHour !== 0) {
-            memberDiscountPerDay = Math.abs(discountPerHour) * duration;
-            memberTypeName = memberType.name;
+          memberTypeName = memberType.name || null;
+          const discountType: string = memberType.discountType || (memberType.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+          const discountValue: number = Number(memberType.discountValue) || 0;
+
+          for (let i = 0; i < perDatePrices.length; i++) {
+            const dayBase = perDatePrices[i].price;
+            let dayDiscount = 0;
+            if (discountType === 'FREE') {
+              dayDiscount = dayBase;
+            } else if (discountType === 'PERCENTAGE') {
+              dayDiscount = Math.floor(dayBase * (discountValue / 100));
+            } else if (discountType === 'FIXED_PER_HOUR') {
+              dayDiscount = Math.min(dayBase, Math.abs(discountValue) * duration);
+            } else if (memberType.discounts) {
+              // 旧データ互換: 拠点別の固定/h
+              const legacyPerHour = Number(memberType.discounts?.[location]) || 0;
+              if (legacyPerHour !== 0) {
+                dayDiscount = Math.min(dayBase, Math.abs(legacyPerHour) * duration);
+              }
+            }
+            memberDiscountPerDate[i] = dayDiscount;
           }
         }
       }
@@ -226,7 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Member discount check error:', e);
     }
 
-    const totalMemberDiscount = memberDiscountPerDay * allDates.length;
+    const totalMemberDiscount = memberDiscountPerDate.reduce((s, v) => s + v, 0);
 
     // クーポン割引の適用（合計金額に対して1回）
     let couponDiscount = 0;
@@ -275,7 +293,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const d = allDates[i];
       const dayPrice = perDatePrices[i].price;
       const dayCouponDiscount = couponDiscountPerDay + (i === 0 ? couponDiscountRemainder : 0);
-      const dayFinalPrice = Math.max(0, dayPrice - memberDiscountPerDay - dayCouponDiscount);
+      const dayMemberDiscount = memberDiscountPerDate[i] || 0;
+      const dayFinalPrice = Math.max(0, dayPrice - dayMemberDiscount - dayCouponDiscount);
 
       const checkinData = {
         userId,
@@ -286,7 +305,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         duration,
         totalPrice: dayFinalPrice,
         originalPrice: dayPrice,
-        memberDiscount: memberDiscountPerDay,
+        memberDiscount: dayMemberDiscount,
         memberTypeName,
         couponCode: couponCode || null,
         couponId,
