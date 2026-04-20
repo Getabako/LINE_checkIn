@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeLiff } from './lib/liff';
+import { userApi } from './lib/api';
 import { Loading } from './components/common/Loading';
 import { DebugPanel } from './components/common/DebugPanel';
 import { LocationPage } from './features/location/LocationPage';
@@ -36,6 +37,8 @@ const App: React.FC = () => {
     const init = async () => {
       try {
         await initializeLiff();
+        // ユーザーをFirestoreに自動登録（失敗してもアプリ起動は継続）
+        userApi.getMe().catch((e) => console.warn('User auto-register failed:', e));
         setIsLiffReady(true);
       } catch (err) {
         console.error('LIFF initialization failed:', err);

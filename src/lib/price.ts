@@ -5,7 +5,7 @@ export const PRICE_TABLE: Record<LocationId, Record<string, Record<string, Recor
   ASP: {
     GYM: {
       WEEKDAY: {
-        DAYTIME: 2200,   // 07:00-17:00
+        DAYTIME: 2200,   // 08:00-17:00
         EVENING: 2750,   // 17:00-21:00
       },
       WEEKEND: {
@@ -39,7 +39,7 @@ export const PRICE_TABLE: Record<LocationId, Record<string, Record<string, Recor
 // 拠点別の利用可能時間枠
 export const LOCATION_TIME_SLOTS: Record<LocationId, string[]> = {
   ASP: [
-    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '08:00', '09:00', '10:00', '11:00', '12:00',
     '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
     '19:00', '20:00',
   ],

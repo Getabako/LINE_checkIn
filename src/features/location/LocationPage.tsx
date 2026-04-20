@@ -1,14 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiMapPin, FiCalendar, FiBook, FiSettings, FiClock, FiUsers, FiBell, FiAlertTriangle, FiAlertCircle } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiBook, FiSettings, FiClock, FiUsers, FiBell, FiAlertTriangle, FiAlertCircle, FiAward } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { LOCATIONS, getLocationName } from '../../lib/locations';
-import { LocationId, Event, School, Announcement, eventApi, schoolApi, announcementApi } from '../../lib/api';
+import { LocationId, Event, School, Announcement, MemberType, UserMembership, eventApi, schoolApi, announcementApi, membershipApi } from '../../lib/api';
 import clsx from 'clsx';
+
+const formatMemberDiscount = (mt: MemberType): string => {
+  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+  if (t === 'NONE') return '';
+  if (t === 'FREE') return '利用無料';
+  if (t === 'PERCENTAGE') return `${mt.discountValue || 0}%OFF`;
+  if (t === 'FIXED_PER_HOUR') return `¥${(mt.discountValue || 0).toLocaleString()}/h OFF`;
+  return '';
+};
 
 const announcementStyle = (priority: Announcement['priority']) => {
   switch (priority) {
@@ -27,16 +36,18 @@ export const LocationPage: React.FC = () => {
   const [events, setEvents] = React.useState<Event[]>([]);
   const [schools, setSchools] = React.useState<School[]>([]);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
+  const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
 
   React.useEffect(() => {
     reset();
   }, [reset]);
 
   React.useEffect(() => {
-    // イベント・スクール・お知らせを取得（失敗しても無視）
+    // イベント・スクール・お知らせ・会員を取得（失敗しても無視）
     eventApi.getAll().then(setEvents).catch(() => setEvents([]));
     schoolApi.getAll().then(setSchools).catch(() => setSchools([]));
     announcementApi.getPublic().then(setAnnouncements).catch(() => setAnnouncements([]));
+    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
   }, []);
 
   const handleLocationSelect = (id: LocationId) => {
@@ -61,6 +72,24 @@ export const LocationPage: React.FC = () => {
       <Header title="みんなの体育館" />
 
       <main className="p-4 pb-28">
+        {/* 会員ステータス */}
+        {membership?.memberType && (
+          <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-400 text-white shadow-button flex items-center gap-3 animate-fade-in-up">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <FiAward className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-primary-100">あなたの会員区分</p>
+              <p className="font-bold truncate">{membership.memberType.name}</p>
+            </div>
+            {formatMemberDiscount(membership.memberType) && (
+              <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold whitespace-nowrap">
+                {formatMemberDiscount(membership.memberType)}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* 施設からのお知らせ */}
         {announcements.length > 0 && (
           <div className="space-y-2 mb-4 stagger-children">

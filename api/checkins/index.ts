@@ -81,8 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (!st) {
             // 時間未指定：日全体で埋まっているかを判定（終日埋まっているときのみ full）
-            // ASP/やばせ共通の営業時間: 07:00-21:00 (14時間)
-            const OPEN_HOUR = 7;
+            // 営業時間: ASP 08:00-21:00 / やばせ 07:00-21:00
+            const OPEN_HOUR = loc === 'ASP' ? 8 : 7;
             const CLOSE_HOUR = 21;
             const totalHours = CLOSE_HOUR - OPEN_HOUR;
 

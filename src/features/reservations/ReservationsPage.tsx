@@ -2,11 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle, FiAward } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
-import { checkinApi, Checkin } from '../../lib/api';
+import { checkinApi, Checkin, MemberType, UserMembership, membershipApi } from '../../lib/api';
 import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculateEndTime } from '../../lib/price';
 import clsx from 'clsx';
@@ -17,6 +17,15 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
     case 'dumbbell': return <FaDumbbell className={className} />;
     default: return null;
   }
+};
+
+const formatMemberDiscount = (mt: MemberType): string => {
+  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+  if (t === 'NONE') return '割引なし';
+  if (t === 'FREE') return '利用無料';
+  if (t === 'PERCENTAGE') return `${mt.discountValue || 0}%OFF`;
+  if (t === 'FIXED_PER_HOUR') return `¥${(mt.discountValue || 0).toLocaleString()}/h OFF`;
+  return '';
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -34,6 +43,11 @@ export const ReservationsPage: React.FC = () => {
   const [cancellingId, setCancellingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
+
+  React.useEffect(() => {
+    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
+  }, []);
 
   const fetchCheckins = React.useCallback(async () => {
     try {
@@ -185,6 +199,50 @@ export const ReservationsPage: React.FC = () => {
       <Header title="マイ予約" showBack />
 
       <main className="p-4 pb-28">
+        {/* 会員区分カード */}
+        <section className="mb-4">
+          <h3 className="font-bold text-primary-800 mb-2 flex items-center gap-2 text-sm">
+            <span className="w-1 h-4 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            あなたの会員情報
+          </h3>
+          {membership?.memberType ? (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-400 text-white shadow-button">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-white/20 rounded-xl flex items-center justify-center">
+                  <FiAward className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-primary-100">会員区分</p>
+                  <p className="font-bold truncate">{membership.memberType.name}</p>
+                  {membership.memberType.description && (
+                    <p className="text-[10px] text-primary-100 truncate mt-0.5">
+                      {membership.memberType.description}
+                    </p>
+                  )}
+                </div>
+                <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold whitespace-nowrap">
+                  {formatMemberDiscount(membership.memberType)}
+                </span>
+              </div>
+              {membership.memberType.monthlyFee ? (
+                <p className="text-[10px] text-primary-100 mt-2">
+                  月額¥{membership.memberType.monthlyFee.toLocaleString()}（別途請求）
+                </p>
+              ) : null}
+              {(membership.startDate || membership.endDate) && (
+                <p className="text-[10px] text-primary-100 mt-1">
+                  期間: {membership.startDate || '指定なし'} 〜 {membership.endDate || '指定なし'}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-center">
+              <p className="text-sm text-gray-500">会員区分は未設定です</p>
+              <p className="text-[10px] text-gray-400 mt-1">割引対象の方は施設までお問い合わせください</p>
+            </div>
+          )}
+        </section>
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 rounded-xl border border-red-200 flex items-center gap-2">
             <FiAlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
