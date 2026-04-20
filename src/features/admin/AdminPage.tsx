@@ -1,13 +1,33 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { adminApi, Event, School, SalesData } from '../../lib/api';
+import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
+
+// CSVダウンロードヘルパー
+const downloadCsv = (filename: string, rows: (string | number)[][]) => {
+  const escape = (v: string | number) => {
+    const s = String(v ?? '');
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = rows.map((r) => r.map(escape).join(',')).join('\r\n');
+  // Excel互換のためBOM付き
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 type Tab = 'calendar' | 'events' | 'schools' | 'sales';
 
@@ -264,35 +284,100 @@ const SalesTab: React.FC = () => {
   const [isLoading, setIsLoading] = React.useState(true);
   const [period, setPeriod] = React.useState<'daily' | 'monthly'>('daily');
   const [groupBy, setGroupBy] = React.useState<string>('');
-  const currentYear = new Date().getFullYear().toString();
-  const currentMonth = format(new Date(), 'yyyy-MM');
+  const [isDownloading, setIsDownloading] = React.useState(false);
+  // 期間：デフォルトは当月
+  const today = new Date();
+  const defaultFrom = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
+  const defaultTo = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
+  const [from, setFrom] = React.useState(defaultFrom);
+  const [to, setTo] = React.useState(defaultTo);
 
   const load = React.useCallback(() => {
     setIsLoading(true);
-    const params: Record<string, string> = { period };
+    const params: Record<string, string> = { period, from, to };
     if (groupBy) params.groupBy = groupBy;
-    if (period === 'daily') {
-      params.from = `${currentMonth}-01`;
-      params.to = `${currentMonth}-31`;
-    } else {
-      params.year = currentYear;
-    }
     adminApi.getSales(params)
       .then(setSalesData)
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, [period, groupBy, currentMonth, currentYear]);
+  }, [period, groupBy, from, to]);
 
   React.useEffect(load, [load]);
 
-  if (isLoading) return <Loading text="集計中..." />;
-  if (!salesData) return <p className="text-center text-gray-400 py-8">データがありません</p>;
+  // 集計CSVダウンロード（現在表示中のサマリ）
+  const handleSummaryCsv = () => {
+    if (!salesData) return;
+    const groupLabel =
+      groupBy === 'location' ? '拠点' :
+      groupBy === 'facility' ? '拠点_施設' :
+      period === 'monthly' ? '年月' : '日付';
+    const rows: (string | number)[][] = [
+      [groupLabel, '件数', '売上(円)'],
+      ...Object.entries(salesData.sales)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, v]) => [key, v.count, v.total]),
+      ['合計', salesData.totalCount, salesData.totalAmount],
+    ];
+    downloadCsv(`売上集計_${from}_${to}.csv`, rows);
+  };
 
-  const entries = Object.entries(salesData.sales).sort(([a], [b]) => a.localeCompare(b));
+  // 詳細CSVダウンロード（個別予約一覧）
+  const handleDetailCsv = async () => {
+    setIsDownloading(true);
+    try {
+      const checkins = await adminApi.getCheckins({ from, to });
+      const paid = checkins.filter((c) => c.status === 'PAID');
+      const rows: (string | number)[][] = [
+        ['予約ID', '日付', '開始時刻', '時間(h)', '拠点', '施設', '利用者', '金額(円)', 'ステータス', '作成日時'],
+        ...paid.map((c) => [
+          c.id,
+          c.date,
+          c.startTime,
+          c.duration,
+          getLocationName(c.location),
+          getFacilityName(c.location, c.facilityType),
+          c.displayName || '',
+          c.totalPrice || 0,
+          c.status,
+          c.createdAt || '',
+        ]),
+      ];
+      downloadCsv(`売上詳細_${from}_${to}.csv`, rows);
+    } catch (e) {
+      console.error(e);
+      alert('CSVのダウンロードに失敗しました');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const entries = salesData
+    ? Object.entries(salesData.sales).sort(([a], [b]) => a.localeCompare(b))
+    : [];
   const maxTotal = Math.max(...entries.map(([, v]) => v.total), 1);
 
   return (
     <div className="space-y-4">
+      {/* 期間指定 */}
+      <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
+        <p className="text-xs font-semibold text-gray-500 mb-2">集計期間</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+          />
+          <span className="text-gray-400 text-sm">〜</span>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+          />
+        </div>
+      </div>
+
       {/* フィルタ */}
       <div className="flex gap-2">
         <button
@@ -309,34 +394,60 @@ const SalesTab: React.FC = () => {
         >拠点別</button>
       </div>
 
-      {/* サマリ */}
-      <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-5 text-white">
-        <p className="text-primary-100 text-sm">合計売上</p>
-        <p className="text-3xl font-bold mt-1">¥{salesData.totalAmount.toLocaleString()}</p>
-        <p className="text-primary-200 text-sm mt-1">{salesData.totalCount}件</p>
-      </div>
+      {isLoading ? (
+        <Loading text="集計中..." />
+      ) : !salesData ? (
+        <p className="text-center text-gray-400 py-8">データがありません</p>
+      ) : (
+        <>
+          {/* サマリ */}
+          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-5 text-white">
+            <p className="text-primary-100 text-sm">合計売上</p>
+            <p className="text-3xl font-bold mt-1">¥{salesData.totalAmount.toLocaleString()}</p>
+            <p className="text-primary-200 text-sm mt-1">{salesData.totalCount}件</p>
+          </div>
 
-      {/* 棒グラフ */}
-      <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
-        {entries.length === 0 ? (
-          <p className="text-center text-gray-400 py-4">データがありません</p>
-        ) : (
-          entries.map(([key, val]) => (
-            <div key={key}>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600 font-medium">{key}</span>
-                <span className="text-gray-700 font-bold">¥{val.total.toLocaleString()} ({val.count}件)</span>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-3">
-                <div
-                  className="bg-gradient-to-r from-primary-500 to-primary-400 h-3 rounded-full transition-all duration-500"
-                  style={{ width: `${(val.total / maxTotal) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+          {/* CSVダウンロード */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleSummaryCsv}
+              disabled={entries.length === 0}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white border-2 border-primary-500 text-primary-700 text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FiDownload className="w-4 h-4" /> 集計CSV
+            </button>
+            <button
+              onClick={handleDetailCsv}
+              disabled={isDownloading}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FiDownload className="w-4 h-4" /> {isDownloading ? '取得中...' : '詳細CSV'}
+            </button>
+          </div>
+
+          {/* 棒グラフ */}
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
+            {entries.length === 0 ? (
+              <p className="text-center text-gray-400 py-4">データがありません</p>
+            ) : (
+              entries.map(([key, val]) => (
+                <div key={key}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600 font-medium">{key}</span>
+                    <span className="text-gray-700 font-bold">¥{val.total.toLocaleString()} ({val.count}件)</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-3">
+                    <div
+                      className="bg-gradient-to-r from-primary-500 to-primary-400 h-3 rounded-full transition-all duration-500"
+                      style={{ width: `${(val.total / maxTotal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };

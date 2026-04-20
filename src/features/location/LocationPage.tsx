@@ -234,6 +234,23 @@ export const LocationPage: React.FC = () => {
             <span className="text-sm text-gray-500">管理画面</span>
           </button>
         </div>
+
+        {/* 法務リンク */}
+        <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-center gap-4 text-xs text-gray-500">
+          <button
+            onClick={() => navigate('/privacy')}
+            className="hover:text-primary-600 underline"
+          >
+            プライバシーポリシー
+          </button>
+          <span className="text-gray-300">|</span>
+          <button
+            onClick={() => navigate('/commerce-law')}
+            className="hover:text-primary-600 underline"
+          >
+            特定商取引法に基づく表記
+          </button>
+        </div>
       </main>
 
       {/* 固定フッター */}
