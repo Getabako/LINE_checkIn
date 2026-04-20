@@ -1,11 +1,11 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority } from '../../lib/api';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -29,7 +29,19 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements';
+
+const PRIORITY_LABEL: Record<AnnouncementPriority, string> = {
+  info: 'お知らせ',
+  warning: '注意',
+  critical: '重要',
+};
+
+const PRIORITY_STYLE: Record<AnnouncementPriority, string> = {
+  info: 'bg-sky-50 text-sky-700 border-sky-200',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200',
+  critical: 'bg-red-50 text-red-700 border-red-200',
+};
 
 const DAY_OPTIONS = [
   { value: 'MON', label: '月' },
@@ -452,6 +464,184 @@ const SalesTab: React.FC = () => {
   );
 };
 
+// ============ お知らせ管理タブ ============
+const AnnouncementsTab: React.FC = () => {
+  const [items, setItems] = React.useState<Announcement[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const emptyForm = {
+    title: '',
+    body: '',
+    location: '' as '' | 'ASP' | 'YABASE',
+    priority: 'info' as AnnouncementPriority,
+    startDate: '',
+    endDate: '',
+    isActive: true,
+  };
+  const [form, setForm] = React.useState(emptyForm);
+
+  const load = () => {
+    adminApi.getAnnouncements()
+      .then(setItems)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  };
+
+  React.useEffect(load, []);
+
+  const handleCreate = async () => {
+    try {
+      await adminApi.createAnnouncement({
+        title: form.title,
+        body: form.body,
+        location: form.location || null,
+        priority: form.priority,
+        startDate: form.startDate || null,
+        endDate: form.endDate || null,
+        isActive: form.isActive,
+      });
+      setShowForm(false);
+      setForm(emptyForm);
+      load();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleToggleActive = async (a: Announcement) => {
+    await adminApi.updateAnnouncement(a.id, { isActive: !a.isActive });
+    load();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('削除しますか？')) return;
+    await adminApi.deleteAnnouncement(id);
+    load();
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+
+  return (
+    <div className="space-y-4">
+      <Button onClick={() => setShowForm(!showForm)}>
+        <FiPlus className="w-4 h-4" /> {showForm ? '閉じる' : 'お知らせ作成'}
+      </Button>
+
+      {showForm && (
+        <div className="bg-white p-5 rounded-2xl shadow-card border border-gray-100 space-y-3">
+          <input
+            placeholder="タイトル" value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm"
+          />
+          <textarea
+            placeholder="本文" value={form.body}
+            onChange={(e) => setForm({ ...form, body: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm" rows={4}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value as typeof form.location })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              <option value="">全拠点</option>
+              <option value="ASP">ASPのみ</option>
+              <option value="YABASE">やばせのみ</option>
+            </select>
+            <select
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value as AnnouncementPriority })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              <option value="info">通常</option>
+              <option value="warning">注意</option>
+              <option value="critical">重要</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500">表示開始日（任意）</label>
+              <input
+                type="date" value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">表示終了日（任意）</label>
+              <input
+                type="date" value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+            </div>
+          </div>
+          <Button fullWidth onClick={handleCreate} disabled={!form.title || !form.body}>作成</Button>
+        </div>
+      )}
+
+      {items.length === 0 && !showForm && (
+        <p className="text-center text-gray-400 py-8">お知らせがありません</p>
+      )}
+
+      {items.map((a) => (
+        <div
+          key={a.id}
+          className={clsx(
+            'bg-white p-4 rounded-2xl shadow-card border',
+            a.isActive ? 'border-gray-100' : 'border-gray-200 opacity-60'
+          )}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={clsx(
+                  'inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border',
+                  PRIORITY_STYLE[a.priority]
+                )}>
+                  {PRIORITY_LABEL[a.priority]}
+                </span>
+                {a.location && (
+                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600">
+                    {a.location === 'ASP' ? 'ASP' : 'やばせ'}限定
+                  </span>
+                )}
+                {!a.isActive && (
+                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">
+                    非表示
+                  </span>
+                )}
+              </div>
+              <h3 className="font-bold text-gray-900">{a.title}</h3>
+              <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{a.body}</p>
+              {(a.startDate || a.endDate) && (
+                <p className="text-xs text-gray-400 mt-2">
+                  期間: {a.startDate || '指定なし'} 〜 {a.endDate || '指定なし'}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={() => handleToggleActive(a)}
+                className="p-2 text-primary-500 hover:text-primary-700 text-xs font-semibold"
+              >
+                {a.isActive ? '非表示' : '表示'}
+              </button>
+              <button
+                onClick={() => handleDelete(a.id)}
+                className="p-2 text-red-400 hover:text-red-600"
+              >
+                <FiTrash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ============ メインの管理画面 ============
 export const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<Tab>('calendar');
@@ -462,18 +652,19 @@ export const AdminPage: React.FC = () => {
 
       <main className="p-4 pb-8">
         {/* タブ切り替え */}
-        <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="grid grid-cols-5 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           {([
             { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
             { key: 'schools', icon: FiBook, label: 'スクール' },
             { key: 'sales', icon: FiBarChart2, label: '売上' },
+            { key: 'announcements', icon: FiBell, label: 'お知らせ' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
               className={clsx(
-                'flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1',
+                'py-2.5 rounded-lg text-[11px] font-semibold transition-all flex flex-col items-center justify-center gap-0.5',
                 activeTab === key
                   ? 'bg-white text-primary-700 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
@@ -489,6 +680,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'events' && <EventsTab />}
         {activeTab === 'schools' && <SchoolsTab />}
         {activeTab === 'sales' && <SalesTab />}
+        {activeTab === 'announcements' && <AnnouncementsTab />}
       </main>
     </div>
   );

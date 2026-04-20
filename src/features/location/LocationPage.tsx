@@ -1,29 +1,42 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiMapPin, FiCalendar, FiBook, FiSettings, FiClock, FiUsers } from 'react-icons/fi';
+import { FiMapPin, FiCalendar, FiBook, FiSettings, FiClock, FiUsers, FiBell, FiAlertTriangle, FiAlertCircle } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { LOCATIONS, getLocationName } from '../../lib/locations';
-import { LocationId, Event, School, eventApi, schoolApi } from '../../lib/api';
+import { LocationId, Event, School, Announcement, eventApi, schoolApi, announcementApi } from '../../lib/api';
 import clsx from 'clsx';
+
+const announcementStyle = (priority: Announcement['priority']) => {
+  switch (priority) {
+    case 'critical':
+      return { box: 'bg-red-50 border-red-200', icon: 'text-red-500', title: 'text-red-800', body: 'text-red-700', Icon: FiAlertCircle };
+    case 'warning':
+      return { box: 'bg-amber-50 border-amber-200', icon: 'text-amber-500', title: 'text-amber-800', body: 'text-amber-700', Icon: FiAlertTriangle };
+    default:
+      return { box: 'bg-sky-50 border-sky-200', icon: 'text-sky-500', title: 'text-sky-800', body: 'text-sky-700', Icon: FiBell };
+  }
+};
 
 export const LocationPage: React.FC = () => {
   const navigate = useNavigate();
   const { location, setLocation, reset } = useCheckinStore();
   const [events, setEvents] = React.useState<Event[]>([]);
   const [schools, setSchools] = React.useState<School[]>([]);
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
 
   React.useEffect(() => {
     reset();
   }, [reset]);
 
   React.useEffect(() => {
-    // イベント・スクール一覧を取得（失敗しても無視）
+    // イベント・スクール・お知らせを取得（失敗しても無視）
     eventApi.getAll().then(setEvents).catch(() => setEvents([]));
     schoolApi.getAll().then(setSchools).catch(() => setSchools([]));
+    announcementApi.getPublic().then(setAnnouncements).catch(() => setAnnouncements([]));
   }, []);
 
   const handleLocationSelect = (id: LocationId) => {
@@ -48,6 +61,36 @@ export const LocationPage: React.FC = () => {
       <Header title="みんなの体育館" />
 
       <main className="p-4 pb-28">
+        {/* 施設からのお知らせ */}
+        {announcements.length > 0 && (
+          <div className="space-y-2 mb-4 stagger-children">
+            {announcements.map((a) => {
+              const s = announcementStyle(a.priority);
+              return (
+                <div
+                  key={a.id}
+                  className={clsx('p-3 rounded-xl border flex items-start gap-2', s.box)}
+                >
+                  <s.Icon className={clsx('w-5 h-5 mt-0.5 flex-shrink-0', s.icon)} />
+                  <div className="flex-1 min-w-0">
+                    <p className={clsx('text-sm font-bold', s.title)}>
+                      {a.title}
+                      {a.location && (
+                        <span className="ml-2 text-[10px] font-semibold opacity-70">
+                          [{a.location === 'ASP' ? 'ASP' : 'やばせ'}]
+                        </span>
+                      )}
+                    </p>
+                    <p className={clsx('text-xs mt-1 whitespace-pre-wrap leading-relaxed', s.body)}>
+                      {a.body}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ヒーローセクション */}
         <div className="text-center mb-8 pt-4 animate-fade-in-up">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-400 rounded-2xl shadow-glow mb-4 animate-float">

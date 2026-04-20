@@ -42,4 +42,5 @@ export const COLLECTIONS = {
   SCHOOLS: 'schools',
   EVENT_REGISTRATIONS: 'eventRegistrations',
   SCHOOL_REGISTRATIONS: 'schoolRegistrations',
+  ANNOUNCEMENTS: 'announcements',
 } as const;

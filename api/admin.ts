@@ -34,16 +34,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const admin = await verifyAdmin(req);
-    if (!admin) {
-      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    const action = req.query.action as string;
+    if (!action) {
+      return res.status(400).json({ error: 'Missing action parameter' });
     }
 
     const db = getDb();
-    const action = req.query.action as string;
 
-    if (!action) {
-      return res.status(400).json({ error: 'Missing action parameter' });
+    // ============ お知らせ公開取得（認証不要） ============
+    if (action === 'announcementsPublic' && req.method === 'GET') {
+      const location = req.query.location as string | undefined;
+      const today = new Date().toISOString().substring(0, 10);
+      const snapshot = await db.collection(COLLECTIONS.ANNOUNCEMENTS).get();
+      const items = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as {
+          id: string;
+          isActive?: boolean;
+          startDate?: string | null;
+          endDate?: string | null;
+          location?: string | null;
+          priority?: string;
+          createdAt?: string;
+        }))
+        .filter((a) => a.isActive !== false)
+        .filter((a) => !a.startDate || a.startDate <= today)
+        .filter((a) => !a.endDate || a.endDate >= today)
+        .filter((a) => !location || !a.location || a.location === location)
+        .sort((a, b) => {
+          const order = { critical: 0, warning: 1, info: 2 } as Record<string, number>;
+          const ap = order[a.priority || 'info'] ?? 9;
+          const bp = order[b.priority || 'info'] ?? 9;
+          if (ap !== bp) return ap - bp;
+          return (b.createdAt || '').localeCompare(a.createdAt || '');
+        });
+      return res.status(200).json(items);
+    }
+
+    const admin = await verifyAdmin(req);
+    if (!admin) {
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 
     // ============ イベント管理 ============
@@ -391,6 +420,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
         .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(regs);
+    }
+
+    // ============ お知らせ管理 ============
+    if (action === 'announcements' && req.method === 'GET') {
+      const snapshot = await db.collection(COLLECTIONS.ANNOUNCEMENTS).get();
+      const items = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return res.status(200).json(items);
+    }
+
+    if (action === 'createAnnouncement' && req.method === 'POST') {
+      const { title, body, location, priority, startDate, endDate, isActive } = req.body;
+      if (!title || !body) return res.status(400).json({ error: 'Missing title or body' });
+      const now = new Date().toISOString();
+      const data = {
+        title,
+        body,
+        location: location || null,
+        priority: priority || 'info',
+        startDate: startDate || null,
+        endDate: endDate || null,
+        isActive: isActive !== false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.ANNOUNCEMENTS).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
+    if (action === 'updateAnnouncement' && req.method === 'PUT') {
+      const { announcementId, ...updates } = req.body;
+      if (!announcementId) return res.status(400).json({ error: 'Missing announcementId' });
+      updates.updatedAt = new Date().toISOString();
+      await db.collection(COLLECTIONS.ANNOUNCEMENTS).doc(announcementId).update(updates);
+      return res.status(200).json({ message: 'Updated' });
+    }
+
+    if (action === 'deleteAnnouncement' && req.method === 'DELETE') {
+      const announcementId = req.query.announcementId as string;
+      if (!announcementId) return res.status(400).json({ error: 'Missing announcementId' });
+      await db.collection(COLLECTIONS.ANNOUNCEMENTS).doc(announcementId).delete();
+      return res.status(200).json({ message: 'Deleted' });
     }
 
     return res.status(400).json({ error: `Unknown action: ${action}` });

@@ -300,6 +300,30 @@ export interface SalesData {
   totalAmount: number;
 }
 
+export type AnnouncementPriority = 'info' | 'warning' | 'critical';
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  location: LocationId | null;
+  priority: AnnouncementPriority;
+  startDate: string | null;
+  endDate: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// 公開お知らせ取得（認証不要・/admin?action=announcementsPublic 経由）
+export const announcementApi = {
+  getPublic: (location?: LocationId) => {
+    const qs = new URLSearchParams({ action: 'announcementsPublic' });
+    if (location) qs.set('location', location);
+    return api.get<Announcement[]>(`/admin?${qs.toString()}`);
+  },
+};
+
 export const adminApi = {
   // イベント管理
   getEvents: () => api.get<Event[]>('/admin?action=events'),
@@ -355,4 +379,13 @@ export const adminApi = {
   // 予約削除（管理者）
   deleteCheckin: (checkinId: string) =>
     api.delete<void>(`/admin?action=deleteCheckin&checkinId=${checkinId}`),
+
+  // お知らせ管理
+  getAnnouncements: () => api.get<Announcement[]>('/admin?action=announcements'),
+  createAnnouncement: (data: Partial<Announcement>) =>
+    api.post<Announcement>('/admin?action=createAnnouncement', data),
+  updateAnnouncement: (announcementId: string, data: Partial<Announcement>) =>
+    api.put<void>('/admin?action=updateAnnouncement', { announcementId, ...data }),
+  deleteAnnouncement: (announcementId: string) =>
+    api.delete<void>(`/admin?action=deleteAnnouncement&announcementId=${announcementId}`),
 };
