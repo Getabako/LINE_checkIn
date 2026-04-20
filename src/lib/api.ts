@@ -116,6 +116,21 @@ export interface CreateCheckoutResponse {
 }
 
 // クーポン関連
+export interface Coupon {
+  id: string;
+  code: string;
+  description?: string;
+  discountType: 'PERCENTAGE' | 'FIXED';
+  discountValue: number;
+  locationFilter?: LocationId | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  maxUses?: number | null;
+  usedCount?: number;
+  isActive: boolean;
+  createdAt?: string;
+}
+
 export interface CouponValidationResult {
   valid: boolean;
   couponId?: string;
@@ -408,6 +423,18 @@ export const adminApi = {
     api.put<void>('/admin?action=updateMemberType', { memberTypeId, ...data }),
   deleteMemberType: (memberTypeId: string) =>
     api.delete<void>(`/admin?action=deleteMemberType&memberTypeId=${memberTypeId}`),
+
+  // クーポン管理
+  getCoupons: () => api.get<Coupon[]>('/admin?action=coupons'),
+  createCoupon: (data: Partial<Coupon>) => api.post<Coupon>('/admin?action=createCoupon', data),
+  updateCoupon: (couponId: string, data: Partial<Coupon>) =>
+    api.put<void>('/admin?action=updateCoupon', { couponId, ...data }),
+  deleteCoupon: (couponId: string) =>
+    api.delete<void>(`/admin?action=deleteCoupon&couponId=${couponId}`),
+
+  // 自分（管理者）を会員に付与
+  assignSelfMembership: (data: { memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
+    api.post<UserMembership>('/admin?action=assignSelfMembership', data),
 
   // ユーザー会員区分の付与
   getUsers: (search?: string) => {

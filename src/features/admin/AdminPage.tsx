@@ -1,11 +1,11 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -29,7 +29,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -695,12 +695,43 @@ const MembersTab: React.FC = () => {
 
   React.useEffect(load, []);
 
-  const handleSearchUsers = async () => {
+  const handleSearchUsers = async (q?: string) => {
     try {
-      const list = await adminApi.getUsers(search);
+      const list = await adminApi.getUsers(q !== undefined ? q : search);
       setUsers(list);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // フォームを開いた時に全ユーザーを自動取得
+  React.useEffect(() => {
+    if (showAssignForm) {
+      handleSearchUsers('');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAssignForm]);
+
+  const handleAssignSelf = async () => {
+    if (!assignForm.memberTypeId) {
+      alert('先に会員種別を選択してください');
+      return;
+    }
+    if (!confirm('管理者(自分)にこの会員区分を付与しますか？')) return;
+    try {
+      await adminApi.assignSelfMembership({
+        memberTypeId: assignForm.memberTypeId,
+        startDate: assignForm.startDate || null,
+        endDate: assignForm.endDate || null,
+      });
+      setShowAssignForm(false);
+      setAssignForm({ userId: '', lineUserId: '', displayName: '', memberTypeId: '', startDate: '', endDate: '' });
+      setUsers([]);
+      setSearch('');
+      load();
+    } catch (e) {
+      console.error(e);
+      alert('付与に失敗しました');
     }
   };
 
@@ -882,7 +913,7 @@ const MembersTab: React.FC = () => {
                   onChange={(e) => setSearch(e.target.value)}
                   className="flex-1 px-3 py-2 border rounded-lg text-sm"
                 />
-                <button onClick={handleSearchUsers} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
+                <button onClick={() => handleSearchUsers()} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
                   <FiSearch className="w-4 h-4" />
                 </button>
               </div>
@@ -940,6 +971,16 @@ const MembersTab: React.FC = () => {
             <Button fullWidth onClick={handleAssign} disabled={!assignForm.lineUserId || !assignForm.memberTypeId}>
               この内容で付与
             </Button>
+            <button
+              onClick={handleAssignSelf}
+              disabled={!assignForm.memberTypeId}
+              className="w-full mt-2 py-2 rounded-xl border-2 border-primary-300 text-primary-700 text-sm font-semibold disabled:opacity-40"
+            >
+              自分(管理者)に付与（テスト用）
+            </button>
+            <p className="text-[10px] text-gray-400 mt-2 text-center">
+              ※ ユーザーが見つからない場合は、対象の方が一度ミニアプリを開く必要があります
+            </p>
           </div>
         )}
 
@@ -969,6 +1010,213 @@ const MembersTab: React.FC = () => {
   );
 };
 
+// ============ クーポン管理タブ ============
+const CouponsTab: React.FC = () => {
+  const [coupons, setCoupons] = React.useState<Coupon[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const emptyForm = {
+    code: '',
+    description: '',
+    discountType: 'FIXED' as 'FIXED' | 'PERCENTAGE',
+    discountValue: 500,
+    locationFilter: '' as '' | 'ASP' | 'YABASE',
+    validFrom: '',
+    validUntil: '',
+    maxUses: '',
+  };
+  const [form, setForm] = React.useState(emptyForm);
+
+  const load = () => {
+    adminApi.getCoupons()
+      .then(setCoupons)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  };
+
+  React.useEffect(load, []);
+
+  const handleCreate = async () => {
+    try {
+      await adminApi.createCoupon({
+        code: form.code,
+        description: form.description,
+        discountType: form.discountType,
+        discountValue: Number(form.discountValue),
+        locationFilter: (form.locationFilter || null) as any,
+        validFrom: form.validFrom || null,
+        validUntil: form.validUntil || null,
+        maxUses: form.maxUses ? Number(form.maxUses) : null,
+        isActive: true,
+      });
+      setShowForm(false);
+      setForm(emptyForm);
+      load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '作成に失敗しました';
+      alert(msg);
+    }
+  };
+
+  const handleSeedTerada = async () => {
+    if (!confirm('TERADA（¥500OFF テスト用）を作成しますか？')) return;
+    try {
+      await adminApi.createCoupon({
+        code: 'TERADA',
+        description: 'テスト用 ¥500OFF',
+        discountType: 'FIXED',
+        discountValue: 500,
+        isActive: true,
+      });
+      load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '作成に失敗しました';
+      alert(msg);
+    }
+  };
+
+  const handleToggle = async (c: Coupon) => {
+    await adminApi.updateCoupon(c.id, { isActive: !c.isActive });
+    load();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('削除しますか？')) return;
+    await adminApi.deleteCoupon(id);
+    load();
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button onClick={() => setShowForm(!showForm)}>
+          <FiPlus className="w-4 h-4" /> {showForm ? '閉じる' : 'クーポン作成'}
+        </Button>
+        <button
+          onClick={handleSeedTerada}
+          className="px-4 py-2.5 rounded-xl border-2 border-primary-300 text-primary-700 text-sm font-semibold whitespace-nowrap"
+        >
+          TERADA¥500を追加
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white p-5 rounded-2xl shadow-card border border-gray-100 space-y-3">
+          <input
+            placeholder="コード（例: TERADA）" value={form.code}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm"
+          />
+          <input
+            placeholder="説明（任意）" value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.discountType}
+              onChange={(e) => setForm({ ...form, discountType: e.target.value as 'FIXED' | 'PERCENTAGE' })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              <option value="FIXED">固定額OFF</option>
+              <option value="PERCENTAGE">％OFF</option>
+            </select>
+            <div>
+              <input
+                type="number" placeholder="割引値" value={form.discountValue}
+                onChange={(e) => setForm({ ...form, discountValue: Number(e.target.value) })}
+                className="w-full px-3 py-2 border rounded-lg text-sm"
+              />
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {form.discountType === 'FIXED' ? '円' : '%'}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.locationFilter}
+              onChange={(e) => setForm({ ...form, locationFilter: e.target.value as typeof form.locationFilter })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              <option value="">全拠点</option>
+              <option value="ASP">ASPのみ</option>
+              <option value="YABASE">やばせのみ</option>
+            </select>
+            <input
+              type="number" placeholder="使用回数上限（任意）" value={form.maxUses}
+              onChange={(e) => setForm({ ...form, maxUses: e.target.value })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-400">有効開始日（任意）</label>
+              <input type="date" value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400">有効終了日（任意）</label>
+              <input type="date" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+          </div>
+          <Button fullWidth onClick={handleCreate} disabled={!form.code || !form.discountValue}>作成</Button>
+        </div>
+      )}
+
+      {coupons.length === 0 && !showForm && (
+        <p className="text-center text-gray-400 py-8 text-sm">クーポンがありません</p>
+      )}
+
+      {coupons.map((c) => (
+        <div
+          key={c.id}
+          className={clsx(
+            'bg-white p-4 rounded-2xl shadow-card border',
+            c.isActive ? 'border-gray-100' : 'border-gray-200 opacity-60'
+          )}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="font-mono font-bold text-primary-700">{c.code}</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">
+                  {c.discountType === 'PERCENTAGE'
+                    ? `${c.discountValue}%OFF`
+                    : `¥${c.discountValue.toLocaleString()} OFF`}
+                </span>
+                {c.locationFilter && (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                    {c.locationFilter === 'ASP' ? 'ASP' : 'やばせ'}限定
+                  </span>
+                )}
+                {!c.isActive && (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-500">無効</span>
+                )}
+              </div>
+              {c.description && <p className="text-xs text-gray-600">{c.description}</p>}
+              <div className="text-[10px] text-gray-400 mt-1 space-x-2">
+                {(c.validFrom || c.validUntil) && (
+                  <span>期間: {c.validFrom || '指定なし'}〜{c.validUntil || '指定なし'}</span>
+                )}
+                {c.maxUses ? <span>使用 {c.usedCount || 0}/{c.maxUses}</span> : null}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <button onClick={() => handleToggle(c)} className="text-xs text-primary-500 px-2">
+                {c.isActive ? '無効化' : '有効化'}
+              </button>
+              <button onClick={() => handleDelete(c.id)} className="p-2 text-red-400 hover:text-red-600">
+                <FiTrash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ============ メインの管理画面 ============
 export const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<Tab>('calendar');
@@ -979,7 +1227,7 @@ export const AdminPage: React.FC = () => {
 
       <main className="p-4 pb-8">
         {/* タブ切り替え */}
-        <div className="grid grid-cols-6 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="grid grid-cols-7 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           {([
             { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
@@ -987,6 +1235,7 @@ export const AdminPage: React.FC = () => {
             { key: 'sales', icon: FiBarChart2, label: '売上' },
             { key: 'announcements', icon: FiBell, label: 'お知らせ' },
             { key: 'members', icon: FiUser, label: '会員' },
+            { key: 'coupons', icon: FiTag, label: 'クーポン' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -1010,6 +1259,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'sales' && <SalesTab />}
         {activeTab === 'announcements' && <AnnouncementsTab />}
         {activeTab === 'members' && <MembersTab />}
+        {activeTab === 'coupons' && <CouponsTab />}
       </main>
     </div>
   );

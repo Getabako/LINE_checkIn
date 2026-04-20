@@ -422,6 +422,93 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(regs);
     }
 
+    // ============ クーポン管理 ============
+    if (action === 'coupons' && req.method === 'GET') {
+      const snapshot = await db.collection(COLLECTIONS.COUPONS).get();
+      const items = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return res.status(200).json(items);
+    }
+
+    if (action === 'createCoupon' && req.method === 'POST') {
+      const { code, description, discountType, discountValue, locationFilter, validFrom, validUntil, maxUses, isActive } = req.body;
+      if (!code || !discountType || discountValue === undefined) {
+        return res.status(400).json({ error: 'Missing code/discountType/discountValue' });
+      }
+      const normalizedCode = String(code).toUpperCase().trim();
+      // 重複チェック
+      const dup = await db.collection(COLLECTIONS.COUPONS).where('code', '==', normalizedCode).limit(1).get();
+      if (!dup.empty) return res.status(409).json({ error: `コード "${normalizedCode}" は既に存在します` });
+
+      const now = new Date().toISOString();
+      const data = {
+        code: normalizedCode,
+        description: description || '',
+        discountType,
+        discountValue: Number(discountValue),
+        locationFilter: locationFilter || null,
+        validFrom: validFrom || null,
+        validUntil: validUntil || null,
+        maxUses: maxUses ? Number(maxUses) : null,
+        usedCount: 0,
+        isActive: isActive !== false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.COUPONS).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
+    if (action === 'updateCoupon' && req.method === 'PUT') {
+      const { couponId, ...updates } = req.body;
+      if (!couponId) return res.status(400).json({ error: 'Missing couponId' });
+      if (updates.code) updates.code = String(updates.code).toUpperCase().trim();
+      updates.updatedAt = new Date().toISOString();
+      await db.collection(COLLECTIONS.COUPONS).doc(couponId).update(updates);
+      return res.status(200).json({ message: 'Updated' });
+    }
+
+    if (action === 'deleteCoupon' && req.method === 'DELETE') {
+      const couponId = req.query.couponId as string;
+      if (!couponId) return res.status(400).json({ error: 'Missing couponId' });
+      await db.collection(COLLECTIONS.COUPONS).doc(couponId).delete();
+      return res.status(200).json({ message: 'Deleted' });
+    }
+
+    // 自分(管理者)に会員区分を付与（ユーザー検索を介さないクイック付与）
+    if (action === 'assignSelfMembership' && req.method === 'POST') {
+      const { memberTypeId, startDate, endDate } = req.body;
+      if (!memberTypeId) return res.status(400).json({ error: 'Missing memberTypeId' });
+
+      const adminUserDoc = await db.collection(COLLECTIONS.USERS).doc(admin.userId).get();
+      const adminUser = adminUserDoc.data() || { displayName: '管理者' };
+
+      // 既存のアクティブ会員を非アクティブ化
+      const existing = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('lineUserId', '==', admin.lineUserId)
+        .where('isActive', '==', true)
+        .get();
+      const batch = db.batch();
+      existing.docs.forEach((d) => batch.update(d.ref, { isActive: false, updatedAt: new Date().toISOString() }));
+      await batch.commit();
+
+      const now = new Date().toISOString();
+      const data = {
+        lineUserId: admin.lineUserId,
+        userId: admin.userId,
+        displayName: adminUser.displayName || '管理者',
+        memberTypeId,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.USER_MEMBERSHIPS).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
     // ============ 会員種別マスタ ============
     if (action === 'memberTypes' && req.method === 'GET') {
       const snapshot = await db.collection(COLLECTIONS.MEMBER_TYPES).get();
