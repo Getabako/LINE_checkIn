@@ -88,6 +88,10 @@ export interface Checkin {
   startTime: string;
   duration: number;
   totalPrice: number;
+  originalPrice?: number;
+  memberDiscount?: number;
+  memberTypeName?: string | null;
+  couponDiscount?: number;
   pinCode?: string;
   status: CheckinStatus;
   groupId?: string;
