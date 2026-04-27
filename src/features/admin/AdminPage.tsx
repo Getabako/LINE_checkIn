@@ -6,6 +6,7 @@ import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
+import * as holidayJp from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -350,25 +351,54 @@ const SalesTab: React.FC = () => {
   };
 
   // 詳細CSVダウンロード（個別予約一覧）
+  // 時間帯区分: 平日昼 / 平日夜 / 土日祝（夜間=18:00以降開始）
+  const classifySlot = (dateStr: string, startTime: string): string => {
+    const d = new Date(dateStr);
+    const dow = d.getDay();
+    const isHoliday = holidayJp.isHoliday(d);
+    if (dow === 0 || dow === 6 || isHoliday) return '土日祝';
+    const hour = parseInt(startTime.split(':')[0], 10);
+    return hour >= 18 ? '平日夜' : '平日昼';
+  };
   const handleDetailCsv = async () => {
     setIsDownloading(true);
     try {
       const checkins = await adminApi.getCheckins({ from, to });
       const paid = checkins.filter((c) => c.status === 'PAID');
       const rows: (string | number)[][] = [
-        ['予約ID', '日付', '開始時刻', '時間(h)', '拠点', '施設', '利用者', '金額(円)', 'ステータス', '作成日時'],
-        ...paid.map((c) => [
-          c.id,
-          c.date,
-          c.startTime,
-          c.duration,
-          getLocationName(c.location),
-          getFacilityName(c.location, c.facilityType),
-          c.displayName || '',
-          c.totalPrice || 0,
-          c.status,
-          c.createdAt || '',
-        ]),
+        [
+          '予約ID', '日付', '開始時刻', '時間(h)',
+          '拠点', '施設', '利用者',
+          '利用区分', '会員区分(団体名)',
+          '時間帯区分',
+          '元金額(税込)', '会員割引', 'クーポン割引',
+          '請求額(税込)', '請求額(税抜)',
+          'ステータス', '作成日時',
+        ],
+        ...paid.map((c) => {
+          const isMember = !!c.memberTypeName;
+          const total = c.totalPrice || 0;
+          const ex = Math.floor(total / 1.1);
+          return [
+            c.id,
+            c.date,
+            c.startTime,
+            c.duration,
+            getLocationName(c.location),
+            getFacilityName(c.location, c.facilityType),
+            c.displayName || '',
+            isMember ? '定期' : '一般',
+            c.memberTypeName || '',
+            classifySlot(c.date, c.startTime),
+            (c as { originalPrice?: number }).originalPrice ?? total,
+            (c as { memberDiscount?: number }).memberDiscount ?? 0,
+            (c as { couponDiscount?: number }).couponDiscount ?? 0,
+            total,
+            ex,
+            c.status,
+            c.createdAt || '',
+          ];
+        }),
       ];
       downloadCsv(`売上詳細_${from}_${to}.csv`, rows);
     } catch (e) {

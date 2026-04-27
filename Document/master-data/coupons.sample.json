@@ -1,0 +1,38 @@
+[
+  {
+    "code": "WELCOME500",
+    "description": "新規利用者向け 500円引きクーポン",
+    "discountType": "FIXED",
+    "discountValue": 500,
+    "locationFilter": null,
+    "validFrom": null,
+    "validUntil": null,
+    "maxUses": null,
+    "usedCount": 0,
+    "isActive": true
+  },
+  {
+    "code": "ASP10OFF",
+    "description": "ASP 拠点限定 10% オフ",
+    "discountType": "PERCENTAGE",
+    "discountValue": 10,
+    "locationFilter": "ASP",
+    "validFrom": null,
+    "validUntil": null,
+    "maxUses": null,
+    "usedCount": 0,
+    "isActive": true
+  },
+  {
+    "code": "FIRSTFREE",
+    "description": "初回利用 100% 割引（社内配布用）",
+    "discountType": "PERCENTAGE",
+    "discountValue": 100,
+    "locationFilter": null,
+    "validFrom": null,
+    "validUntil": null,
+    "maxUses": 50,
+    "usedCount": 0,
+    "isActive": false
+  }
+]

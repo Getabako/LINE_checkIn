@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
+import { createLogger } from '../../server-lib/logger.js';
+
+const log = createLogger('api.checkins');
 
 const VALID_LOCATIONS = ['ASP', 'YABASE'];
 const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
@@ -31,9 +34,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
 
+  log.debug('request.in', { method: req.method, query: req.query });
   try {
     const profile = await verifyLiffToken(req.headers.authorization);
     if (!profile) {
+      log.warn('unauthorized', { method: req.method });
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -309,6 +314,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
 
       const docRef = await checkinsRef.add(checkinData);
+      log.op('checkin.create', {
+        checkinId: docRef.id,
+        userId,
+        location: loc,
+        facilityType,
+        date,
+        startTime,
+        duration,
+      });
 
       return res.status(201).json({
         checkin: { id: docRef.id, ...checkinData },
@@ -317,7 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    console.error('API Error:', error);
+    log.error('handler.fail', { message: String(error) });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

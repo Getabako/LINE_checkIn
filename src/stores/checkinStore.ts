@@ -27,6 +27,8 @@ interface CheckinState {
   // 会員割引
   memberDiscount: number;
   memberTypeName: string | null;
+  // 請求書払い（FREE 会員区分: S-01 等）
+  isInvoicePayment: boolean;
 
   // アクション
   setLocation: (location: LocationId) => void;
@@ -36,7 +38,7 @@ interface CheckinState {
   setDuration: (duration: number) => void;
   setTotalPrice: (price: number) => void;
   setCoupon: (code: string | null, discount: number) => void;
-  setMemberDiscount: (discount: number, typeName: string | null) => void;
+  setMemberDiscount: (discount: number, typeName: string | null, isInvoice?: boolean) => void;
   setMultiDateMode: (enabled: boolean) => void;
   toggleDate: (date: Date) => void;
   setDates: (dates: Date[]) => void;
@@ -59,6 +61,7 @@ const initialState = {
   couponDiscount: 0,
   memberDiscount: 0,
   memberTypeName: null,
+  isInvoicePayment: false,
 };
 
 export const useCheckinStore = create<CheckinState>((set) => ({
@@ -71,7 +74,7 @@ export const useCheckinStore = create<CheckinState>((set) => ({
   setDuration: (duration) => set({ duration }),
   setTotalPrice: (price) => set({ totalPrice: price }),
   setCoupon: (code, discount) => set({ couponCode: code, couponDiscount: discount }),
-  setMemberDiscount: (discount, typeName) => set({ memberDiscount: discount, memberTypeName: typeName }),
+  setMemberDiscount: (discount, typeName, isInvoice) => set({ memberDiscount: discount, memberTypeName: typeName, isInvoicePayment: !!isInvoice }),
   setMultiDateMode: (enabled) => set({ multiDateMode: enabled, dates: [], recurringType: null }),
   toggleDate: (date) => set((state) => {
     const exists = state.dates.some((d) => d.toDateString() === date.toDateString());

@@ -37,7 +37,7 @@ export const PaymentPage: React.FC = () => {
 
   const {
     location, facilityType, date, startTime, duration, totalPrice,
-    couponCode, couponDiscount, memberDiscount, memberTypeName,
+    couponCode, couponDiscount, memberDiscount, memberTypeName, isInvoicePayment,
     multiDateMode, dates, recurringType,
     setCoupon, setMemberDiscount,
   } = useCheckinStore();
@@ -62,7 +62,8 @@ export const PaymentPage: React.FC = () => {
       const discountValue = Number(mt.discountValue) || 0;
 
       let perDay = 0;
-      if (discountType === 'FREE') {
+      const isFree = discountType === 'FREE';
+      if (isFree) {
         perDay = dayBase;
       } else if (discountType === 'PERCENTAGE') {
         perDay = Math.floor(dayBase * (discountValue / 100));
@@ -73,7 +74,7 @@ export const PaymentPage: React.FC = () => {
         if (legacy !== 0) perDay = Math.min(dayBase, Math.abs(legacy) * duration);
       }
       const totalDiscount = perDay * dayCount;
-      if (totalDiscount > 0) setMemberDiscount(totalDiscount, mt.name);
+      if (totalDiscount > 0) setMemberDiscount(totalDiscount, mt.name, isFree);
     }).catch(() => {
       // 会員情報取得失敗は無視
     });
@@ -342,33 +343,53 @@ export const PaymentPage: React.FC = () => {
             <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
             お支払い方法
           </h3>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border border-primary-200 transition-all duration-300">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm">
-                <FiCreditCard className="w-5 h-5 text-white" />
+          {isInvoicePayment ? (
+            <>
+              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
+                <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-400 rounded-xl flex items-center justify-center shadow-sm">
+                  <span className="text-white font-bold text-xs">請求</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-sm">請求書払い（後日請求）</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{memberTypeName ? `${memberTypeName} 会員区分` : '定期利用会員'}</p>
+                </div>
+                <FiCheckCircle className="w-5 h-5 text-emerald-500" />
               </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-900 text-sm">クレジットカード</p>
+              <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
+                オンライン決済は発生しません。月次の利用実績に基づき、後日 別途請求書を発行いたします。
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border border-primary-200 transition-all duration-300">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm">
+                    <FiCreditCard className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900 text-sm">クレジットカード</p>
+                  </div>
+                  <FiCheckCircle className="w-5 h-5 text-primary-500" />
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border border-red-200 transition-all duration-300">
+                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-400 rounded-xl flex items-center justify-center shadow-sm">
+                    <span className="text-white font-bold text-xs">Pay</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-900 text-sm">PayPay</p>
+                  </div>
+                  <FiCheckCircle className="w-5 h-5 text-red-500" />
+                </div>
               </div>
-              <FiCheckCircle className="w-5 h-5 text-primary-500" />
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border border-red-200 transition-all duration-300">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-400 rounded-xl flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-xs">Pay</span>
+              <p className="text-[10px] text-gray-400 mt-3 text-center">
+                決済画面でお支払い方法を選択できます
+              </p>
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400 justify-center">
+                <FiShield className="w-3.5 h-3.5" />
+                <span>安全な暗号化通信で保護されています</span>
               </div>
-              <div className="flex-1">
-                <p className="font-bold text-gray-900 text-sm">PayPay</p>
-              </div>
-              <FiCheckCircle className="w-5 h-5 text-red-500" />
-            </div>
-          </div>
-          <p className="text-[10px] text-gray-400 mt-3 text-center">
-            決済画面でお支払い方法を選択できます
-          </p>
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400 justify-center">
-            <FiShield className="w-3.5 h-3.5" />
-            <span>安全な暗号化通信で保護されています</span>
-          </div>
+            </>
+          )}
         </div>
 
         {/* キャンセルメッセージ */}
@@ -391,9 +412,9 @@ export const PaymentPage: React.FC = () => {
       {/* 固定フッター */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-lg border-t border-primary-100/30">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-gray-500 text-sm">お支払い金額</span>
+          <span className="text-gray-500 text-sm">{isInvoicePayment ? '今回のお支払い' : 'お支払い金額'}</span>
           <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-            ¥{finalPrice.toLocaleString()}
+            {isInvoicePayment ? '請求書払い' : `¥${finalPrice.toLocaleString()}`}
           </span>
         </div>
         <Button
@@ -401,10 +422,10 @@ export const PaymentPage: React.FC = () => {
           loading={isLoading}
           onClick={handlePayment}
         >
-          お支払いへ進む
+          {isInvoicePayment ? '予約を確定する' : 'お支払いへ進む'}
         </Button>
         <p className="text-xs text-gray-400 text-center mt-2">
-          お支払い完了後、暗証番号が発行されます
+          {isInvoicePayment ? '確定後、暗証番号が発行されます' : 'お支払い完了後、暗証番号が発行されます'}
         </p>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeLiff } from './lib/liff';
 import { userApi } from './lib/api';
+import { createLogger } from './lib/logger';
 import { Loading } from './components/common/Loading';
 import { DebugPanel } from './components/common/DebugPanel';
 import { LocationPage } from './features/location/LocationPage';
@@ -29,19 +30,27 @@ const queryClient = new QueryClient({
   },
 });
 
+const log = createLogger('App');
+
 const App: React.FC = () => {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
+      log.op('app.boot');
       try {
+        log.debug('liff.init start');
         await initializeLiff();
+        log.debug('liff.init ok');
         // ユーザーをFirestoreに自動登録（失敗してもアプリ起動は継続）
-        userApi.getMe().catch((e) => console.warn('User auto-register failed:', e));
+        userApi
+          .getMe()
+          .then(() => log.op('user.autoRegister.ok'))
+          .catch((e) => log.warn('user.autoRegister.fail', { message: String(e) }));
         setIsLiffReady(true);
       } catch (err) {
-        console.error('LIFF initialization failed:', err);
+        log.error('liff.init.fail', { message: String(err) });
         setError('LIFFの初期化に失敗しました');
         // 開発環境では続行
         if (import.meta.env.DEV) {

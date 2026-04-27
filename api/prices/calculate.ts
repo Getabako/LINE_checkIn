@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import * as holidayJp from '@holiday-jp/holiday_jp';
 
 // 拠点別料金表
 const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
@@ -27,10 +28,11 @@ const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, n
 const VALID_LOCATIONS = ['ASP', 'YABASE'];
 const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
 
-// 曜日判定
+// 曜日判定（土日 + 祝日）
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
-  return day === 0 || day === 6;
+  if (day === 0 || day === 6) return true;
+  return holidayJp.isHoliday(date);
 }
 
 // 時間帯判定

@@ -1,0 +1,32 @@
+[
+  {
+    "code": "GENERAL",
+    "name": "一般会員",
+    "description": "通常料金で利用する会員区分。割引はありません。",
+    "discountType": "NONE",
+    "discountValue": 0,
+    "monthlyFee": 0,
+    "isActive": true,
+    "sortOrder": 1
+  },
+  {
+    "code": "STUDENT",
+    "name": "学生会員",
+    "description": "学生向け。月額3,630円で1時間あたり550円割引。",
+    "discountType": "FIXED_PER_HOUR",
+    "discountValue": 550,
+    "monthlyFee": 3630,
+    "isActive": true,
+    "sortOrder": 2
+  },
+  {
+    "code": "STAFF",
+    "name": "スタッフ",
+    "description": "運営スタッフ。無料で利用可能。",
+    "discountType": "FREE",
+    "discountValue": 0,
+    "monthlyFee": 0,
+    "isActive": true,
+    "sortOrder": 3
+  }
+]

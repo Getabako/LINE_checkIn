@@ -1,0 +1,29 @@
+[
+  {
+    "title": "サービス開始のお知らせ",
+    "body": "みんなの体育館 予約システムの運用を開始しました。ご不明点は LINE 公式アカウントへお問い合わせください。",
+    "location": null,
+    "priority": "info",
+    "startDate": null,
+    "endDate": null,
+    "isActive": true
+  },
+  {
+    "title": "年末年始休業のお知らせ",
+    "body": "12/30〜1/3 は臨時休館です。予約画面では該当日を非表示にしています。",
+    "location": null,
+    "priority": "warning",
+    "startDate": "2026-12-01T00:00:00+09:00",
+    "endDate": "2027-01-03T23:59:59+09:00",
+    "isActive": false
+  },
+  {
+    "title": "ASP トレーニング室メンテナンスのお知らせ",
+    "body": "設備点検のため、ASP トレーニング室は一時利用を停止します。",
+    "location": "ASP",
+    "priority": "critical",
+    "startDate": null,
+    "endDate": null,
+    "isActive": false
+  }
+]

@@ -1,4 +1,5 @@
 import { FacilityType, LocationId } from './api';
+import * as holidayJp from '@holiday-jp/holiday_jp';
 
 // 拠点別料金表（税込）
 export const PRICE_TABLE: Record<LocationId, Record<string, Record<string, Record<string, number>>>> = {
@@ -60,10 +61,11 @@ export const TIME_SLOTS = [
 // 利用時間オプション（時間単位）
 export const DURATION_OPTIONS = [1, 2, 3, 4] as const;
 
-// 曜日判定
+// 曜日判定（土日 + 日本の祝日を WEEKEND 扱い）
 export const isWeekend = (date: Date): boolean => {
   const day = date.getDay();
-  return day === 0 || day === 6;
+  if (day === 0 || day === 6) return true;
+  return holidayJp.isHoliday(date);
 };
 
 // 時間帯判定（17時を境界）

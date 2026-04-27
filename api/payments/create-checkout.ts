@@ -4,6 +4,10 @@ import crypto from 'crypto';
 import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
+import { createLogger } from '../../server-lib/logger.js';
+import * as holidayJp from '@holiday-jp/holiday_jp';
+
+const log = createLogger('api.payments.create-checkout');
 
 // 拠点別料金表
 const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
@@ -45,7 +49,8 @@ const LOCATION_NAMES: Record<string, string> = {
 
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
-  return day === 0 || day === 6;
+  if (day === 0 || day === 6) return true;
+  return holidayJp.isHoliday(date);
 }
 
 function getTimeSlot(hour: number): 'DAYTIME' | 'EVENING' {
@@ -90,9 +95,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  log.debug('request.in', { method: req.method });
   try {
     const profile = await verifyLiffToken(req.headers.authorization);
     if (!profile) {
+      log.warn('unauthorized');
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -391,6 +398,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      log.op('checkout.skip.paid', {
+        lineUserId: profile.userId,
+        primaryCheckinId,
+        checkinIds,
+        groupId,
+        location,
+        facilityType,
+        finalPrice,
+        dayCount: allDates.length,
+      });
       return res.status(200).json({
         checkinId: primaryCheckinId,
         checkinIds,
@@ -447,6 +464,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    log.op('checkout.stripe.session.created', {
+      lineUserId: profile.userId,
+      sessionId: session.id,
+      primaryCheckinId,
+      checkinIds,
+      groupId,
+      location,
+      facilityType,
+      finalPrice,
+      dayCount: allDates.length,
+    });
     return res.status(200).json({
       checkoutUrl: session.url,
       checkinId: primaryCheckinId,
@@ -455,7 +483,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: 'stripe',
     });
   } catch (error) {
-    console.error('Create checkout error:', error);
+    log.error('handler.fail', { message: String(error) });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
