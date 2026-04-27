@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as holidayJp from '@holiday-jp/holiday_jp';
+import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 
 // 拠点別料金表
 const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
@@ -32,7 +32,7 @@ const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
   if (day === 0 || day === 6) return true;
-  return holidayJp.isHoliday(date);
+  return isJpHoliday(date);
 }
 
 // 時間帯判定

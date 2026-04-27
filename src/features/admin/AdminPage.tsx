@@ -6,7 +6,7 @@ import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
-import * as holidayJp from '@holiday-jp/holiday_jp';
+import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -355,8 +355,7 @@ const SalesTab: React.FC = () => {
   const classifySlot = (dateStr: string, startTime: string): string => {
     const d = new Date(dateStr);
     const dow = d.getDay();
-    const isHoliday = holidayJp.isHoliday(d);
-    if (dow === 0 || dow === 6 || isHoliday) return '土日祝';
+    if (dow === 0 || dow === 6 || isJpHoliday(d)) return '土日祝';
     const hour = parseInt(startTime.split(':')[0], 10);
     return hour >= 18 ? '平日夜' : '平日昼';
   };

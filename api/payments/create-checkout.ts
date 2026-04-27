@@ -5,7 +5,7 @@ import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 import { createLogger } from '../../server-lib/logger.js';
-import * as holidayJp from '@holiday-jp/holiday_jp';
+import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 
 const log = createLogger('api.payments.create-checkout');
 
@@ -50,7 +50,7 @@ const LOCATION_NAMES: Record<string, string> = {
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
   if (day === 0 || day === 6) return true;
-  return holidayJp.isHoliday(date);
+  return isJpHoliday(date);
 }
 
 function getTimeSlot(hour: number): 'DAYTIME' | 'EVENING' {
