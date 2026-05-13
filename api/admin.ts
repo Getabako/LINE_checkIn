@@ -70,9 +70,133 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(items);
     }
 
+    // ============ 認証ユーザー向け（管理者でなくてもOK） ============
+    if (action === 'applyMembership' && req.method === 'POST') {
+      const profile = await verifyLiffToken(req.headers.authorization);
+      if (!profile) return res.status(401).json({ error: 'Unauthorized' });
+      const { memberTypeId, reason } = req.body || {};
+      if (!memberTypeId) return res.status(400).json({ error: 'Missing memberTypeId' });
+
+      // ユーザー特定
+      const usersSnap = await db.collection(COLLECTIONS.USERS).where('lineUserId', '==', profile.userId).limit(1).get();
+      if (usersSnap.empty) return res.status(404).json({ error: 'User not found' });
+      const userId = usersSnap.docs[0].id;
+      const displayName = (usersSnap.docs[0].data() as { displayName?: string }).displayName || profile.displayName || '';
+
+      // 既存のpending申請があれば上書き
+      const existing = await db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS)
+        .where('lineUserId', '==', profile.userId)
+        .where('status', '==', 'pending').get();
+      const now = new Date().toISOString();
+      const batch = db.batch();
+      existing.docs.forEach((d) => batch.delete(d.ref));
+      const newRef = db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS).doc();
+      batch.set(newRef, {
+        userId, lineUserId: profile.userId, displayName,
+        memberTypeId, reason: reason || '',
+        status: 'pending', createdAt: now,
+      });
+      await batch.commit();
+      return res.status(201).json({ id: newRef.id });
+    }
+
+    if (action === 'myMembershipApplication' && req.method === 'GET') {
+      const profile = await verifyLiffToken(req.headers.authorization);
+      if (!profile) return res.status(401).json({ error: 'Unauthorized' });
+      const snap = await db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS)
+        .where('lineUserId', '==', profile.userId)
+        .where('status', '==', 'pending').limit(1).get();
+      if (snap.empty) return res.status(200).json({ application: null });
+      const doc = snap.docs[0];
+      const data = doc.data() as { memberTypeId: string };
+      const mt = await db.collection(COLLECTIONS.MEMBER_TYPES).doc(data.memberTypeId).get();
+      return res.status(200).json({
+        application: {
+          id: doc.id, ...doc.data(),
+          memberTypeName: mt.exists ? (mt.data() as { name?: string }).name : '',
+        },
+      });
+    }
+
+    if (action === 'cancelMembershipApplication' && req.method === 'DELETE') {
+      const profile = await verifyLiffToken(req.headers.authorization);
+      if (!profile) return res.status(401).json({ error: 'Unauthorized' });
+      const snap = await db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS)
+        .where('lineUserId', '==', profile.userId)
+        .where('status', '==', 'pending').get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return res.status(200).json({ message: 'Cancelled' });
+    }
+
     const admin = await verifyAdmin(req);
     if (!admin) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    // ============ 会員種別申請（管理者） ============
+    if (action === 'membershipApplications' && req.method === 'GET') {
+      const status = (req.query.status as string) || 'pending';
+      const snap = await db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS)
+        .where('status', '==', status).get();
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Array<{
+        id: string; memberTypeId: string; createdAt?: string;
+      }>;
+      // memberType名を結合
+      const typeIds = [...new Set(items.map((i) => i.memberTypeId))];
+      const typeDocs = await Promise.all(typeIds.map((id) => db.collection(COLLECTIONS.MEMBER_TYPES).doc(id).get()));
+      const typeMap = new Map(typeDocs.filter((d) => d.exists).map((d) => [d.id, (d.data() as { name?: string }).name || '']));
+      const enriched = items.map((i) => ({ ...i, memberTypeName: typeMap.get(i.memberTypeId) || '' }))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return res.status(200).json(enriched);
+    }
+
+    if (action === 'approveMembershipApplication' && req.method === 'POST') {
+      const { applicationId, startDate, endDate } = req.body || {};
+      if (!applicationId) return res.status(400).json({ error: 'Missing applicationId' });
+      const appRef = db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS).doc(applicationId);
+      const appDoc = await appRef.get();
+      if (!appDoc.exists) return res.status(404).json({ error: 'Application not found' });
+      const appData = appDoc.data() as { lineUserId: string; userId?: string; displayName?: string; memberTypeId: string; status: string };
+      if (appData.status !== 'pending') return res.status(400).json({ error: 'Already reviewed' });
+
+      const now = new Date().toISOString();
+      // 既存のアクティブ会員を非アクティブ化
+      const existing = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('lineUserId', '==', appData.lineUserId)
+        .where('isActive', '==', true).get();
+      const batch = db.batch();
+      existing.docs.forEach((d) => batch.update(d.ref, { isActive: false, updatedAt: now }));
+      // 新規メンバーシップ作成
+      const newMemRef = db.collection(COLLECTIONS.USER_MEMBERSHIPS).doc();
+      batch.set(newMemRef, {
+        lineUserId: appData.lineUserId,
+        userId: appData.userId || null,
+        displayName: appData.displayName || null,
+        memberTypeId: appData.memberTypeId,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      // 申請を承認済みに
+      batch.update(appRef, { status: 'approved', reviewedAt: now, reviewedBy: admin.userId });
+      await batch.commit();
+      return res.status(200).json({ message: 'Approved', membershipId: newMemRef.id });
+    }
+
+    if (action === 'rejectMembershipApplication' && req.method === 'POST') {
+      const { applicationId, rejectReason } = req.body || {};
+      if (!applicationId) return res.status(400).json({ error: 'Missing applicationId' });
+      await db.collection(COLLECTIONS.MEMBERSHIP_APPLICATIONS).doc(applicationId).update({
+        status: 'rejected',
+        rejectReason: rejectReason || '',
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: admin.userId,
+      });
+      return res.status(200).json({ message: 'Rejected' });
     }
 
     // ============ イベント管理 ============
@@ -627,6 +751,155 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: new Date().toISOString(),
       });
       return res.status(200).json({ message: 'Revoked' });
+    }
+
+    // ============ Labora CSVインポート ============
+    // 受信形式: { rows: Array<{ customerType, customerNumber, displayName, name, kana, phone, mobile, email, postalCode, address, gender, birthday, occupation, registeredAt }> }
+    if (action === 'importCustomers' && req.method === 'POST') {
+      const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+      if (!rows) return res.status(400).json({ error: 'Missing rows' });
+
+      // 会員種別マップを作成（code -> id）
+      const mtSnap = await db.collection(COLLECTIONS.MEMBER_TYPES).get();
+      const codeToTypeId = new Map<string, string>();
+      mtSnap.docs.forEach((d) => {
+        const data = d.data() as { code?: string };
+        if (data.code) codeToTypeId.set(data.code, d.id);
+      });
+
+      // Labora顧客タイプ → 会員種別code マッピング
+      const mapCustomerTypeToCode = (t: string): string => {
+        const v = (t || '').trim();
+        if (v === 'S-01') return 'S-01';
+        if (v === 'TR-00' || v === 'T-00') return 'TR-00';
+        if (v === 'TR-01' || v === 'T-01') return 'TR-01';
+        if (v === 'その他') return 'OTHER';
+        if (v === '学生会員') return 'STUDENT';
+        // 通常会員・ビジター・空欄 → GENERAL
+        return 'GENERAL';
+      };
+
+      // 電話番号正規化（ハイフン/全角/空白除去、先頭0確保）
+      const normPhone = (s: string): string => {
+        if (!s) return '';
+        const z = s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+        return z.replace(/[^0-9]/g, '');
+      };
+
+      // 既存usersをロードしてphone索引を作成
+      const usersSnap = await db.collection(COLLECTIONS.USERS).get();
+      const phoneToUserId = new Map<string, string>();
+      const customerNoToUserId = new Map<string, string>();
+      usersSnap.docs.forEach((d) => {
+        const u = d.data() as { phone?: string; mobile?: string; customerNumber?: string };
+        const p1 = normPhone(u.phone || '');
+        const p2 = normPhone(u.mobile || '');
+        if (p1) phoneToUserId.set(p1, d.id);
+        if (p2) phoneToUserId.set(p2, d.id);
+        if (u.customerNumber) customerNoToUserId.set(u.customerNumber, d.id);
+      });
+
+      // 既存メンバーシップ（lineUserIdまたはuserIdベース）
+      const memSnap = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('isActive', '==', true).get();
+      const activeMembershipByUserKey = new Map<string, { id: string; memberTypeId: string }>();
+      memSnap.docs.forEach((d) => {
+        const m = d.data() as { lineUserId?: string; userId?: string; memberTypeId?: string };
+        const key = m.lineUserId || m.userId || '';
+        if (key && m.memberTypeId) activeMembershipByUserKey.set(key, { id: d.id, memberTypeId: m.memberTypeId });
+      });
+
+      const now = new Date().toISOString();
+      let created = 0, updated = 0, membershipsAssigned = 0, skipped = 0;
+      const errors: string[] = [];
+
+      for (const raw of rows) {
+        try {
+          const customerNumber = String(raw.customerNumber || '').trim();
+          const phone = normPhone(raw.mobile || raw.phone || '');
+          const code = mapCustomerTypeToCode(raw.customerType);
+          const memberTypeId = codeToTypeId.get(code);
+
+          // ユーザー特定
+          let userId: string | undefined;
+          if (phone) userId = phoneToUserId.get(phone);
+          if (!userId && customerNumber) userId = customerNoToUserId.get(customerNumber);
+
+          const userPayload = {
+            displayName: raw.displayName || raw.name || '',
+            name: raw.name || '',
+            kana: raw.kana || '',
+            phone: raw.phone || '',
+            mobile: raw.mobile || '',
+            email: raw.email || '',
+            postalCode: raw.postalCode || '',
+            address: raw.address || '',
+            gender: raw.gender || '',
+            birthday: raw.birthday || '',
+            occupation: raw.occupation || '',
+            customerNumber,
+            customerType: raw.customerType || '',
+            laboraRegisteredAt: raw.registeredAt || '',
+            isImported: true,
+            updatedAt: now,
+          };
+
+          if (userId) {
+            await db.collection(COLLECTIONS.USERS).doc(userId).update(userPayload);
+            updated++;
+          } else {
+            const ref = await db.collection(COLLECTIONS.USERS).add({
+              ...userPayload,
+              lineUserId: null,
+              pictureUrl: null,
+              createdAt: now,
+            });
+            userId = ref.id;
+            if (phone) phoneToUserId.set(phone, userId);
+            if (customerNumber) customerNoToUserId.set(customerNumber, userId);
+            created++;
+          }
+
+          // 会員種別を付与（GENERAL以外、または既存付与と異なる場合）
+          if (memberTypeId) {
+            const existing = activeMembershipByUserKey.get(userId);
+            if (!existing || existing.memberTypeId !== memberTypeId) {
+              // 既存を非アクティブ化
+              if (existing) {
+                await db.collection(COLLECTIONS.USER_MEMBERSHIPS).doc(existing.id).update({
+                  isActive: false, updatedAt: now,
+                });
+              }
+              // GENERALは敢えてレコード作らない（基準料金のため）
+              if (code !== 'GENERAL') {
+                const ref = await db.collection(COLLECTIONS.USER_MEMBERSHIPS).add({
+                  lineUserId: null,
+                  userId,
+                  displayName: userPayload.displayName,
+                  memberTypeId,
+                  startDate: null,
+                  endDate: null,
+                  isActive: true,
+                  createdAt: now,
+                  updatedAt: now,
+                });
+                activeMembershipByUserKey.set(userId, { id: ref.id, memberTypeId });
+                membershipsAssigned++;
+              }
+            }
+          } else if (code !== 'GENERAL') {
+            errors.push(`memberType not found for code=${code} (customer ${customerNumber})`);
+          }
+        } catch (e: unknown) {
+          skipped++;
+          errors.push(`row ${raw.customerNumber}: ${(e as Error).message}`);
+        }
+      }
+
+      return res.status(200).json({
+        total: rows.length, created, updated, membershipsAssigned, skipped,
+        errors: errors.slice(0, 20),
+      });
     }
 
     // ============ お知らせ管理 ============

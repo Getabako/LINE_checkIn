@@ -6,7 +6,7 @@ import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle,
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
-import { checkinApi, Checkin, MemberType, UserMembership, membershipApi } from '../../lib/api';
+import { checkinApi, Checkin, MemberType, UserMembership, MembershipApplication, membershipApi, memberTypeApi, membershipApplicationApi } from '../../lib/api';
 import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculateEndTime } from '../../lib/price';
 import clsx from 'clsx';
@@ -19,13 +19,28 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
   }
 };
 
-const formatMemberDiscount = (mt: MemberType): string => {
-  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+const fmtDiscount = (type: string | undefined, value: number | undefined): string => {
+  const t = type || 'NONE';
   if (t === 'NONE') return '割引なし';
-  if (t === 'FREE') return '利用無料';
-  if (t === 'PERCENTAGE') return `${mt.discountValue || 0}%OFF`;
-  if (t === 'FIXED_PER_HOUR') return `¥${(mt.discountValue || 0).toLocaleString()}/h OFF`;
+  if (t === 'FREE') return '無料';
+  if (t === 'PERCENTAGE') return `${value || 0}%OFF`;
+  if (t === 'FIXED_PER_HOUR') return `¥${(value || 0).toLocaleString()}/h OFF`;
   return '';
+};
+
+const formatMemberDiscount = (mt: MemberType): string => {
+  // 新スキーマ: 体育館/ジム別
+  if (mt.gymDiscountType || mt.trainingDiscountType || mt.monthlyCoversTraining) {
+    const gym = fmtDiscount(mt.gymDiscountType, mt.gymDiscountValue);
+    const tr = mt.monthlyCoversTraining
+      ? '月額契約中無料'
+      : fmtDiscount(mt.trainingDiscountType, mt.trainingDiscountValue);
+    if (gym === tr) return `体育館・ジム: ${gym}`;
+    return `体育館: ${gym} / ジム: ${tr}`;
+  }
+  // 後方互換
+  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+  return fmtDiscount(t, mt.discountValue);
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -44,10 +59,40 @@ export const ReservationsPage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
+  const [memberTypes, setMemberTypes] = React.useState<MemberType[]>([]);
+  const [pendingApp, setPendingApp] = React.useState<MembershipApplication | null>(null);
+  const [showApplyForm, setShowApplyForm] = React.useState(false);
+  const [applyForm, setApplyForm] = React.useState({ memberTypeId: '', reason: '' });
+  const [applyMsg, setApplyMsg] = React.useState<string | null>(null);
+
+  const reloadMembership = React.useCallback(() => {
+    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
+    membershipApplicationApi.getMine().then((res) => setPendingApp(res.application)).catch(() => setPendingApp(null));
+  }, []);
 
   React.useEffect(() => {
-    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
-  }, []);
+    reloadMembership();
+    memberTypeApi.getAll().then(setMemberTypes).catch(() => setMemberTypes([]));
+  }, [reloadMembership]);
+
+  const handleApplySubmit = async () => {
+    if (!applyForm.memberTypeId) return;
+    try {
+      await membershipApplicationApi.apply(applyForm.memberTypeId, applyForm.reason);
+      setApplyMsg('申請を送信しました。管理者の承認をお待ちください。');
+      setShowApplyForm(false);
+      setApplyForm({ memberTypeId: '', reason: '' });
+      reloadMembership();
+    } catch {
+      setApplyMsg('申請の送信に失敗しました');
+    }
+  };
+
+  const handleCancelApp = async () => {
+    if (!confirm('申請を取り消しますか？')) return;
+    await membershipApplicationApi.cancel();
+    reloadMembership();
+  };
 
   const fetchCheckins = React.useCallback(async () => {
     try {
@@ -237,10 +282,53 @@ export const ReservationsPage: React.FC = () => {
             </div>
           ) : (
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-center">
-              <p className="text-sm text-gray-500">会員区分は未設定です</p>
-              <p className="text-[10px] text-gray-400 mt-1">割引対象の方は施設までお問い合わせください</p>
+              <p className="text-sm text-gray-500">一般会員（通常料金）</p>
+              <p className="text-[10px] text-gray-400 mt-1">割引対象（その他/S-01/TR-00/TR-01/学生会員）は下から申請できます</p>
             </div>
           )}
+
+          {/* 会員種別申請 */}
+          <div className="mt-2">
+            {pendingApp ? (
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+                <div className="text-xs">
+                  <p className="font-semibold text-amber-800">申請中: {pendingApp.memberTypeName || '会員種別'}</p>
+                  <p className="text-[10px] text-amber-600">管理者の承認をお待ちください</p>
+                </div>
+                <button onClick={handleCancelApp} className="text-[11px] text-amber-700 underline">取消</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowApplyForm(!showApplyForm)}
+                className="w-full text-xs text-primary-700 font-semibold py-2 border border-dashed border-primary-300 rounded-xl"
+              >
+                {showApplyForm ? '閉じる' : '+ 会員種別を申請する'}
+              </button>
+            )}
+            {showApplyForm && !pendingApp && (
+              <div className="mt-2 p-3 bg-white rounded-xl border space-y-2">
+                <p className="text-[11px] text-gray-500">希望する会員種別を選択し、理由を記入してください。管理者の承認後に適用されます。</p>
+                <select
+                  value={applyForm.memberTypeId}
+                  onChange={(e) => setApplyForm({ ...applyForm, memberTypeId: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                >
+                  <option value="">-- 会員種別を選択 --</option>
+                  {memberTypes.filter((m) => m.code !== 'GENERAL').map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}（{m.description}）</option>
+                  ))}
+                </select>
+                <textarea
+                  placeholder="申請理由（例: 学生証あり、会員番号など）"
+                  value={applyForm.reason}
+                  onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm" rows={2}
+                />
+                <Button fullWidth onClick={handleApplySubmit} disabled={!applyForm.memberTypeId}>申請を送信</Button>
+              </div>
+            )}
+            {applyMsg && <p className="text-[11px] text-emerald-700 mt-1">{applyMsg}</p>}
+          </div>
         </section>
 
         {error && (

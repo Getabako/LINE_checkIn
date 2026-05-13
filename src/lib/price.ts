@@ -1,5 +1,38 @@
-import { FacilityType, LocationId } from './api';
+import { FacilityType, LocationId, MemberType, DiscountType } from './api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
+
+// 施設タイプ別に有効な割引設定を取得（体育館=GYM / ジム=TRAINING_*）
+export const getEffectiveDiscount = (
+  memberType: MemberType,
+  facilityType: FacilityType,
+): { type: DiscountType; value: number } => {
+  const isGym = facilityType === 'GYM';
+  // STUDENT等: 月額契約でジム利用無料
+  if (!isGym && memberType.monthlyCoversTraining) {
+    return { type: 'FREE', value: 0 };
+  }
+  const t = isGym ? memberType.gymDiscountType : memberType.trainingDiscountType;
+  const v = isGym ? memberType.gymDiscountValue : memberType.trainingDiscountValue;
+  if (t) return { type: t, value: Number(v) || 0 };
+  // 後方互換: 旧フィールド
+  if (memberType.discountType) {
+    return { type: memberType.discountType, value: Number(memberType.discountValue) || 0 };
+  }
+  return { type: 'NONE', value: 0 };
+};
+
+export const calcMemberDiscount = (
+  memberType: MemberType,
+  facilityType: FacilityType,
+  dayBase: number,
+  duration: number,
+): number => {
+  const { type, value } = getEffectiveDiscount(memberType, facilityType);
+  if (type === 'FREE') return dayBase;
+  if (type === 'PERCENTAGE') return Math.floor(dayBase * (value / 100));
+  if (type === 'FIXED_PER_HOUR') return Math.min(dayBase, Math.abs(value) * duration);
+  return 0;
+};
 
 // 拠点別料金表（税込）
 export const PRICE_TABLE: Record<LocationId, Record<string, Record<string, Record<string, number>>>> = {

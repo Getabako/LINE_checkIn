@@ -153,12 +153,33 @@ export interface MemberType {
   code: string;
   name: string;
   description: string;
+  // 旧フィールド（後方互換 fallback）
   discountType?: DiscountType;
-  discountValue?: number;            // PERCENTAGE→%値 / FIXED_PER_HOUR→円/時
-  monthlyFee?: number;               // 月額（任意・備考用 / 学生会員=3630）
-  discounts?: Record<string, number>; // 旧データ互換（拠点別）
+  discountValue?: number;
+  // 新フィールド（施設別の割引設定）
+  gymDiscountType?: DiscountType;      // 体育館（GYM）
+  gymDiscountValue?: number;
+  trainingDiscountType?: DiscountType; // ジム（TRAINING_PRIVATE/SHARED）
+  trainingDiscountValue?: number;
+  monthlyFee?: number;                  // 月額（STUDENT=3630等）
+  monthlyCoversTraining?: boolean;      // 月額契約中ジム利用無料（STUDENT用）
+  discounts?: Record<string, number>;   // 旧データ互換（拠点別）
   isActive: boolean;
   sortOrder: number;
+}
+
+export interface MembershipApplication {
+  id: string;
+  userId: string;
+  lineUserId: string;
+  displayName?: string;
+  memberTypeId: string;
+  memberTypeName?: string;
+  reason?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  rejectReason?: string;
+  createdAt?: string;
+  reviewedAt?: string;
 }
 
 export interface UserMembership {
@@ -451,4 +472,29 @@ export const adminApi = {
     api.post<UserMembership>('/admin?action=assignMembership', data),
   revokeMembership: (membershipId: string) =>
     api.delete<void>(`/admin?action=revokeMembership&membershipId=${membershipId}`),
+
+  // Labora CSVインポート
+  importCustomers: (rows: Array<Record<string, string>>) =>
+    api.post<{
+      total: number; created: number; updated: number;
+      membershipsAssigned: number; skipped: number; errors: string[];
+    }>('/admin?action=importCustomers', { rows }),
+
+  // 会員種別申請（管理者）
+  getMembershipApplications: (status: 'pending' | 'approved' | 'rejected' = 'pending') =>
+    api.get<MembershipApplication[]>(`/admin?action=membershipApplications&status=${status}`),
+  approveMembershipApplication: (applicationId: string, opts?: { startDate?: string | null; endDate?: string | null }) =>
+    api.post<{ message: string; membershipId: string }>('/admin?action=approveMembershipApplication', { applicationId, ...opts }),
+  rejectMembershipApplication: (applicationId: string, rejectReason?: string) =>
+    api.post<{ message: string }>('/admin?action=rejectMembershipApplication', { applicationId, rejectReason }),
+};
+
+// ユーザー側の会員種別申請API
+export const membershipApplicationApi = {
+  apply: (memberTypeId: string, reason: string) =>
+    api.post<{ id: string }>('/admin?action=applyMembership', { memberTypeId, reason }),
+  getMine: () =>
+    api.get<{ application: MembershipApplication | null }>('/admin?action=myMembershipApplication'),
+  cancel: () =>
+    api.delete<{ message: string }>('/admin?action=cancelMembershipApplication'),
 };

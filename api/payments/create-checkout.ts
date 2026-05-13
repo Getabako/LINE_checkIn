@@ -224,8 +224,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (memberTypeDoc.exists) {
           const memberType = memberTypeDoc.data()!;
           memberTypeName = memberType.name || null;
-          const discountType: string = memberType.discountType || (memberType.discounts ? 'FIXED_PER_HOUR' : 'NONE');
-          const discountValue: number = Number(memberType.discountValue) || 0;
+
+          // 施設別の割引設定を解決（体育館=GYM / ジム=TRAINING_*）
+          const isGym = facilityType === 'GYM';
+          let discountType: string;
+          let discountValue: number;
+          if (!isGym && memberType.monthlyCoversTraining) {
+            discountType = 'FREE';
+            discountValue = 0;
+          } else {
+            const t = isGym ? memberType.gymDiscountType : memberType.trainingDiscountType;
+            const v = isGym ? memberType.gymDiscountValue : memberType.trainingDiscountValue;
+            if (t) {
+              discountType = t;
+              discountValue = Number(v) || 0;
+            } else {
+              // 後方互換
+              discountType = memberType.discountType || (memberType.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+              discountValue = Number(memberType.discountValue) || 0;
+            }
+          }
 
           for (let i = 0; i < perDatePrices.length; i++) {
             const dayBase = perDatePrices[i].price;

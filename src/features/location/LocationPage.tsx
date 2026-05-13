@@ -10,13 +10,24 @@ import { LOCATIONS, getLocationName } from '../../lib/locations';
 import { LocationId, Event, School, Announcement, MemberType, UserMembership, eventApi, schoolApi, announcementApi, membershipApi } from '../../lib/api';
 import clsx from 'clsx';
 
-const formatMemberDiscount = (mt: MemberType): string => {
-  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
-  if (t === 'NONE') return '';
-  if (t === 'FREE') return '利用無料';
-  if (t === 'PERCENTAGE') return `${mt.discountValue || 0}%OFF`;
-  if (t === 'FIXED_PER_HOUR') return `¥${(mt.discountValue || 0).toLocaleString()}/h OFF`;
+const fmtD = (type: string | undefined, value: number | undefined): string => {
+  if (!type || type === 'NONE') return '';
+  if (type === 'FREE') return '無料';
+  if (type === 'PERCENTAGE') return `${value || 0}%OFF`;
+  if (type === 'FIXED_PER_HOUR') return `¥${(value || 0).toLocaleString()}/h OFF`;
   return '';
+};
+
+const formatMemberDiscount = (mt: MemberType): string => {
+  if (mt.gymDiscountType || mt.trainingDiscountType || mt.monthlyCoversTraining) {
+    const g = fmtD(mt.gymDiscountType, mt.gymDiscountValue);
+    const t = mt.monthlyCoversTraining ? '月額契約中無料' : fmtD(mt.trainingDiscountType, mt.trainingDiscountValue);
+    if (!g && !t) return '';
+    if (g === t) return g;
+    return `体育館 ${g || '通常'} / ジム ${t || '通常'}`;
+  }
+  const t = mt.discountType || (mt.discounts ? 'FIXED_PER_HOUR' : 'NONE');
+  return fmtD(t, mt.discountValue);
 };
 
 const announcementStyle = (priority: Announcement['priority']) => {

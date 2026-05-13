@@ -5,7 +5,7 @@ import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, 
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, MembershipApplication, DiscountType, Coupon } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
@@ -39,13 +39,22 @@ const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   FREE: '無料',
 };
 
-const formatDiscount = (m: MemberType): string => {
-  const t = m.discountType || 'NONE';
-  if (t === 'NONE') return '割引なし';
+const fmtDisc = (t: string | undefined, v: number | undefined): string => {
+  if (!t || t === 'NONE') return '通常';
   if (t === 'FREE') return '無料';
-  if (t === 'PERCENTAGE') return `${m.discountValue || 0}%OFF`;
-  if (t === 'FIXED_PER_HOUR') return `¥${(m.discountValue || 0).toLocaleString()}/h OFF`;
+  if (t === 'PERCENTAGE') return `${v || 0}%OFF`;
+  if (t === 'FIXED_PER_HOUR') return `¥${(v || 0).toLocaleString()}/h OFF`;
   return '';
+};
+
+const formatDiscount = (m: MemberType): string => {
+  if (m.gymDiscountType || m.trainingDiscountType || m.monthlyCoversTraining) {
+    const g = fmtDisc(m.gymDiscountType, m.gymDiscountValue);
+    const t = m.monthlyCoversTraining ? '月額契約中無料' : fmtDisc(m.trainingDiscountType, m.trainingDiscountValue);
+    return `体育館 ${g} / ジム ${t}`;
+  }
+  const t = m.discountType || 'NONE';
+  return fmtDisc(t, m.discountValue);
 };
 
 const PRIORITY_LABEL: Record<AnnouncementPriority, string> = {
@@ -700,9 +709,12 @@ const MembersTab: React.FC = () => {
     code: '',
     name: '',
     description: '',
-    discountType: 'NONE' as DiscountType,
-    discountValue: 0,
+    gymDiscountType: 'NONE' as DiscountType,
+    gymDiscountValue: 0,
+    trainingDiscountType: 'NONE' as DiscountType,
+    trainingDiscountValue: 0,
     monthlyFee: 0,
+    monthlyCoversTraining: false,
     sortOrder: 0,
   };
   const [typeForm, setTypeForm] = React.useState(emptyTypeForm);
@@ -714,12 +726,127 @@ const MembersTab: React.FC = () => {
     startDate: '',
     endDate: '',
   });
+  const [importing, setImporting] = React.useState(false);
+  const [importResult, setImportResult] = React.useState<{
+    total: number; created: number; updated: number;
+    membershipsAssigned: number; skipped: number; errors: string[];
+  } | null>(null);
+  const [importPreview, setImportPreview] = React.useState<{
+    rows: Array<Record<string, string>>;
+    summary: Record<string, number>;
+  } | null>(null);
 
+  // CSVパーサ（ダブルクォート対応）
+  const parseCsvLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') { inQ = false; }
+        else cur += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+
+  const handleCsvFile = async (file: File) => {
+    setImportResult(null);
+    try {
+      const buf = await file.arrayBuffer();
+      // Shift-JIS → UTF-8
+      let text: string;
+      try {
+        text = new TextDecoder('shift-jis').decode(buf);
+      } catch {
+        text = new TextDecoder('utf-8').decode(buf);
+      }
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) throw new Error('CSVが空です');
+      const header = parseCsvLine(lines[0]);
+      const idx = (name: string) => header.findIndex((h) => h.trim() === name);
+      const cols = {
+        registeredAt: idx('登録日'),
+        customerType: idx('顧客タイプ'),
+        customerNumber: idx('会員番号（自動発行）'),
+        displayName: idx('表示名、チーム名等'),
+        name: idx('名前'),
+        kana: idx('ふりがな'),
+        phone: idx('電話番号'),
+        mobile: idx('携帯電話'),
+        email: idx('メールアドレス'),
+        postalCode: idx('郵便番号'),
+        address: idx('住所'),
+        gender: idx('性別'),
+        birthday: idx('生年月日'),
+        occupation: idx('職業'),
+      };
+      if (cols.customerType < 0 || (cols.phone < 0 && cols.mobile < 0)) {
+        throw new Error('必須列（顧客タイプ・電話番号）が見つかりません');
+      }
+      const rows: Array<Record<string, string>> = [];
+      const summary: Record<string, number> = {};
+      for (let i = 1; i < lines.length; i++) {
+        const c = parseCsvLine(lines[i]);
+        const row: Record<string, string> = {};
+        (Object.keys(cols) as Array<keyof typeof cols>).forEach((k) => {
+          const ci = cols[k];
+          row[k] = ci >= 0 ? (c[ci] || '').trim() : '';
+        });
+        rows.push(row);
+        const t = row.customerType || '(空)';
+        summary[t] = (summary[t] || 0) + 1;
+      }
+      setImportPreview({ rows, summary });
+    } catch (e: unknown) {
+      alert('CSV解析に失敗しました: ' + (e as Error).message);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importPreview) return;
+    if (!confirm(`${importPreview.rows.length}件をインポートします。よろしいですか？`)) return;
+    setImporting(true);
+    try {
+      const result = await adminApi.importCustomers(importPreview.rows);
+      setImportResult(result);
+      setImportPreview(null);
+      load();
+    } catch (e: unknown) {
+      alert('インポートに失敗しました: ' + (e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const [applications, setApplications] = React.useState<MembershipApplication[]>([]);
   const load = () => {
-    Promise.all([adminApi.getMemberTypes(), adminApi.getMemberships()])
-      .then(([t, m]) => { setMemberTypes(t); setMemberships(m); })
+    Promise.all([
+      adminApi.getMemberTypes(),
+      adminApi.getMemberships(),
+      adminApi.getMembershipApplications('pending'),
+    ])
+      .then(([t, m, a]) => { setMemberTypes(t); setMemberships(m); setApplications(a); })
       .catch(console.error)
       .finally(() => setIsLoading(false));
+  };
+
+  const handleApprove = async (id: string) => {
+    if (!confirm('この申請を承認して会員種別を付与しますか？')) return;
+    await adminApi.approveMembershipApplication(id);
+    load();
+  };
+  const handleReject = async (id: string) => {
+    const reason = prompt('却下理由（任意）');
+    if (reason === null) return;
+    await adminApi.rejectMembershipApplication(id, reason);
+    load();
   };
 
   React.useEffect(load, []);
@@ -807,13 +934,44 @@ const MembersTab: React.FC = () => {
 
   // クイック登録（要件に沿った既定値）
   const handleSeedDefaults = async () => {
-    if (!confirm('5種類の会員区分（一般・TR-01／その他／S-01／TR-00／学生会員）を一括登録しますか？')) return;
+    if (!confirm('6種類の会員区分を一括登録しますか？（既存と重複する場合は手動で削除してください）')) return;
     const seeds: Array<Partial<MemberType>> = [
-      { code: 'GENERAL', name: '一般・TR-01', description: '基準料金', discountType: 'NONE', discountValue: 0, monthlyFee: 0, sortOrder: 1 },
-      { code: 'OTHER', name: 'その他', description: '30%OFF', discountType: 'PERCENTAGE', discountValue: 30, monthlyFee: 0, sortOrder: 2 },
-      { code: 'S-01', name: 'S-01（定期）', description: '時間あたり¥275 OFF', discountType: 'FIXED_PER_HOUR', discountValue: 275, monthlyFee: 0, sortOrder: 3 },
-      { code: 'TR-00', name: 'TR-00', description: '無料', discountType: 'FREE', discountValue: 0, monthlyFee: 0, sortOrder: 4 },
-      { code: 'STUDENT', name: '学生会員', description: '月額¥3,630（利用は無料）', discountType: 'FREE', discountValue: 0, monthlyFee: 3630, sortOrder: 5 },
+      {
+        code: 'GENERAL', name: '一般', description: '体育館・ジム 通常料金',
+        gymDiscountType: 'NONE', gymDiscountValue: 0,
+        trainingDiscountType: 'NONE', trainingDiscountValue: 0,
+        monthlyFee: 0, sortOrder: 1,
+      },
+      {
+        code: 'OTHER', name: 'その他', description: '体育館・ジム 30%OFF',
+        gymDiscountType: 'PERCENTAGE', gymDiscountValue: 30,
+        trainingDiscountType: 'PERCENTAGE', trainingDiscountValue: 30,
+        monthlyFee: 0, sortOrder: 2,
+      },
+      {
+        code: 'S-01', name: 'S-01（定期）', description: '体育館・ジム ¥275/h OFF',
+        gymDiscountType: 'FIXED_PER_HOUR', gymDiscountValue: 275,
+        trainingDiscountType: 'FIXED_PER_HOUR', trainingDiscountValue: 275,
+        monthlyFee: 0, sortOrder: 3,
+      },
+      {
+        code: 'TR-00', name: 'TR-00（定期）', description: '体育館・ジム 無料',
+        gymDiscountType: 'FREE', gymDiscountValue: 0,
+        trainingDiscountType: 'FREE', trainingDiscountValue: 0,
+        monthlyFee: 0, sortOrder: 4,
+      },
+      {
+        code: 'TR-01', name: 'TR-01（定期）', description: '体育館 通常料金 / ジム 25%OFF',
+        gymDiscountType: 'NONE', gymDiscountValue: 0,
+        trainingDiscountType: 'PERCENTAGE', trainingDiscountValue: 25,
+        monthlyFee: 0, sortOrder: 5,
+      },
+      {
+        code: 'STUDENT', name: '学生会員', description: '月額¥3,630でジム無料 / 体育館 通常料金',
+        gymDiscountType: 'NONE', gymDiscountValue: 0,
+        trainingDiscountType: 'FREE', trainingDiscountValue: 0,
+        monthlyFee: 3630, monthlyCoversTraining: true, sortOrder: 6,
+      },
     ];
     for (const s of seeds) {
       await adminApi.createMemberType(s);
@@ -825,6 +983,100 @@ const MembersTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Labora CSVインポート */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-primary-800 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            Labora顧客CSVインポート
+          </h3>
+        </div>
+        <div className="bg-white p-4 rounded-2xl shadow-card border border-gray-100 space-y-3">
+          <p className="text-xs text-gray-600 leading-relaxed">
+            Laboraからエクスポートした顧客CSVを取り込みます。電話番号で既存ユーザーと突合し、未登録は仮ユーザーとして作成、顧客タイプに応じて会員種別を自動付与します。<br />
+            <span className="text-gray-400">マッピング: 通常会員・ビジター→一般 / その他→OTHER / S-01→S-01 / TR-00→TR-00 / TR-01→TR-01 / 学生会員→STUDENT</span>
+          </p>
+          <input
+            type="file" accept=".csv,text/csv"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); }}
+            className="text-xs w-full"
+          />
+          {importPreview && (
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-semibold">プレビュー: 合計 {importPreview.rows.length} 件</p>
+              <div className="grid grid-cols-2 gap-1 text-[11px]">
+                {Object.entries(importPreview.summary).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                  <div key={k} className="flex justify-between bg-white rounded px-2 py-1">
+                    <span className="text-gray-700">{k}</span>
+                    <span className="font-semibold text-primary-700">{v}件</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleImport}
+                  disabled={importing}
+                  className="flex-1 bg-primary-600 text-white text-xs font-semibold py-2 rounded-lg disabled:opacity-50"
+                >
+                  {importing ? 'インポート中...' : 'インポート実行'}
+                </button>
+                <button
+                  onClick={() => setImportPreview(null)}
+                  disabled={importing}
+                  className="px-3 text-xs border rounded-lg"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          )}
+          {importResult && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-xs space-y-1">
+              <p className="font-semibold text-green-800">インポート完了</p>
+              <p className="text-gray-700">合計{importResult.total}件 / 新規{importResult.created} / 更新{importResult.updated} / 会員種別付与{importResult.membershipsAssigned} / スキップ{importResult.skipped}</p>
+              {importResult.errors.length > 0 && (
+                <details className="text-red-600">
+                  <summary className="cursor-pointer">エラー {importResult.errors.length}件</summary>
+                  <ul className="list-disc pl-4 mt-1">
+                    {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 会員種別 申請一覧 */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-primary-800 flex items-center gap-2">
+            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+            会員種別申請（承認待ち {applications.length}件）
+          </h3>
+        </div>
+        <div className="space-y-2">
+          {applications.length === 0 ? (
+            <p className="text-center text-gray-400 py-4 text-sm">承認待ちの申請はありません</p>
+          ) : applications.map((a) => (
+            <div key={a.id} className="bg-white p-3 rounded-xl border border-amber-200 space-y-2">
+              <div className="flex items-start justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{a.displayName || '(名前未設定)'}</p>
+                  <p className="text-xs text-primary-700 font-semibold mt-0.5">希望: {a.memberTypeName}</p>
+                  {a.reason && <p className="text-[11px] text-gray-600 mt-1 whitespace-pre-wrap">理由: {a.reason}</p>}
+                  {a.createdAt && <p className="text-[10px] text-gray-400 mt-1">{format(new Date(a.createdAt), 'yyyy/M/d HH:mm', { locale: ja })}</p>}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => handleApprove(a.id)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">承認</button>
+                <button onClick={() => handleReject(a.id)} className="flex-1 bg-gray-200 text-gray-700 text-xs font-semibold py-2 rounded-lg">却下</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* 会員種別マスタ */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -857,27 +1109,53 @@ const MembersTab: React.FC = () => {
               <input placeholder="表示名" value={typeForm.name} onChange={(e) => setTypeForm({ ...typeForm, name: e.target.value })} className="px-3 py-2 border rounded-lg text-sm" />
             </div>
             <input placeholder="説明（任意）" value={typeForm.description} onChange={(e) => setTypeForm({ ...typeForm, description: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
-            <div className="grid grid-cols-2 gap-2">
-              <select value={typeForm.discountType} onChange={(e) => setTypeForm({ ...typeForm, discountType: e.target.value as DiscountType })} className="px-3 py-2 border rounded-lg text-sm">
-                {(['NONE', 'PERCENTAGE', 'FIXED_PER_HOUR', 'FREE'] as DiscountType[]).map((t) => (
-                  <option key={t} value={t}>{DISCOUNT_TYPE_LABEL[t]}</option>
-                ))}
-              </select>
-              <div>
+
+            {/* 体育館（GYM）割引 */}
+            <div className="border rounded-lg p-2">
+              <p className="text-[11px] font-semibold text-gray-700 mb-1">体育館（GYM）の割引</p>
+              <div className="grid grid-cols-2 gap-2">
+                <select value={typeForm.gymDiscountType} onChange={(e) => setTypeForm({ ...typeForm, gymDiscountType: e.target.value as DiscountType })} className="px-3 py-2 border rounded-lg text-sm">
+                  {(['NONE', 'PERCENTAGE', 'FIXED_PER_HOUR', 'FREE'] as DiscountType[]).map((t) => (
+                    <option key={t} value={t}>{DISCOUNT_TYPE_LABEL[t]}</option>
+                  ))}
+                </select>
                 <input
-                  type="number" placeholder="割引値" value={typeForm.discountValue}
-                  onChange={(e) => setTypeForm({ ...typeForm, discountValue: Number(e.target.value) })}
+                  type="number" placeholder="割引値" value={typeForm.gymDiscountValue}
+                  onChange={(e) => setTypeForm({ ...typeForm, gymDiscountValue: Number(e.target.value) })}
                   className="w-full px-3 py-2 border rounded-lg text-sm"
-                  disabled={typeForm.discountType === 'NONE' || typeForm.discountType === 'FREE'}
+                  disabled={typeForm.gymDiscountType === 'NONE' || typeForm.gymDiscountType === 'FREE'}
                 />
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {typeForm.discountType === 'PERCENTAGE' ? '%' : typeForm.discountType === 'FIXED_PER_HOUR' ? '円/h' : ''}
-                </p>
               </div>
             </div>
+
+            {/* ジム（TRAINING）割引 */}
+            <div className="border rounded-lg p-2">
+              <p className="text-[11px] font-semibold text-gray-700 mb-1">ジム（TRAINING）の割引</p>
+              <div className="grid grid-cols-2 gap-2">
+                <select value={typeForm.trainingDiscountType} onChange={(e) => setTypeForm({ ...typeForm, trainingDiscountType: e.target.value as DiscountType })} className="px-3 py-2 border rounded-lg text-sm">
+                  {(['NONE', 'PERCENTAGE', 'FIXED_PER_HOUR', 'FREE'] as DiscountType[]).map((t) => (
+                    <option key={t} value={t}>{DISCOUNT_TYPE_LABEL[t]}</option>
+                  ))}
+                </select>
+                <input
+                  type="number" placeholder="割引値" value={typeForm.trainingDiscountValue}
+                  onChange={(e) => setTypeForm({ ...typeForm, trainingDiscountValue: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  disabled={typeForm.trainingDiscountType === 'NONE' || typeForm.trainingDiscountType === 'FREE'}
+                />
+              </div>
+              <label className="flex items-center gap-1 text-[11px] mt-1 text-gray-600">
+                <input
+                  type="checkbox" checked={typeForm.monthlyCoversTraining}
+                  onChange={(e) => setTypeForm({ ...typeForm, monthlyCoversTraining: e.target.checked })}
+                />
+                月額契約中はジム利用を無料にする（STUDENT用）
+              </label>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-gray-400">月額（任意・備考）</label>
+                <label className="text-[10px] text-gray-400">月額（円）</label>
                 <input type="number" value={typeForm.monthlyFee} onChange={(e) => setTypeForm({ ...typeForm, monthlyFee: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
               </div>
               <div>
