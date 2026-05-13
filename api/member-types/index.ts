@@ -12,16 +12,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const db = getDb();
-    const snapshot = await db
-      .collection(COLLECTIONS.MEMBER_TYPES)
-      .where('isActive', '==', true)
-      .orderBy('sortOrder', 'asc')
-      .get();
-
-    const memberTypes = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    const snapshot = await db.collection(COLLECTIONS.MEMBER_TYPES).get();
+    const memberTypes = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; isActive?: boolean; sortOrder?: number }))
+      .filter((m) => m.isActive !== false)
+      .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
 
     return res.status(200).json(memberTypes);
   } catch (error) {

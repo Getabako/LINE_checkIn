@@ -473,12 +473,26 @@ export const adminApi = {
   revokeMembership: (membershipId: string) =>
     api.delete<void>(`/admin?action=revokeMembership&membershipId=${membershipId}`),
 
-  // Labora CSVインポート
-  importCustomers: (rows: Array<Record<string, string>>) =>
-    api.post<{
-      total: number; created: number; updated: number;
-      membershipsAssigned: number; skipped: number; errors: string[];
-    }>('/admin?action=importCustomers', { rows }),
+  // Labora CSVインポート（チャンク処理: タイムアウト回避）
+  importCustomers: async (rows: Array<Record<string, string>>, onProgress?: (done: number, total: number) => void) => {
+    const CHUNK = 50;
+    const total = rows.length;
+    let created = 0, updated = 0, membershipsAssigned = 0, skipped = 0;
+    const errors: string[] = [];
+    for (let offset = 0; offset < total; offset += CHUNK) {
+      const res = await api.post<{
+        total: number; processed: number; hasMore: boolean; nextOffset: number | null;
+        created: number; updated: number; membershipsAssigned: number; skipped: number; errors: string[];
+      }>(`/admin?action=importCustomers&offset=${offset}&limit=${CHUNK}`, { rows });
+      created += res.created;
+      updated += res.updated;
+      membershipsAssigned += res.membershipsAssigned;
+      skipped += res.skipped;
+      errors.push(...res.errors);
+      onProgress?.(Math.min(offset + CHUNK, total), total);
+    }
+    return { total, created, updated, membershipsAssigned, skipped, errors };
+  },
 
   // 会員種別申請（管理者）
   getMembershipApplications: (status: 'pending' | 'approved' | 'rejected' = 'pending') =>

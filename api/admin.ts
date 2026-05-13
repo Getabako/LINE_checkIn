@@ -813,7 +813,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let created = 0, updated = 0, membershipsAssigned = 0, skipped = 0;
       const errors: string[] = [];
 
-      for (const raw of rows) {
+      // チャンク処理（Vercelタイムアウト回避のため offset/limit 指定可能）
+      const offset = Number(req.query.offset) || 0;
+      const limit = Number(req.query.limit) || rows.length;
+      const targetRows = rows.slice(offset, offset + limit);
+
+      for (const raw of targetRows) {
         try {
           const customerNumber = String(raw.customerNumber || '').trim();
           const phone = normPhone(raw.mobile || raw.phone || '');
@@ -896,8 +901,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      const processed = offset + targetRows.length;
+      const hasMore = processed < rows.length;
       return res.status(200).json({
-        total: rows.length, created, updated, membershipsAssigned, skipped,
+        total: rows.length, processed, hasMore, nextOffset: hasMore ? processed : null,
+        created, updated, membershipsAssigned, skipped,
         errors: errors.slice(0, 20),
       });
     }
@@ -948,6 +956,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (error) {
     console.error('Admin API error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    const msg = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({ error: `Server error: ${msg}` });
   }
 }
