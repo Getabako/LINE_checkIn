@@ -1,4 +1,8 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, PDFFont } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 const LOCATION_NAMES: Record<string, string> = {
   ASP: 'みんなの体育館 ASP',
@@ -29,27 +33,61 @@ interface UserData {
   displayName: string;
 }
 
+// 日本語フォントを読み込む（Vercel/ローカル両対応で複数パスを試行）
+function loadJapaneseFont(): Buffer {
+  const candidates = [
+    path.join(process.cwd(), 'server-lib/fonts/NotoSansJP-Regular.ttf'),
+    fileURLToPath(new URL('./fonts/NotoSansJP-Regular.ttf', import.meta.url)),
+  ];
+  for (const p of candidates) {
+    try {
+      return readFileSync(p);
+    } catch {
+      // 次の候補へ
+    }
+  }
+  throw new Error('Japanese font file not found');
+}
+
 export async function generateReceipt(
   checkin: CheckinData,
-  user: UserData
+  user: UserData,
+  recipientName?: string
 ): Promise<string> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]); // A4
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  doc.registerFontkit(fontkit);
+  const fontBytes = loadJapaneseFont();
+  // サブセット埋め込みでPDFを軽量化
+  const font = await doc.embedFont(fontBytes, { subset: true });
 
+  const page = doc.addPage([595, 842]); // A4
   const { width, height } = page.getSize();
   const margin = 50;
   let y = height - margin;
 
-  const drawText = (text: string, x: number, yPos: number, size: number, bold = false) => {
-    page.drawText(text, {
-      x,
-      y: yPos,
-      size,
-      font: bold ? fontBold : font,
-      color: rgb(0.1, 0.1, 0.1),
-    });
+  const ink = rgb(0.1, 0.1, 0.1);
+  const sub = rgb(0.45, 0.45, 0.45);
+
+  const drawText = (
+    text: string,
+    x: number,
+    yPos: number,
+    size: number,
+    color = ink
+  ) => {
+    page.drawText(text, { x, y: yPos, size, font, color });
+  };
+
+  // 右寄せ描画（金額用）
+  const drawRight = (
+    text: string,
+    rightX: number,
+    yPos: number,
+    size: number,
+    color = ink
+  ) => {
+    const w = (font as PDFFont).widthOfTextAtSize(text, size);
+    page.drawText(text, { x: rightX - w, y: yPos, size, font, color });
   };
 
   const drawLine = (yPos: number) => {
@@ -62,102 +100,112 @@ export async function generateReceipt(
   };
 
   // タイトル
-  drawText('RECEIPT', margin, y, 28, true);
-  // 領収書 (ASCII representation)
-  drawText('Receipt / Ryoshusho', margin, y - 30, 10);
-  y -= 60;
-
+  drawText('領 収 書', margin, y, 26);
+  y -= 38;
   drawLine(y);
-  y -= 25;
+  y -= 24;
 
-  // 発行日
+  // 発行日・領収書番号
   const issueDate = new Date().toLocaleDateString('ja-JP', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   });
-  drawText(`Issue Date: ${issueDate}`, margin, y, 10);
-  drawText(`No. ${checkin.id?.substring(0, 8) || 'N/A'}`, width - margin - 120, y, 10);
-  y -= 25;
-
-  // 宛名
-  drawText(`To: ${user.displayName}`, margin, y, 12, true);
+  drawText(`発行日: ${issueDate}`, margin, y, 10, sub);
+  drawRight(`No. ${checkin.id?.substring(0, 8) || 'N/A'}`, width - margin, y, 10, sub);
   y -= 30;
 
+  // 宛名（編集された宛名を優先、無ければ利用者名）
+  const recipient = (recipientName && recipientName.trim()) || user.displayName || '利用者';
+  drawText(`${recipient}　様`, margin, y, 16);
+  y -= 28;
+
+  // 金額（大きく強調）
+  const total = checkin.totalPrice || 0;
+  drawText('金額', margin, y, 11, sub);
+  drawText(`¥${total.toLocaleString()}-`, margin + 50, y - 4, 22);
+  y -= 24;
+  drawText('（消費税込）', margin + 50, y, 9, sub);
+  y -= 22;
+  drawText('但し、施設利用料として', margin, y, 11);
+  y -= 24;
   drawLine(y);
-  y -= 25;
+  y -= 26;
 
   // 利用内容
-  drawText('Details', margin, y, 14, true);
-  y -= 25;
+  drawText('ご利用内容', margin, y, 13);
+  y -= 24;
 
   const locationName = LOCATION_NAMES[checkin.location || ''] || checkin.location || '';
   const facilityName = FACILITY_NAMES[checkin.facilityType || ''] || checkin.facilityType || '';
+  const startHour = Number(checkin.startTime?.split(':')[0] || 0);
+  const endHour = startHour + (checkin.duration || 0);
+  const timeStr = `${checkin.startTime || ''} 〜 ${String(endHour).padStart(2, '0')}:00（${checkin.duration || 0}時間）`;
 
-  const details = [
-    ['Location', locationName],
-    ['Facility', facilityName],
-    ['Date', checkin.date || ''],
-    ['Time', `${checkin.startTime || ''} - ${Number(checkin.startTime?.split(':')[0] || 0) + (checkin.duration || 0)}:00 (${checkin.duration || 0}h)`],
+  const details: [string, string][] = [
+    ['拠点', locationName],
+    ['施設', facilityName],
+    ['利用日', checkin.date || ''],
+    ['利用時間', timeStr],
   ];
 
   for (const [label, value] of details) {
-    drawText(`${label}:`, margin + 10, y, 10);
-    drawText(value, margin + 120, y, 10, true);
+    drawText(label, margin + 10, y, 10, sub);
+    drawText(value, margin + 110, y, 10);
     y -= 20;
   }
 
   y -= 10;
   drawLine(y);
-  y -= 25;
+  y -= 26;
 
   // 料金内訳
-  drawText('Amount', margin, y, 14, true);
-  y -= 25;
+  drawText('料金内訳', margin, y, 13);
+  y -= 24;
 
   const priceLines: [string, string][] = [
-    ['Subtotal', `JPY ${(checkin.originalPrice || checkin.totalPrice || 0).toLocaleString()}`],
+    ['施設利用料', `¥${(checkin.originalPrice || checkin.totalPrice || 0).toLocaleString()}`],
   ];
-
   if (checkin.memberDiscount && checkin.memberDiscount > 0) {
-    priceLines.push(['Member Discount', `-JPY ${checkin.memberDiscount.toLocaleString()}`]);
+    priceLines.push(['会員割引', `-¥${checkin.memberDiscount.toLocaleString()}`]);
   }
   if (checkin.couponDiscount && checkin.couponDiscount > 0) {
-    priceLines.push(['Coupon Discount', `-JPY ${checkin.couponDiscount.toLocaleString()}`]);
+    priceLines.push(['クーポン割引', `-¥${checkin.couponDiscount.toLocaleString()}`]);
   }
 
   for (const [label, value] of priceLines) {
-    drawText(label, margin + 10, y, 10);
-    drawText(value, width - margin - 120, y, 10);
+    drawText(label, margin + 10, y, 10, sub);
+    drawRight(value, width - margin, y, 10);
     y -= 20;
   }
 
   y -= 5;
   drawLine(y);
-  y -= 25;
+  y -= 26;
 
   // 合計
-  drawText('Total', margin + 10, y, 14, true);
-  drawText(`JPY ${(checkin.totalPrice || 0).toLocaleString()}`, width - margin - 150, y, 18, true);
-  y -= 40;
+  drawText('合計', margin + 10, y, 14);
+  drawRight(`¥${total.toLocaleString()}`, width - margin, y, 18);
+  y -= 44;
 
   drawLine(y);
-  y -= 30;
+  y -= 28;
 
   // 発行元
-  drawText('Issued by:', margin, y, 10);
+  drawText('発行元', margin, y, 10, sub);
   y -= 18;
-  drawText('if(juku) / Minna no Taiikukan', margin, y, 10, true);
+  drawText('if(juku) ／ みんなの体育館', margin, y, 11);
   y -= 18;
-  drawText('Akita City, Akita Prefecture', margin, y, 9);
-  y -= 30;
+  drawText('秋田県秋田市', margin, y, 9, sub);
 
   // フッタ注記
-  page.drawText('This receipt is electronically generated and valid without signature.', {
-    x: margin,
-    y: margin + 10,
-    size: 8,
-    font,
-    color: rgb(0.5, 0.5, 0.5),
-  });
+  drawText(
+    'この領収書は電子的に発行されており、署名・押印がなくても有効です。',
+    margin,
+    margin + 10,
+    8,
+    sub
+  );
 
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes).toString('base64');

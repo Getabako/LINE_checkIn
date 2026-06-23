@@ -59,9 +59,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { generateReceipt } = await import('../../server-lib/pdf.js');
           const userDoc = await db.collection(COLLECTIONS.USERS).doc(checkinData.userId).get();
           const user = userDoc.exists ? userDoc.data()! : { displayName: '利用者' };
+          // 宛名（任意）。指定が無ければ利用者の表示名を使用
+          const recipientName =
+            typeof req.query.recipient === 'string' && req.query.recipient.trim()
+              ? req.query.recipient.trim()
+              : undefined;
           const pdf = await generateReceipt(
             { id, ...checkinData },
-            { displayName: user.displayName }
+            { displayName: user.displayName },
+            recipientName
           );
           return res.status(200).json({ pdf });
         } catch (e) {

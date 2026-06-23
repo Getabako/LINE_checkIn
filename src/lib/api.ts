@@ -225,7 +225,10 @@ export const checkinApi = {
   getById: (id: string) => api.get<Checkin>(`/checkins/${id}`),
   getByGroup: (groupId: string) => api.get<Checkin[]>(`/checkins?groupId=${groupId}`),
   cancel: (id: string) => api.delete<void>(`/checkins/${id}`),
-  getReceipt: (id: string) => api.get<{ pdf: string }>(`/checkins/${id}?format=receipt`),
+  getReceipt: (id: string, recipient?: string) =>
+    api.get<{ pdf: string }>(
+      `/checkins/${id}?format=receipt${recipient && recipient.trim() ? `&recipient=${encodeURIComponent(recipient.trim())}` : ''}`
+    ),
   getAvailability: (params: {
     location: LocationId;
     facilityType: FacilityType;

@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle, FiAward } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle, FiAward, FiFileText, FiLoader } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
@@ -58,6 +58,9 @@ export const ReservationsPage: React.FC = () => {
   const [cancellingId, setCancellingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
+  const [receiptTarget, setReceiptTarget] = React.useState<Checkin | null>(null);
+  const [recipientInput, setRecipientInput] = React.useState('');
+  const [receiptLoadingId, setReceiptLoadingId] = React.useState<string | null>(null);
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
   const [memberTypes, setMemberTypes] = React.useState<MemberType[]>([]);
   const [pendingApp, setPendingApp] = React.useState<MembershipApplication | null>(null);
@@ -132,13 +135,51 @@ export const ReservationsPage: React.FC = () => {
     });
   };
 
+  // キャンセル可否: 前日まで or 申込から1時間以内（サーバー側の判定と一致させる）
   const canCancel = (checkin: Checkin): boolean => {
     if (checkin.status !== 'PAID' && checkin.status !== 'PENDING') return false;
-    const startDateTime = new Date(checkin.date);
-    const [hours, minutes] = checkin.startTime.split(':').map(Number);
-    startDateTime.setHours(hours, minutes, 0, 0);
-    const oneHourBefore = new Date(startDateTime.getTime() - 60 * 60 * 1000);
-    return new Date() < oneHourBefore;
+    const nowT = new Date();
+    const startOfUsageDayJst = new Date(`${checkin.date}T00:00:00+09:00`);
+    const beforeUsageDay = nowT < startOfUsageDayJst;
+    const withinGrace = checkin.createdAt
+      ? nowT.getTime() - new Date(checkin.createdAt).getTime() <= 60 * 60 * 1000
+      : false;
+    return beforeUsageDay || withinGrace;
+  };
+
+  const openReceiptModal = (checkin: Checkin) => {
+    setReceiptTarget(checkin);
+    setRecipientInput('');
+  };
+
+  const handleDownloadReceipt = async () => {
+    if (!receiptTarget) return;
+    const id = receiptTarget.id;
+    setReceiptLoadingId(id);
+    setError(null);
+    try {
+      const { pdf } = await checkinApi.getReceipt(id, recipientInput);
+      const byteCharacters = atob(pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt_${id.substring(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setReceiptTarget(null);
+      setRecipientInput('');
+    } catch {
+      setError('領収書の取得に失敗しました');
+    } finally {
+      setReceiptLoadingId(null);
+    }
   };
 
   // 予約を「今後」と「過去」に分類
@@ -220,18 +261,34 @@ export const ReservationsPage: React.FC = () => {
             )}
 
             {/* 料金 */}
-            <div className="mt-2 flex items-center justify-between">
+            <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-sm font-bold text-primary-700">¥{checkin.totalPrice.toLocaleString()}</span>
-              {canCancel(checkin) && (
-                <button
-                  onClick={() => handleCancel(checkin.id)}
-                  disabled={cancellingId === checkin.id}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
-                >
-                  <FiTrash2 className="w-3 h-3" />
-                  {cancellingId === checkin.id ? '処理中...' : 'キャンセル'}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {checkin.status === 'PAID' && (
+                  <button
+                    onClick={() => openReceiptModal(checkin)}
+                    disabled={receiptLoadingId === checkin.id}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors disabled:opacity-50"
+                  >
+                    {receiptLoadingId === checkin.id ? (
+                      <FiLoader className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <FiFileText className="w-3 h-3" />
+                    )}
+                    領収書
+                  </button>
+                )}
+                {canCancel(checkin) && (
+                  <button
+                    onClick={() => handleCancel(checkin.id)}
+                    disabled={cancellingId === checkin.id}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+                  >
+                    <FiTrash2 className="w-3 h-3" />
+                    {cancellingId === checkin.id ? '処理中...' : 'キャンセル'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -391,6 +448,51 @@ export const ReservationsPage: React.FC = () => {
           </span>
         </Button>
       </div>
+
+      {/* 領収書 宛名編集モーダル */}
+      {receiptTarget && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          onClick={() => receiptLoadingId ? null : setReceiptTarget(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <FiFileText className="w-4 h-4 text-primary-500" />
+              領収書の宛名
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              宛名を入力してください。空欄の場合はご登録のお名前で発行されます。
+            </p>
+            <input
+              type="text"
+              value={recipientInput}
+              onChange={(e) => setRecipientInput(e.target.value)}
+              placeholder="例: 株式会社○○ / 山田 太郎"
+              className="w-full px-3 py-2.5 border-2 border-gray-100 rounded-xl text-sm focus:border-primary-300 focus:outline-none mb-2"
+              autoFocus
+            />
+            <p className="text-[11px] text-gray-400 mb-4">
+              ※「様」は自動で付きます。但し書きは「施設利用料として」です。
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setReceiptTarget(null)}
+                disabled={!!receiptLoadingId}
+              >
+                キャンセル
+              </Button>
+              <Button fullWidth onClick={handleDownloadReceipt} disabled={!!receiptLoadingId}>
+                {receiptLoadingId ? '生成中...' : 'ダウンロード'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
