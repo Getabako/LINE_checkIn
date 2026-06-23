@@ -75,13 +75,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // DELETE: チェックインキャンセル
     if (req.method === 'DELETE') {
-      // キャンセル可能かチェック（前日まで＝利用日当日になるとキャンセル不可）
-      // 日本時間(JST=UTC+9)で利用日の 00:00 を境界にする
+      // キャンセル可能かチェック
+      // 条件A: 利用日の前日まで（日本時間JST=UTC+9で利用日0:00より前）
+      // 条件B: 申込から1時間以内なら、いつでもキャンセル可能（誤予約の救済）
       const now = new Date();
       const startOfUsageDayJst = new Date(`${checkinData.date}T00:00:00+09:00`);
+      const beforeUsageDay = now < startOfUsageDayJst;
 
-      if (now >= startOfUsageDayJst) {
-        return res.status(400).json({ error: 'キャンセル期限を過ぎています（前日まで可能です）' });
+      const createdAt = checkinData.createdAt ? new Date(checkinData.createdAt) : null;
+      const withinGracePeriod = createdAt
+        ? now.getTime() - createdAt.getTime() <= 60 * 60 * 1000
+        : false;
+
+      if (!beforeUsageDay && !withinGracePeriod) {
+        return res.status(400).json({
+          error: 'キャンセル期限を過ぎています（前日まで／お申込みから1時間以内は可能です）',
+        });
       }
 
       await checkinDoc.ref.update({

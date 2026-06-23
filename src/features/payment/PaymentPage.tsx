@@ -319,7 +319,7 @@ export const PaymentPage: React.FC = () => {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0"></span>
-              キャンセルは利用日の前日まで可能です
+              キャンセルは利用日の前日まで可能です（お申込みから1時間以内はいつでもキャンセルできます）
             </li>
           </ul>
         </div>
