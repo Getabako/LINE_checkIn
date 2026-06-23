@@ -5,7 +5,10 @@ import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 import { createLogger } from '../../server-lib/logger.js';
-import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
+import * as holidayJpModule from '@holiday-jp/holiday_jp';
+// CommonJSパッケージのため、Vercel ESMランタイムでは default 経由で参照する
+const holidayJp: any = (holidayJpModule as any).default ?? holidayJpModule;
+const isJpHoliday = (date: Date): boolean => holidayJp.isHoliday(date);
 
 const log = createLogger('api.payments.create-checkout');
 

@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
+import * as holidayJpModule from '@holiday-jp/holiday_jp';
+// CommonJSパッケージのため、Vercel ESMランタイムでは default 経由で参照する
+const holidayJp: any = (holidayJpModule as any).default ?? holidayJpModule;
+const isJpHoliday = (date: Date): boolean => holidayJp.isHoliday(date);
 
 // 拠点別料金表
 const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
