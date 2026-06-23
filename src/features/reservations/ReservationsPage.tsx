@@ -6,7 +6,7 @@ import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle,
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
-import { checkinApi, Checkin, MemberType, UserMembership, MembershipApplication, membershipApi, memberTypeApi, membershipApplicationApi } from '../../lib/api';
+import { checkinApi, Checkin, MemberType, UserMembership, membershipApi } from '../../lib/api';
 import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculateEndTime } from '../../lib/price';
 import clsx from 'clsx';
@@ -62,40 +62,10 @@ export const ReservationsPage: React.FC = () => {
   const [recipientInput, setRecipientInput] = React.useState('');
   const [receiptLoadingId, setReceiptLoadingId] = React.useState<string | null>(null);
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
-  const [memberTypes, setMemberTypes] = React.useState<MemberType[]>([]);
-  const [pendingApp, setPendingApp] = React.useState<MembershipApplication | null>(null);
-  const [showApplyForm, setShowApplyForm] = React.useState(false);
-  const [applyForm, setApplyForm] = React.useState({ memberTypeId: '', reason: '' });
-  const [applyMsg, setApplyMsg] = React.useState<string | null>(null);
-
-  const reloadMembership = React.useCallback(() => {
-    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
-    membershipApplicationApi.getMine().then((res) => setPendingApp(res.application)).catch(() => setPendingApp(null));
-  }, []);
 
   React.useEffect(() => {
-    reloadMembership();
-    memberTypeApi.getAll().then(setMemberTypes).catch(() => setMemberTypes([]));
-  }, [reloadMembership]);
-
-  const handleApplySubmit = async () => {
-    if (!applyForm.memberTypeId) return;
-    try {
-      await membershipApplicationApi.apply(applyForm.memberTypeId, applyForm.reason);
-      setApplyMsg('申請を送信しました。管理者の承認をお待ちください。');
-      setShowApplyForm(false);
-      setApplyForm({ memberTypeId: '', reason: '' });
-      reloadMembership();
-    } catch {
-      setApplyMsg('申請の送信に失敗しました');
-    }
-  };
-
-  const handleCancelApp = async () => {
-    if (!confirm('申請を取り消しますか？')) return;
-    await membershipApplicationApi.cancel();
-    reloadMembership();
-  };
+    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
+  }, []);
 
   const fetchCheckins = React.useCallback(async () => {
     try {
@@ -340,52 +310,9 @@ export const ReservationsPage: React.FC = () => {
           ) : (
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-center">
               <p className="text-sm text-gray-500">一般会員（通常料金）</p>
-              <p className="text-[10px] text-gray-400 mt-1">割引対象（その他/S-01/TR-00/TR-01/学生会員）は下から申請できます</p>
+              <p className="text-[10px] text-gray-400 mt-1">割引会員区分の適用をご希望の場合は、施設の受付・LINEにてお問い合わせください</p>
             </div>
           )}
-
-          {/* 会員種別申請 */}
-          <div className="mt-2">
-            {pendingApp ? (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
-                <div className="text-xs">
-                  <p className="font-semibold text-amber-800">申請中: {pendingApp.memberTypeName || '会員種別'}</p>
-                  <p className="text-[10px] text-amber-600">管理者の承認をお待ちください</p>
-                </div>
-                <button onClick={handleCancelApp} className="text-[11px] text-amber-700 underline">取消</button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowApplyForm(!showApplyForm)}
-                className="w-full text-xs text-primary-700 font-semibold py-2 border border-dashed border-primary-300 rounded-xl"
-              >
-                {showApplyForm ? '閉じる' : '+ 会員種別を申請する'}
-              </button>
-            )}
-            {showApplyForm && !pendingApp && (
-              <div className="mt-2 p-3 bg-white rounded-xl border space-y-2">
-                <p className="text-[11px] text-gray-500">希望する会員種別を選択し、理由を記入してください。管理者の承認後に適用されます。</p>
-                <select
-                  value={applyForm.memberTypeId}
-                  onChange={(e) => setApplyForm({ ...applyForm, memberTypeId: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                >
-                  <option value="">-- 会員種別を選択 --</option>
-                  {memberTypes.filter((m) => m.code !== 'GENERAL').map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}（{m.description}）</option>
-                  ))}
-                </select>
-                <textarea
-                  placeholder="申請理由（例: 学生証あり、会員番号など）"
-                  value={applyForm.reason}
-                  onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-sm" rows={2}
-                />
-                <Button fullWidth onClick={handleApplySubmit} disabled={!applyForm.memberTypeId}>申請を送信</Button>
-              </div>
-            )}
-            {applyMsg && <p className="text-[11px] text-emerald-700 mt-1">{applyMsg}</p>}
-          </div>
         </section>
 
         {error && (
