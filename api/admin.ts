@@ -383,7 +383,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ============ 予約作成（管理者） ============
     if (action === 'createCheckin' && req.method === 'POST') {
-      const { location, facilityType, date, startTime, duration, totalPrice, userId, displayName, skipRemoteLock } = req.body;
+      const { location, facilityType, date, startTime, duration, totalPrice, userId, displayName, skipRemoteLock, isInvoicePayment } = req.body;
       if (!location || !facilityType || !date || !startTime || !duration) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -470,6 +470,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pinCode,
         status: 'PAID',
         paymentId: null,
+        isInvoicePayment: isInvoicePayment || false,
+        paymentMethod: isInvoicePayment ? 'INVOICE' : null,
         skipRemoteLock: skipRemoteLock || false,
         groupId: null,
         recurringType: null,

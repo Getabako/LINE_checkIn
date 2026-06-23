@@ -6,7 +6,7 @@ import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculatePrice, calculateEndTime, LOCATION_TIME_SLOTS, getAvailableDurations } from '../../lib/price';
 import clsx from 'clsx';
 
-type CheckinItem = Checkin & { displayName?: string };
+type CheckinItem = Checkin & { displayName?: string; isInvoicePayment?: boolean };
 
 const DAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土'];
 const DAY_TO_NUM: Record<string, number> = {
@@ -84,9 +84,29 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
   const [date, setDate] = React.useState(defaultDate);
   const [startTime, setStartTime] = React.useState('10:00');
   const [duration, setDuration] = React.useState(1);
-  const [displayName, setDisplayName] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  // 利用者選択（この人の予約として登録 → 相手のマイ予約に表示）
+  const [userQuery, setUserQuery] = React.useState('');
+  const [userResults, setUserResults] = React.useState<{ id: string; displayName: string; lineUserId: string }[]>([]);
+  const [userLoading, setUserLoading] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<{ id: string; displayName: string } | null>(null);
+  const [isInvoice, setIsInvoice] = React.useState(false);
+
+  // ユーザー検索（300msデバウンス）。選択済みのときは検索しない
+  React.useEffect(() => {
+    if (selectedUser) return;
+    const q = userQuery.trim();
+    const handle = setTimeout(() => {
+      setUserLoading(true);
+      adminApi.getUsers(q || undefined)
+        .then(setUserResults)
+        .catch(() => setUserResults([]))
+        .finally(() => setUserLoading(false));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [userQuery, selectedUser]);
 
   const availableFacilities = LOCATION_FACILITIES[location];
   const timeSlots = LOCATION_TIME_SLOTS[location];
@@ -127,7 +147,9 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
         startTime,
         duration,
         totalPrice,
-        displayName: displayName.trim() || undefined,
+        userId: selectedUser?.id,
+        displayName: selectedUser?.displayName,
+        isInvoicePayment: isInvoice,
         skipRemoteLock: true,
       });
       onCreated();
@@ -234,19 +256,60 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
             </p>
           </div>
 
-          {/* 利用者名（任意） */}
+          {/* 利用者選択（この人の予約として登録・相手のマイ予約に表示） */}
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1">
-              利用者名（任意：既存ユーザーの displayName で紐付け）
+              利用者（この人の予約として登録され、相手のマイ予約に表示されます）
             </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="未入力の場合は管理者名義"
-              className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
-            />
+            {selectedUser ? (
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg border-2 border-primary-300 bg-primary-50">
+                <span className="text-sm font-semibold text-primary-800">{selectedUser.displayName || '(名前未設定)'}</span>
+                <button
+                  onClick={() => { setSelectedUser(null); setUserQuery(''); }}
+                  className="text-xs text-primary-600 underline"
+                >
+                  変更
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder="名前で検索（空欄で一覧表示）"
+                  className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+                />
+                <div className="mt-1 max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+                  {userLoading && <p className="text-xs text-gray-400 p-2">検索中...</p>}
+                  {!userLoading && userResults.length === 0 && (
+                    <p className="text-xs text-gray-400 p-2">該当ユーザーがいません</p>
+                  )}
+                  {!userLoading && userResults.map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => setSelectedUser({ id: u.id, displayName: u.displayName })}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50"
+                    >
+                      {u.displayName || '(名前未設定)'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1">未選択の場合は管理者名義で登録されます</p>
+              </>
+            )}
           </div>
+
+          {/* 請求書払い（後日請求・定期利用者向け） */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isInvoice}
+              onChange={(e) => setIsInvoice(e.target.checked)}
+              className="w-4 h-4 accent-primary-500"
+            />
+            <span className="text-sm text-gray-700">請求書払い（後日請求・定期利用者向け）</span>
+          </label>
 
           {/* 料金 */}
           <div className="p-3 bg-gradient-to-r from-sky-50 to-primary-50 rounded-lg border border-primary-100">
@@ -544,7 +607,7 @@ export const CalendarTab: React.FC = () => {
                           {c.startTime}〜 {getLocationName((c.location || 'ASP') as LocationId)} / {c.facilityType}
                         </div>
                         <div className="text-xs text-gray-600 mt-0.5">
-                          {c.displayName || ''} ({c.duration}h) · {c.status === 'PENDING' ? '未決済' : '決済済'}
+                          {c.displayName || ''} ({c.duration}h) · {c.isInvoicePayment ? '請求書払い' : c.status === 'PENDING' ? '未決済' : '決済済'}
                           {c.pinCode && <span className="ml-2 font-mono">PIN: {c.pinCode}</span>}
                         </div>
                       </div>

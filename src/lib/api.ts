@@ -428,6 +428,7 @@ export const adminApi = {
     userId?: string;
     displayName?: string;
     skipRemoteLock?: boolean;
+    isInvoicePayment?: boolean;
   }) => api.post<Checkin>('/admin?action=createCheckin', data),
 
   // 予約削除（管理者）
