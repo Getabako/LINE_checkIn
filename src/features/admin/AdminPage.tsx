@@ -5,7 +5,7 @@ import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, 
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, MembershipApplication, DiscountType, Coupon } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { CalendarTab } from './CalendarTab';
@@ -825,28 +825,14 @@ const MembersTab: React.FC = () => {
     }
   };
 
-  const [applications, setApplications] = React.useState<MembershipApplication[]>([]);
   const load = () => {
     Promise.all([
       adminApi.getMemberTypes(),
       adminApi.getMemberships(),
-      adminApi.getMembershipApplications('pending'),
     ])
-      .then(([t, m, a]) => { setMemberTypes(t); setMemberships(m); setApplications(a); })
+      .then(([t, m]) => { setMemberTypes(t); setMemberships(m); })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  };
-
-  const handleApprove = async (id: string) => {
-    if (!confirm('この申請を承認して会員種別を付与しますか？')) return;
-    await adminApi.approveMembershipApplication(id);
-    load();
-  };
-  const handleReject = async (id: string) => {
-    const reason = prompt('却下理由（任意）');
-    if (reason === null) return;
-    await adminApi.rejectMembershipApplication(id, reason);
-    load();
   };
 
   React.useEffect(load, []);
@@ -1044,36 +1030,6 @@ const MembersTab: React.FC = () => {
               )}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* 会員種別 申請一覧 */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-primary-800 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            会員種別申請（承認待ち {applications.length}件）
-          </h3>
-        </div>
-        <div className="space-y-2">
-          {applications.length === 0 ? (
-            <p className="text-center text-gray-400 py-4 text-sm">承認待ちの申請はありません</p>
-          ) : applications.map((a) => (
-            <div key={a.id} className="bg-white p-3 rounded-xl border border-amber-200 space-y-2">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-900 truncate">{a.displayName || '(名前未設定)'}</p>
-                  <p className="text-xs text-primary-700 font-semibold mt-0.5">希望: {a.memberTypeName}</p>
-                  {a.reason && <p className="text-[11px] text-gray-600 mt-1 whitespace-pre-wrap">理由: {a.reason}</p>}
-                  {a.createdAt && <p className="text-[10px] text-gray-400 mt-1">{format(new Date(a.createdAt), 'yyyy/M/d HH:mm', { locale: ja })}</p>}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => handleApprove(a.id)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">承認</button>
-                <button onClick={() => handleReject(a.id)} className="flex-1 bg-gray-200 text-gray-700 text-xs font-semibold py-2 rounded-lg">却下</button>
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 
