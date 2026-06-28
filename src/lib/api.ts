@@ -251,6 +251,9 @@ export const checkinApi = {
   },
 };
 
+// 料金マスタ（拠点 > 施設 > 曜日区分 > 時間帯 > 金額）
+export type PriceTable = Record<string, Record<string, Record<string, Record<string, number>>>>;
+
 export const priceApi = {
   calculate: (params: {
     location: LocationId;
@@ -259,6 +262,7 @@ export const priceApi = {
     startTime: string;
     duration: number;
   }) => api.post<{ totalPrice: number; breakdown: { hour: number; price: number }[] }>('/prices/calculate', params),
+  getPricePlans: () => api.get<PriceTable>('/admin?action=pricePlans'),
 };
 
 export const couponApi = {
@@ -501,6 +505,11 @@ export const adminApi = {
   getFacilityProfiles: () => api.get<FacilityProfiles>('/admin?action=facilityProfiles'),
   updateFacilityProfiles: (data: FacilityProfiles) =>
     api.put<FacilityProfiles>('/admin?action=updateFacilityProfiles', data),
+
+  // 料金マスタ
+  getPricePlans: () => api.get<PriceTable>('/admin?action=pricePlans'),
+  updatePricePlans: (data: PriceTable) =>
+    api.put<PriceTable>('/admin?action=updatePricePlans', data),
 
   // 自分（管理者）を会員に付与
   assignSelfMembership: (data: { memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>

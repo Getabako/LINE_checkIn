@@ -7,7 +7,7 @@ import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { mergeFacilities, getLocationName } from '../../lib/locations';
 import { PRICE_TABLE } from '../../lib/price';
-import { FacilityType, FacilityProfiles, facilityApi } from '../../lib/api';
+import { FacilityType, FacilityProfiles, PriceTable, facilityApi, priceApi } from '../../lib/api';
 import clsx from 'clsx';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
@@ -25,6 +25,7 @@ export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { location, facilityType, setFacilityType } = useCheckinStore();
   const [profiles, setProfiles] = React.useState<FacilityProfiles | undefined>(undefined);
+  const [priceTable, setPriceTable] = React.useState<PriceTable | undefined>(undefined);
 
   React.useEffect(() => {
     if (!location) {
@@ -34,13 +35,14 @@ export const HomePage: React.FC = () => {
 
   React.useEffect(() => {
     facilityApi.getProfiles().then(setProfiles).catch(() => setProfiles(undefined));
+    priceApi.getPricePlans().then(setPriceTable).catch(() => setPriceTable(undefined));
   }, []);
 
   if (!location) return null;
 
   const facilities = mergeFacilities(location, profiles);
   const locationName = getLocationName(location);
-  const locationPrices = PRICE_TABLE[location];
+  const locationPrices = (priceTable || PRICE_TABLE)[location];
   // 拠点別の営業開始時刻
   const openTime = location === 'ASP' ? '08:00' : '07:00';
   const dayRange = `${openTime}-17:00`;

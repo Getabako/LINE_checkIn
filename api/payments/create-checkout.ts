@@ -12,29 +12,7 @@ const isJpHoliday = (date: Date): boolean => holidayJp.isHoliday(date);
 
 const log = createLogger('api.payments.create-checkout');
 
-// 拠点別料金表
-const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
-  ASP: {
-    GYM: {
-      WEEKDAY: { DAYTIME: 2200, EVENING: 2750 },
-      WEEKEND: { DAYTIME: 2750, EVENING: 2750 },
-    },
-    TRAINING_PRIVATE: {
-      WEEKDAY: { ALLDAY: 2200 },
-      WEEKEND: { ALLDAY: 2200 },
-    },
-    TRAINING_SHARED: {
-      WEEKDAY: { ALLDAY: 550 },
-      WEEKEND: { ALLDAY: 550 },
-    },
-  },
-  YABASE: {
-    GYM: {
-      WEEKDAY: { DAYTIME: 1650, EVENING: 2200 },
-      WEEKEND: { DAYTIME: 2200, EVENING: 2200 },
-    },
-  },
-};
+import { loadPriceTable, type PriceTable } from '../../server-lib/prices.js';
 
 const VALID_LOCATIONS = ['ASP', 'YABASE'];
 const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
@@ -61,6 +39,7 @@ function getTimeSlot(hour: number): 'DAYTIME' | 'EVENING' {
 }
 
 function calculatePrice(
+  priceTable: PriceTable,
   location: string,
   facilityType: string,
   date: Date,
@@ -70,7 +49,7 @@ function calculatePrice(
   const dayType = isWeekend(date) ? 'WEEKEND' : 'WEEKDAY';
   const startHour = parseInt(startTime.split(':')[0], 10);
 
-  const facilityPrices = PRICE_TABLE[location]?.[facilityType];
+  const facilityPrices = priceTable[location]?.[facilityType];
   if (!facilityPrices) {
     throw new Error(`No price table for ${location}/${facilityType}`);
   }
@@ -158,6 +137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid facility type' });
     }
 
+    // 料金マスタ（管理画面の上書き反映）を読み込み
+    const PRICE_TABLE = await loadPriceTable();
+
     if (!PRICE_TABLE[location]?.[facilityType]) {
       return res.status(400).json({ error: `Facility type ${facilityType} is not available at ${location}` });
     }
@@ -204,7 +186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const perDatePrices: { date: string; price: number }[] = [];
     for (const d of allDates) {
       const parsedDate = new Date(d);
-      const price = calculatePrice(location, facilityType, parsedDate, startTime, duration);
+      const price = calculatePrice(PRICE_TABLE, location, facilityType, parsedDate, startTime, duration);
       perDatePrices.push({ date: d, price });
       grandTotalPrice += price;
     }

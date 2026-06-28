@@ -4,29 +4,7 @@ import * as holidayJpModule from '@holiday-jp/holiday_jp';
 const holidayJp: any = (holidayJpModule as any).default ?? holidayJpModule;
 const isJpHoliday = (date: Date): boolean => holidayJp.isHoliday(date);
 
-// 拠点別料金表
-const PRICE_TABLE: Record<string, Record<string, Record<string, Record<string, number>>>> = {
-  ASP: {
-    GYM: {
-      WEEKDAY: { DAYTIME: 2200, EVENING: 2750 },
-      WEEKEND: { DAYTIME: 2750, EVENING: 2750 },
-    },
-    TRAINING_PRIVATE: {
-      WEEKDAY: { ALLDAY: 2200 },
-      WEEKEND: { ALLDAY: 2200 },
-    },
-    TRAINING_SHARED: {
-      WEEKDAY: { ALLDAY: 550 },
-      WEEKEND: { ALLDAY: 550 },
-    },
-  },
-  YABASE: {
-    GYM: {
-      WEEKDAY: { DAYTIME: 1650, EVENING: 2200 },
-      WEEKEND: { DAYTIME: 2200, EVENING: 2200 },
-    },
-  },
-};
+import { loadPriceTable } from '../../server-lib/prices.js';
 
 const VALID_LOCATIONS = ['ASP', 'YABASE'];
 const VALID_FACILITY_TYPES = ['GYM', 'TRAINING_PRIVATE', 'TRAINING_SHARED'];
@@ -69,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid facility type' });
     }
 
+    const PRICE_TABLE = await loadPriceTable();
     const facilityPrices = PRICE_TABLE[loc]?.[facilityType];
     if (!facilityPrices) {
       return res.status(400).json({ error: `Facility type ${facilityType} is not available at ${loc}` });

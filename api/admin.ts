@@ -76,6 +76,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(doc.exists ? doc.data() : {});
     }
 
+    // ============ 料金マスタ公開取得（認証不要・表示用） ============
+    if (action === 'pricePlans' && req.method === 'GET') {
+      const { loadPriceTable } = await import('../server-lib/prices.js');
+      const table = await loadPriceTable();
+      return res.status(200).json(table);
+    }
+
     // ============ 認証ユーザー向け（管理者でなくてもOK） ============
     if (action === 'applyMembership' && req.method === 'POST') {
       const profile = await verifyLiffToken(req.headers.authorization);
@@ -639,6 +646,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .doc('facilityProfiles')
         .set({ ...profiles, updatedAt: new Date().toISOString() }, { merge: false });
       return res.status(200).json(profiles);
+    }
+
+    // ============ 料金マスタの保存（管理者） ============
+    if (action === 'updatePricePlans' && (req.method === 'PUT' || req.method === 'POST')) {
+      const { savePriceTable } = await import('../server-lib/prices.js');
+      const saved = await savePriceTable(req.body || {});
+      return res.status(200).json(saved);
     }
 
     // ============ 自動通知文の設定（管理者編集可） ============

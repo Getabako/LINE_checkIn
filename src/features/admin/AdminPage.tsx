@@ -1,11 +1,11 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
@@ -31,7 +31,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -667,6 +667,103 @@ const NotificationSettingsTab: React.FC = () => {
       <p className="text-xs text-gray-400 px-1">
         ※ LINE通知には環境変数 LINE_CHANNEL_ACCESS_TOKEN の設定が必要です。未設定の場合は通知は送信されません。
       </p>
+    </div>
+  );
+};
+
+// ============ 料金マスタ設定タブ ============
+const DAYTYPE_LABELS: Record<string, string> = { WEEKDAY: '平日', WEEKEND: '土日祝' };
+const SLOT_LABELS: Record<string, string> = { DAYTIME: '昼（〜17時）', EVENING: '夜（17時〜）', ALLDAY: '全日' };
+
+const PricingTab: React.FC = () => {
+  const [table, setTable] = React.useState<PriceTable | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [savedMsg, setSavedMsg] = React.useState('');
+
+  React.useEffect(() => {
+    adminApi.getPricePlans()
+      .then(setTable)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const setVal = (loc: string, fac: string, day: string, slot: string, value: number) => {
+    setTable((prev) => {
+      if (!prev) return prev;
+      const next: PriceTable = JSON.parse(JSON.stringify(prev));
+      next[loc][fac][day][slot] = value;
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!table) return;
+    setIsSaving(true);
+    setSavedMsg('');
+    try {
+      const saved = await adminApi.updatePricePlans(table);
+      setTable(saved);
+      setSavedMsg('保存しました（以降の予約に反映されます）');
+      setTimeout(() => setSavedMsg(''), 4000);
+    } catch (e) {
+      console.error(e);
+      alert('保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+  if (!table) return <p className="text-center text-gray-400 py-8">読み込みに失敗しました</p>;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500 px-1">
+        料金（税込・円/時間）を編集できます。保存すると以降の新規予約の課金に反映されます。
+        ※会員割引の設定は「会員」タブで行います。
+      </p>
+      {Object.keys(table).map((loc) => (
+        <div key={loc} className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
+          <p className="font-bold text-gray-900">{getLocationName(loc as LocationId)}</p>
+          {Object.keys(table[loc]).map((fac) => (
+            <div key={fac} className="border border-gray-100 rounded-xl p-3">
+              <p className="text-sm font-semibold text-gray-700 mb-2">
+                {getFacilityName(loc as LocationId, fac as Parameters<typeof getFacilityName>[1])}
+              </p>
+              <div className="space-y-2">
+                {Object.keys(table[loc][fac]).map((day) =>
+                  Object.keys(table[loc][fac][day]).map((slot) => (
+                    <div key={`${day}-${slot}`} className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-600">
+                        {DAYTYPE_LABELS[day] || day}・{SLOT_LABELS[slot] || slot}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-400">¥</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={50}
+                          value={table[loc][fac][day][slot]}
+                          onChange={(e) => setVal(loc, fac, day, slot, Math.max(0, Number(e.target.value)))}
+                          className="w-24 px-2 py-1.5 border rounded-lg text-sm text-right"
+                        />
+                        <span className="text-xs text-gray-400">/h</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+          {isSaving ? '保存中...' : '保存する'}
+        </Button>
+      </div>
+      {savedMsg && <p className="text-sm text-green-600 font-semibold px-1">{savedMsg}</p>}
     </div>
   );
 };
@@ -1784,6 +1881,7 @@ export const AdminPage: React.FC = () => {
             { key: 'coupons', icon: FiTag, label: 'クーポン' },
             { key: 'notifications', icon: FiBell, label: '通知設定' },
             { key: 'facilities', icon: FiMapPin, label: '施設' },
+            { key: 'pricing', icon: FiDollarSign, label: '料金' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -1810,6 +1908,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'coupons' && <CouponsTab />}
         {activeTab === 'notifications' && <NotificationSettingsTab />}
         {activeTab === 'facilities' && <FacilityProfilesTab />}
+        {activeTab === 'pricing' && <PricingTab />}
       </main>
     </div>
   );
