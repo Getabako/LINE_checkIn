@@ -61,11 +61,33 @@ export const ReservationsPage: React.FC = () => {
   const [receiptTarget, setReceiptTarget] = React.useState<Checkin | null>(null);
   const [recipientInput, setRecipientInput] = React.useState('');
   const [receiptLoadingId, setReceiptLoadingId] = React.useState<string | null>(null);
+  const [emailInput, setEmailInput] = React.useState('');
+  const [emailSending, setEmailSending] = React.useState(false);
+  const [emailMsg, setEmailMsg] = React.useState('');
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
+  const [withdrawing, setWithdrawing] = React.useState(false);
 
-  React.useEffect(() => {
+  const reloadMembership = React.useCallback(() => {
     membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
   }, []);
+
+  React.useEffect(() => {
+    reloadMembership();
+  }, [reloadMembership]);
+
+  const handleWithdraw = async () => {
+    if (!confirm('現在の会員区分を退会します。よろしいですか？\n（割引が適用されなくなります。再登録は施設へお問い合わせください）')) return;
+    setWithdrawing(true);
+    try {
+      await membershipApi.withdraw();
+      reloadMembership();
+      alert('退会手続きが完了しました');
+    } catch {
+      alert('退会手続きに失敗しました');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   const fetchCheckins = React.useCallback(async () => {
     try {
@@ -120,6 +142,31 @@ export const ReservationsPage: React.FC = () => {
   const openReceiptModal = (checkin: Checkin) => {
     setReceiptTarget(checkin);
     setRecipientInput('');
+    setEmailInput('');
+    setEmailMsg('');
+  };
+
+  const handleEmailReceipt = async () => {
+    if (!receiptTarget) return;
+    if (!emailInput.trim()) {
+      setEmailMsg('メールアドレスを入力してください');
+      return;
+    }
+    setEmailSending(true);
+    setEmailMsg('');
+    try {
+      await checkinApi.emailReceipt(receiptTarget.id, emailInput, recipientInput);
+      setEmailMsg('送信しました');
+      setTimeout(() => {
+        setReceiptTarget(null);
+        setEmailMsg('');
+      }, 1500);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'メール送信に失敗しました';
+      setEmailMsg(msg);
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const handleDownloadReceipt = async () => {
@@ -306,6 +353,16 @@ export const ReservationsPage: React.FC = () => {
                   期間: {membership.startDate || '指定なし'} 〜 {membership.endDate || '指定なし'}
                 </p>
               )}
+              <button
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="mt-3 w-full py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+              >
+                {withdrawing ? '手続き中...' : '会員区分を退会する'}
+              </button>
+              <p className="text-[10px] text-primary-100 mt-1 text-center">
+                ※更新・プラン変更は施設・LINEへお問い合わせください
+              </p>
             </div>
           ) : (
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-center">
@@ -402,20 +459,45 @@ export const ReservationsPage: React.FC = () => {
               autoFocus
             />
             <p className="text-[11px] text-gray-400 mb-4">
-              ※「様」は自動で付きます。但し書きは「施設利用料として」です。
+              ※「様」は自動で付きます。但し書きは「利用施設名（利用年月日）ご利用分として」です。
             </p>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
                 fullWidth
                 onClick={() => setReceiptTarget(null)}
-                disabled={!!receiptLoadingId}
+                disabled={!!receiptLoadingId || emailSending}
               >
-                キャンセル
+                閉じる
               </Button>
-              <Button fullWidth onClick={handleDownloadReceipt} disabled={!!receiptLoadingId}>
+              <Button fullWidth onClick={handleDownloadReceipt} disabled={!!receiptLoadingId || emailSending}>
                 {receiptLoadingId ? '生成中...' : 'ダウンロード'}
               </Button>
+            </div>
+
+            {/* メール送信 */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-600 mb-2">メールで送る</p>
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="送信先メールアドレス"
+                className="w-full px-3 py-2.5 border-2 border-gray-100 rounded-xl text-sm focus:border-primary-300 focus:outline-none mb-2"
+              />
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={handleEmailReceipt}
+                disabled={emailSending || !!receiptLoadingId}
+              >
+                {emailSending ? '送信中...' : 'メールで領収書を送る'}
+              </Button>
+              {emailMsg && (
+                <p className={clsx('text-xs mt-2 text-center', emailMsg === '送信しました' ? 'text-green-600' : 'text-red-500')}>
+                  {emailMsg}
+                </p>
+              )}
             </div>
           </div>
         </div>

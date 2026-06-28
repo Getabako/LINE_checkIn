@@ -69,6 +69,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             { displayName: user.displayName },
             recipientName
           );
+
+          // メール送信（?email=指定時）。未設定なら501で明示。
+          const emailTo =
+            typeof req.query.email === 'string' && req.query.email.trim()
+              ? req.query.email.trim()
+              : undefined;
+          if (emailTo) {
+            const { isEmailConfigured, sendEmailWithAttachment } = await import('../../server-lib/email.js');
+            if (!isEmailConfigured()) {
+              return res.status(501).json({ error: 'メール送信が未設定です（管理者にお問い合わせください）' });
+            }
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailTo)) {
+              return res.status(400).json({ error: 'メールアドレスの形式が正しくありません' });
+            }
+            try {
+              await sendEmailWithAttachment({
+                to: emailTo,
+                subject: 'みんなの体育館 ご利用領収書',
+                html:
+                  '<p>みんなの体育館をご利用いただきありがとうございます。</p>' +
+                  '<p>ご利用の領収書を添付いたします。</p>',
+                attachment: { filename: `receipt_${id}.pdf`, contentBase64: pdf },
+              });
+              return res.status(200).json({ sent: true, email: emailTo });
+            } catch (e) {
+              console.error('Receipt email error:', e);
+              return res.status(500).json({ error: 'メール送信に失敗しました' });
+            }
+          }
+
           return res.status(200).json({ pdf });
         } catch (e) {
           console.error('Receipt generation error:', e);

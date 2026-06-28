@@ -229,6 +229,10 @@ export const checkinApi = {
     api.get<{ pdf: string }>(
       `/checkins/${id}?format=receipt${recipient && recipient.trim() ? `&recipient=${encodeURIComponent(recipient.trim())}` : ''}`
     ),
+  emailReceipt: (id: string, email: string, recipient?: string) =>
+    api.get<{ sent: boolean; email: string }>(
+      `/checkins/${id}?format=receipt&email=${encodeURIComponent(email.trim())}${recipient && recipient.trim() ? `&recipient=${encodeURIComponent(recipient.trim())}` : ''}`
+    ),
   getAvailability: (params: {
     location: LocationId;
     facilityType: FacilityType;
@@ -268,6 +272,7 @@ export const memberTypeApi = {
 
 export const membershipApi = {
   get: () => api.get<{ membership: (UserMembership & { memberType: MemberType | null }) | null }>('/users/membership'),
+  withdraw: () => api.delete<{ message: string; withdrawn: number }>('/admin?action=withdrawMembership'),
 };
 
 export const reviewApi = {

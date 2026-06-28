@@ -136,6 +136,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ message: 'Cancelled' });
     }
 
+    // 会員退会（自分の有効な会員区分を解除）
+    if (action === 'withdrawMembership' && req.method === 'DELETE') {
+      const profile = await verifyLiffToken(req.headers.authorization);
+      if (!profile) return res.status(401).json({ error: 'Unauthorized' });
+      const snap = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('lineUserId', '==', profile.userId)
+        .where('isActive', '==', true)
+        .get();
+      if (snap.empty) return res.status(200).json({ message: 'No active membership', withdrawn: 0 });
+      const now = new Date().toISOString();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.update(d.ref, { isActive: false, withdrawnAt: now, updatedAt: now }));
+      await batch.commit();
+      return res.status(200).json({ message: 'Withdrawn', withdrawn: snap.size });
+    }
+
     const admin = await verifyAdmin(req);
     if (!admin) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
