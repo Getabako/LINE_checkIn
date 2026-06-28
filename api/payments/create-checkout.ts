@@ -419,6 +419,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // 予約完了をLINEで通知（代表のcheckinに対して1回／冪等）
+      try {
+        const { notifyBookingComplete } = await import('../../server-lib/notify.js');
+        await notifyBookingComplete(primaryCheckinId);
+      } catch (e) {
+        console.error('notify error (skip):', e);
+      }
+
       log.op('checkout.skip.paid', {
         lineUserId: profile.userId,
         primaryCheckinId,

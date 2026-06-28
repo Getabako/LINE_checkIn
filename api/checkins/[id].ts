@@ -104,6 +104,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: new Date().toISOString(),
       });
 
+      // キャンセル完了をLINEで通知
+      try {
+        const { notifyBookingCancelled } = await import('../../server-lib/notify.js');
+        await notifyBookingCancelled(checkinData as Parameters<typeof notifyBookingCancelled>[0]);
+      } catch (e) {
+        console.error('notify error (cancel):', e);
+      }
+
       return res.status(200).json({ message: 'Cancelled successfully' });
     }
 

@@ -480,6 +480,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updatedAt: now,
       };
       const ref = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
+      // 利用者へ予約完了（利用開始案内）をLINE通知
+      try {
+        const { notifyBookingComplete } = await import('../server-lib/notify.js');
+        await notifyBookingComplete(ref.id);
+      } catch (e) {
+        console.error('notify error (admin createCheckin):', e);
+      }
       return res.status(201).json({ id: ref.id, ...checkinData });
     }
 
@@ -600,6 +607,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!couponId) return res.status(400).json({ error: 'Missing couponId' });
       await db.collection(COLLECTIONS.COUPONS).doc(couponId).delete();
       return res.status(200).json({ message: 'Deleted' });
+    }
+
+    // ============ 自動通知文の設定（管理者編集可） ============
+    if (action === 'notificationSettings' && req.method === 'GET') {
+      const { getNotificationTemplates } = await import('../server-lib/notify.js');
+      const templates = await getNotificationTemplates();
+      return res.status(200).json(templates);
+    }
+    if (action === 'updateNotificationSettings' && (req.method === 'PUT' || req.method === 'POST')) {
+      const { saveNotificationTemplates } = await import('../server-lib/notify.js');
+      const { bookingComplete, bookingCancelled, eventComplete, enabled } = req.body || {};
+      const patch: Record<string, unknown> = {};
+      if (typeof bookingComplete === 'string') patch.bookingComplete = bookingComplete;
+      if (typeof bookingCancelled === 'string') patch.bookingCancelled = bookingCancelled;
+      if (typeof eventComplete === 'string') patch.eventComplete = eventComplete;
+      if (typeof enabled === 'boolean') patch.enabled = enabled;
+      const saved = await saveNotificationTemplates(patch);
+      return res.status(200).json(saved);
     }
 
     // 自分(管理者)に会員区分を付与（ユーザー検索を介さないクイック付与）

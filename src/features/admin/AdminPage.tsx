@@ -5,7 +5,7 @@ import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, 
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
@@ -31,7 +31,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -584,6 +584,89 @@ const SalesTab: React.FC = () => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+// ============ 自動通知設定タブ ============
+const NotificationSettingsTab: React.FC = () => {
+  const [tpl, setTpl] = React.useState<NotificationTemplates | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [savedMsg, setSavedMsg] = React.useState('');
+
+  React.useEffect(() => {
+    adminApi.getNotificationSettings()
+      .then(setTpl)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    if (!tpl) return;
+    setIsSaving(true);
+    setSavedMsg('');
+    try {
+      const saved = await adminApi.updateNotificationSettings(tpl);
+      setTpl(saved);
+      setSavedMsg('保存しました');
+      setTimeout(() => setSavedMsg(''), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+  if (!tpl) return <p className="text-center text-gray-400 py-8">読み込みに失敗しました</p>;
+
+  const fields: { key: keyof NotificationTemplates; label: string; hint: string }[] = [
+    { key: 'bookingComplete', label: '予約完了通知（利用開始案内）', hint: '使用可能: {location} {facility} {date} {time} {price} {pin}' },
+    { key: 'bookingCancelled', label: 'キャンセル完了通知', hint: '使用可能: {location} {facility} {date} {time}' },
+    { key: 'eventComplete', label: 'イベント予約完了通知', hint: '使用可能: {title} {date} {time}' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
+        <label className="flex items-center justify-between">
+          <div>
+            <p className="font-bold text-gray-900 text-sm">LINE自動通知</p>
+            <p className="text-xs text-gray-500 mt-0.5">予約・キャンセル完了時にLINEへ自動送信します</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={tpl.enabled}
+            onChange={(e) => setTpl({ ...tpl, enabled: e.target.checked })}
+            className="w-5 h-5"
+          />
+        </label>
+      </div>
+
+      {fields.map(({ key, label, hint }) => (
+        <div key={key} className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
+          <p className="font-semibold text-gray-800 text-sm mb-1">{label}</p>
+          <p className="text-[11px] text-gray-400 mb-2">{hint}</p>
+          <textarea
+            value={String(tpl[key])}
+            onChange={(e) => setTpl({ ...tpl, [key]: e.target.value })}
+            rows={6}
+            className="w-full px-3 py-2 border rounded-lg text-sm leading-relaxed"
+          />
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+          {isSaving ? '保存中...' : '保存する'}
+        </Button>
+        {savedMsg && <span className="text-sm text-green-600 font-semibold">{savedMsg}</span>}
+      </div>
+      <p className="text-xs text-gray-400 px-1">
+        ※ LINE通知には環境変数 LINE_CHANNEL_ACCESS_TOKEN の設定が必要です。未設定の場合は通知は送信されません。
+      </p>
     </div>
   );
 };
@@ -1560,7 +1643,7 @@ export const AdminPage: React.FC = () => {
 
       <main className="p-4 pb-8">
         {/* タブ切り替え */}
-        <div className="grid grid-cols-7 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="grid grid-cols-4 gap-1 bg-gray-100 rounded-xl p-1 mb-6">
           {([
             { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
@@ -1569,6 +1652,7 @@ export const AdminPage: React.FC = () => {
             { key: 'announcements', icon: FiBell, label: 'お知らせ' },
             { key: 'members', icon: FiUser, label: '会員' },
             { key: 'coupons', icon: FiTag, label: 'クーポン' },
+            { key: 'notifications', icon: FiBell, label: '通知設定' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -1593,6 +1677,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'announcements' && <AnnouncementsTab />}
         {activeTab === 'members' && <MembersTab />}
         {activeTab === 'coupons' && <CouponsTab />}
+        {activeTab === 'notifications' && <NotificationSettingsTab />}
       </main>
     </div>
   );

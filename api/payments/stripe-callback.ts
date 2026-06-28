@@ -128,6 +128,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // 予約完了をLINEで通知（代表のcheckinに対して1回のみ／冪等）
+    try {
+      const { notifyBookingComplete } = await import('../../server-lib/notify.js');
+      await notifyBookingComplete(checkinId);
+    } catch (e) {
+      console.error('notify error (callback):', e);
+    }
+
     const groupParam = checkin.groupId ? `&groupId=${checkin.groupId}` : '';
     return res.redirect(`${baseUrl}/complete?checkinId=${checkinId}${groupParam}`);
   } catch (error) {

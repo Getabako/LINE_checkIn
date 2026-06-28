@@ -123,6 +123,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // 予約完了をLINEで通知（冪等）
+      try {
+        const { notifyBookingComplete } = await import('../../server-lib/notify.js');
+        await notifyBookingComplete(checkinId);
+      } catch (e) {
+        console.error('notify error (webhook):', e);
+      }
+
       console.log(`Webhook: Checkin ${checkinId} processed successfully`);
     }
 

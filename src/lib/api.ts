@@ -378,6 +378,13 @@ export const announcementApi = {
   },
 };
 
+export interface NotificationTemplates {
+  bookingComplete: string;
+  bookingCancelled: string;
+  eventComplete: string;
+  enabled: boolean;
+}
+
 export const adminApi = {
   // イベント管理
   getEvents: () => api.get<Event[]>('/admin?action=events'),
@@ -460,6 +467,12 @@ export const adminApi = {
     api.put<void>('/admin?action=updateCoupon', { couponId, ...data }),
   deleteCoupon: (couponId: string) =>
     api.delete<void>(`/admin?action=deleteCoupon&couponId=${couponId}`),
+
+  // 自動通知文の設定
+  getNotificationSettings: () =>
+    api.get<NotificationTemplates>('/admin?action=notificationSettings'),
+  updateNotificationSettings: (data: Partial<NotificationTemplates>) =>
+    api.put<NotificationTemplates>('/admin?action=updateNotificationSettings', data),
 
   // 自分（管理者）を会員に付与
   assignSelfMembership: (data: { memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
