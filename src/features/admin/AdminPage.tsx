@@ -5,9 +5,10 @@ import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, 
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName } from '../../lib/locations';
+import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
 
@@ -417,6 +418,31 @@ const SalesTab: React.FC = () => {
     }
   };
 
+  // 経理用CSV（先方フォーマット：一般明細／定期明細／月次サマリー）
+  const [keiriBusy, setKeiriBusy] = React.useState<string>('');
+  const handleKeiriCsv = async (
+    kind: 'general' | 'recurring' | 'summary',
+    loc?: LocationId
+  ) => {
+    const key = `${kind}_${loc || ''}`;
+    setKeiriBusy(key);
+    try {
+      const checkins = (await adminApi.getCheckins({ from, to })) as KeiriCheckin[];
+      const file =
+        kind === 'general'
+          ? buildGeneralDetail(checkins, loc!, from)
+          : kind === 'recurring'
+          ? buildRecurringDetail(checkins, loc!, from)
+          : buildMonthlySummary(checkins, from);
+      downloadCsv(file.filename, file.rows);
+    } catch (e) {
+      console.error(e);
+      alert('経理用CSVの生成に失敗しました');
+    } finally {
+      setKeiriBusy('');
+    }
+  };
+
   const entries = salesData
     ? Object.entries(salesData.sales).sort(([a], [b]) => a.localeCompare(b))
     : [];
@@ -489,6 +515,50 @@ const SalesTab: React.FC = () => {
             >
               <FiDownload className="w-4 h-4" /> {isDownloading ? '取得中...' : '詳細CSV'}
             </button>
+          </div>
+
+          {/* 経理用CSV（先方フォーマット） */}
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-bold text-gray-900">経理用CSV（先方フォーマット）</p>
+              <p className="text-xs text-gray-500 mt-1">
+                集計期間の月（{from.slice(0, 7).replace('-', '年')}月）で、一般／定期の明細と月次サマリーを出力します。
+                平昼・平夜・土・日・祝の時間区分も自動集計。Laboraからの手動変換は不要です。
+              </p>
+            </div>
+            <div className="space-y-2">
+              {(['ASP', 'YABASE'] as LocationId[]).map((loc) => (
+                <div key={loc} className="border border-gray-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">{getLocationName(loc)}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleKeiriCsv('general', loc)}
+                      disabled={!!keiriBusy}
+                      className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border-2 border-primary-500 text-primary-700 text-xs font-semibold disabled:opacity-40"
+                    >
+                      <FiDownload className="w-3.5 h-3.5" />
+                      {keiriBusy === `general_${loc}` ? '生成中...' : '一般利用明細'}
+                    </button>
+                    <button
+                      onClick={() => handleKeiriCsv('recurring', loc)}
+                      disabled={!!keiriBusy}
+                      className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white border-2 border-primary-500 text-primary-700 text-xs font-semibold disabled:opacity-40"
+                    >
+                      <FiDownload className="w-3.5 h-3.5" />
+                      {keiriBusy === `recurring_${loc}` ? '生成中...' : '定期利用明細'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={() => handleKeiriCsv('summary')}
+                disabled={!!keiriBusy}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold disabled:opacity-40"
+              >
+                <FiDownload className="w-4 h-4" />
+                {keiriBusy === 'summary_' ? '生成中...' : '月次サマリー'}
+              </button>
+            </div>
           </div>
 
           {/* 棒グラフ */}

@@ -127,7 +127,17 @@ export async function generateReceipt(
   y -= 24;
   drawText('（消費税込）', margin + 50, y, 9, sub);
   y -= 22;
-  drawText('但し、施設利用料として', margin, y, 11);
+  // 但し書き：「利用施設名（利用年月日）ご利用分として」
+  const tadashiLocation = LOCATION_NAMES[checkin.location || ''] || checkin.location || '';
+  const tadashiFacility = FACILITY_NAMES[checkin.facilityType || ''] || checkin.facilityType || '';
+  const tadashiFacilityFull = `${tadashiLocation} ${tadashiFacility}`.trim();
+  const tadashiDate = checkin.date
+    ? (() => {
+        const [yy, mm, dd] = String(checkin.date).split('-');
+        return `${Number(yy)}年${Number(mm)}月${Number(dd)}日`;
+      })()
+    : '';
+  drawText(`但し、${tadashiFacilityFull}（${tadashiDate}）ご利用分として`, margin, y, 11);
   y -= 24;
   drawLine(y);
   y -= 26;
