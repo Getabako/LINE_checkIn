@@ -6,6 +6,7 @@ export interface LocationInfo {
   shortName: string;
   description: string;
   address: string;
+  imageUrl?: string;
 }
 
 export interface FacilityInfo {
@@ -24,6 +25,7 @@ export const LOCATIONS: LocationInfo[] = [
     shortName: 'ASP',
     description: '体育館・トレーニングルーム',
     address: '秋田県秋田市八橋大畑1丁目3-20',
+    // サムネイル画像は管理画面「施設」タブで設定（imageUrl）
   },
   {
     id: 'YABASE',
@@ -31,6 +33,7 @@ export const LOCATIONS: LocationInfo[] = [
     shortName: 'やばせ',
     description: '体育館',
     address: '秋田県秋田市八橋南2丁目8-2',
+    // サムネイル画像は管理画面「施設」タブで設定（imageUrl）
   },
 ];
 
@@ -69,6 +72,42 @@ export const LOCATION_FACILITIES: Record<LocationId, FacilityInfo[]> = {
     },
   ],
 };
+
+// 管理画面で設定された施設プロフィールを静的定義に上書きマージ
+import type { FacilityProfiles } from './api';
+
+export function mergeLocations(profiles?: FacilityProfiles): (LocationInfo & { overview?: string })[] {
+  if (!profiles) return LOCATIONS;
+  return LOCATIONS.map((loc) => {
+    const o = profiles[loc.id];
+    if (!o) return loc;
+    return {
+      ...loc,
+      description: o.description || loc.description,
+      address: o.address || loc.address,
+      imageUrl: o.imageUrl || loc.imageUrl,
+      overview: o.overview,
+    };
+  });
+}
+
+export function mergeFacilities(
+  locationId: LocationId,
+  profiles?: FacilityProfiles
+): FacilityInfo[] {
+  const base = LOCATION_FACILITIES[locationId] || [];
+  const o = profiles?.[locationId]?.facilities;
+  if (!o) return base;
+  return base.map((f) => {
+    const fo = o[f.id];
+    if (!fo) return f;
+    return {
+      ...f,
+      description: fo.description || f.description,
+      operatingHours: fo.operatingHours || f.operatingHours,
+    };
+  });
+}
 
 // 拠点名を取得
 export function getLocationName(locationId: LocationId): string {

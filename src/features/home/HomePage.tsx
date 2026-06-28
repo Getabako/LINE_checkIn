@@ -5,9 +5,9 @@ import { FiClock, FiMapPin } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
+import { mergeFacilities, getLocationName } from '../../lib/locations';
 import { PRICE_TABLE } from '../../lib/price';
-import { FacilityType } from '../../lib/api';
+import { FacilityType, FacilityProfiles, facilityApi } from '../../lib/api';
 import clsx from 'clsx';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
@@ -24,6 +24,7 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { location, facilityType, setFacilityType } = useCheckinStore();
+  const [profiles, setProfiles] = React.useState<FacilityProfiles | undefined>(undefined);
 
   React.useEffect(() => {
     if (!location) {
@@ -31,9 +32,13 @@ export const HomePage: React.FC = () => {
     }
   }, [location, navigate]);
 
+  React.useEffect(() => {
+    facilityApi.getProfiles().then(setProfiles).catch(() => setProfiles(undefined));
+  }, []);
+
   if (!location) return null;
 
-  const facilities = LOCATION_FACILITIES[location] || [];
+  const facilities = mergeFacilities(location, profiles);
   const locationName = getLocationName(location);
   const locationPrices = PRICE_TABLE[location];
   // 拠点別の営業開始時刻

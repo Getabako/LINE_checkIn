@@ -70,6 +70,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(items);
     }
 
+    // ============ 施設プロフィール公開取得（認証不要） ============
+    if (action === 'facilityProfiles' && req.method === 'GET') {
+      const doc = await db.collection('settings').doc('facilityProfiles').get();
+      return res.status(200).json(doc.exists ? doc.data() : {});
+    }
+
     // ============ 認証ユーザー向け（管理者でなくてもOK） ============
     if (action === 'applyMembership' && req.method === 'POST') {
       const profile = await verifyLiffToken(req.headers.authorization);
@@ -607,6 +613,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!couponId) return res.status(400).json({ error: 'Missing couponId' });
       await db.collection(COLLECTIONS.COUPONS).doc(couponId).delete();
       return res.status(200).json({ message: 'Deleted' });
+    }
+
+    // ============ 施設プロフィールの保存（管理者） ============
+    if (action === 'updateFacilityProfiles' && (req.method === 'PUT' || req.method === 'POST')) {
+      const profiles = req.body || {};
+      await db
+        .collection('settings')
+        .doc('facilityProfiles')
+        .set({ ...profiles, updatedAt: new Date().toISOString() }, { merge: false });
+      return res.status(200).json(profiles);
     }
 
     // ============ 自動通知文の設定（管理者編集可） ============

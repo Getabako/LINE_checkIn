@@ -1,13 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
-import { getLocationName, getFacilityName } from '../../lib/locations';
+import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
 import { CalendarTab } from './CalendarTab';
 import clsx from 'clsx';
@@ -31,7 +31,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -667,6 +667,136 @@ const NotificationSettingsTab: React.FC = () => {
       <p className="text-xs text-gray-400 px-1">
         ※ LINE通知には環境変数 LINE_CHANNEL_ACCESS_TOKEN の設定が必要です。未設定の場合は通知は送信されません。
       </p>
+    </div>
+  );
+};
+
+// ============ 施設プロフィール設定タブ ============
+const FacilityProfilesTab: React.FC = () => {
+  const [profiles, setProfiles] = React.useState<FacilityProfiles>({});
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [savedMsg, setSavedMsg] = React.useState('');
+
+  React.useEffect(() => {
+    adminApi.getFacilityProfiles()
+      .then((p) => setProfiles(p || {}))
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const setLoc = (loc: LocationId, patch: Record<string, string>) => {
+    setProfiles((prev) => ({ ...prev, [loc]: { ...prev[loc], ...patch } }));
+  };
+  const setFac = (loc: LocationId, fac: string, patch: Record<string, string>) => {
+    setProfiles((prev) => {
+      const locData = prev[loc] || {};
+      const facs = locData.facilities || {};
+      return { ...prev, [loc]: { ...locData, facilities: { ...facs, [fac]: { ...facs[fac], ...patch } } } };
+    });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSavedMsg('');
+    try {
+      const saved = await adminApi.updateFacilityProfiles(profiles);
+      setProfiles(saved || profiles);
+      setSavedMsg('保存しました');
+      setTimeout(() => setSavedMsg(''), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('保存に失敗しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-gray-500 px-1">
+        施設の概要・住所・外観サムネイル（画像URL）を編集できます。空欄の項目は初期設定の表示になります。
+        サムネイル画像は <code className="bg-gray-100 px-1 rounded">/images/ファイル名</code> または外部URLを指定できます。
+      </p>
+      {LOCATIONS.map((loc) => {
+        const o = profiles[loc.id] || {};
+        return (
+          <div key={loc.id} className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
+            <p className="font-bold text-gray-900">{loc.name}</p>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">説明（一覧の短い説明）</label>
+              <input
+                value={o.description ?? ''}
+                placeholder={loc.description}
+                onChange={(e) => setLoc(loc.id, { description: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">住所</label>
+              <input
+                value={o.address ?? ''}
+                placeholder={loc.address}
+                onChange={(e) => setLoc(loc.id, { address: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">外観サムネイル画像URL</label>
+              <input
+                value={o.imageUrl ?? ''}
+                placeholder={loc.imageUrl || '/images/space.asp.gif'}
+                onChange={(e) => setLoc(loc.id, { imageUrl: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm mt-1"
+              />
+              {(o.imageUrl || loc.imageUrl) && (
+                <img src={o.imageUrl || loc.imageUrl} alt="" className="mt-2 h-24 w-full object-cover rounded-lg bg-gray-100" />
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500">施設概要（選択画面に表示する詳しい説明）</label>
+              <textarea
+                value={o.overview ?? ''}
+                placeholder="例）駐車場あり。更衣室・シャワー完備。バスケットゴール2面..."
+                onChange={(e) => setLoc(loc.id, { overview: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border rounded-lg text-sm mt-1 leading-relaxed"
+              />
+            </div>
+            <div className="border-t border-gray-100 pt-3 space-y-3">
+              <p className="text-xs font-semibold text-gray-600">施設ごとの説明・営業時間</p>
+              {(LOCATION_FACILITIES[loc.id] || []).map((f) => {
+                const fo = o.facilities?.[f.id] || {};
+                return (
+                  <div key={f.id} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                    <p className="text-sm font-semibold text-gray-800">{f.name}</p>
+                    <input
+                      value={fo.description ?? ''}
+                      placeholder={f.description}
+                      onChange={(e) => setFac(loc.id, f.id, { description: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                    <input
+                      value={fo.operatingHours ?? ''}
+                      placeholder={f.operatingHours}
+                      onChange={(e) => setFac(loc.id, f.id, { operatingHours: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <div className="flex items-center gap-3">
+        <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+          {isSaving ? '保存中...' : '保存する'}
+        </Button>
+        {savedMsg && <span className="text-sm text-green-600 font-semibold">{savedMsg}</span>}
+      </div>
     </div>
   );
 };
@@ -1653,6 +1783,7 @@ export const AdminPage: React.FC = () => {
             { key: 'members', icon: FiUser, label: '会員' },
             { key: 'coupons', icon: FiTag, label: 'クーポン' },
             { key: 'notifications', icon: FiBell, label: '通知設定' },
+            { key: 'facilities', icon: FiMapPin, label: '施設' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -1678,6 +1809,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'members' && <MembersTab />}
         {activeTab === 'coupons' && <CouponsTab />}
         {activeTab === 'notifications' && <NotificationSettingsTab />}
+        {activeTab === 'facilities' && <FacilityProfilesTab />}
       </main>
     </div>
   );

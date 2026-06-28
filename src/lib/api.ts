@@ -378,6 +378,24 @@ export const announcementApi = {
   },
 };
 
+// 施設プロフィール（管理画面で編集可能な上書き設定）
+export interface FacilityProfileOverride {
+  description?: string;
+  operatingHours?: string;
+}
+export interface LocationProfileOverride {
+  description?: string;
+  address?: string;
+  imageUrl?: string;
+  overview?: string; // 施設概要（選択時に表示する長めの説明）
+  facilities?: Record<string, FacilityProfileOverride>;
+}
+export type FacilityProfiles = Partial<Record<LocationId, LocationProfileOverride>>;
+
+export const facilityApi = {
+  getProfiles: () => api.get<FacilityProfiles>('/admin?action=facilityProfiles'),
+};
+
 export interface NotificationTemplates {
   bookingComplete: string;
   bookingCancelled: string;
@@ -473,6 +491,11 @@ export const adminApi = {
     api.get<NotificationTemplates>('/admin?action=notificationSettings'),
   updateNotificationSettings: (data: Partial<NotificationTemplates>) =>
     api.put<NotificationTemplates>('/admin?action=updateNotificationSettings', data),
+
+  // 施設プロフィール
+  getFacilityProfiles: () => api.get<FacilityProfiles>('/admin?action=facilityProfiles'),
+  updateFacilityProfiles: (data: FacilityProfiles) =>
+    api.put<FacilityProfiles>('/admin?action=updateFacilityProfiles', data),
 
   // 自分（管理者）を会員に付与
   assignSelfMembership: (data: { memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>

@@ -6,8 +6,8 @@ import { ja } from 'date-fns/locale';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { LOCATIONS, getLocationName } from '../../lib/locations';
-import { LocationId, Event, School, Announcement, MemberType, UserMembership, eventApi, schoolApi, announcementApi, membershipApi } from '../../lib/api';
+import { mergeLocations, getLocationName } from '../../lib/locations';
+import { LocationId, Event, School, Announcement, MemberType, UserMembership, FacilityProfiles, eventApi, schoolApi, announcementApi, membershipApi, facilityApi } from '../../lib/api';
 import clsx from 'clsx';
 
 const fmtD = (type: string | undefined, value: number | undefined): string => {
@@ -48,6 +48,8 @@ export const LocationPage: React.FC = () => {
   const [schools, setSchools] = React.useState<School[]>([]);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
+  const [profiles, setProfiles] = React.useState<FacilityProfiles | undefined>(undefined);
+  const locations = React.useMemo(() => mergeLocations(profiles), [profiles]);
 
   React.useEffect(() => {
     reset();
@@ -59,6 +61,7 @@ export const LocationPage: React.FC = () => {
     schoolApi.getAll().then(setSchools).catch(() => setSchools([]));
     announcementApi.getPublic().then(setAnnouncements).catch(() => setAnnouncements([]));
     membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
+    facilityApi.getProfiles().then(setProfiles).catch(() => setProfiles(undefined));
   }, []);
 
   const handleLocationSelect = (id: LocationId) => {
@@ -146,17 +149,27 @@ export const LocationPage: React.FC = () => {
 
         {/* 拠点カード */}
         <div className="space-y-4 stagger-children">
-          {LOCATIONS.map((loc) => (
+          {locations.map((loc) => (
             <button
               key={loc.id}
               onClick={() => handleLocationSelect(loc.id)}
               className={clsx(
-                'w-full p-5 rounded-2xl border-2 text-left transition-all duration-300 transform hover:-translate-y-1',
+                'w-full p-5 rounded-2xl border-2 text-left transition-all duration-300 transform hover:-translate-y-1 overflow-hidden',
                 location === loc.id
                   ? 'border-primary-500 bg-gradient-to-br from-white to-sky-50 shadow-card-hover scale-[1.01]'
                   : 'border-gray-100 bg-white shadow-card hover:shadow-card-hover hover:border-primary-200'
               )}
             >
+              {loc.imageUrl && (
+                <div className="-mx-5 -mt-5 mb-4 h-36 bg-gray-100 overflow-hidden">
+                  <img
+                    src={loc.imageUrl}
+                    alt={loc.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              )}
               <div className="flex items-start gap-4">
                 <div className={clsx(
                   'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm',
@@ -183,6 +196,11 @@ export const LocationPage: React.FC = () => {
                   <p className="text-xs text-primary-400 mt-1">
                     {loc.address}
                   </p>
+                  {loc.overview && (
+                    <p className="text-xs text-gray-500 mt-2 leading-relaxed whitespace-pre-wrap">
+                      {loc.overview}
+                    </p>
+                  )}
                 </div>
               </div>
             </button>
