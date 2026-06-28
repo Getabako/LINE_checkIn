@@ -1,9 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, addDays, isToday, isTomorrow } from 'date-fns';
+import { format, addDays, isToday, isTomorrow, startOfMonth, endOfMonth, addMonths, getDay, isSameDay, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
-import { FiCheck, FiCalendar, FiRepeat } from 'react-icons/fi';
+import { FiCheck, FiCalendar, FiRepeat, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
@@ -26,6 +26,117 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
     default:
       return null;
   }
+};
+
+const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土'];
+
+// 月間カレンダー（空き状況を一覧表示）
+const MonthCalendar: React.FC<{
+  selectedDate: Date | null;
+  onSelect: (d: Date) => void;
+  minDate: Date;
+  maxDate: Date;
+  getAvail: (d: Date) => { text: string; color: string } | null;
+}> = ({ selectedDate, onSelect, minDate, maxDate, getAvail }) => {
+  const [viewMonth, setViewMonth] = React.useState<Date>(() => startOfMonth(selectedDate || new Date()));
+
+  const days = React.useMemo(() => {
+    const first = startOfMonth(viewMonth);
+    const last = endOfMonth(viewMonth);
+    const leading = getDay(first); // 日曜=0
+    const cells: (Date | null)[] = [];
+    for (let i = 0; i < leading; i++) cells.push(null);
+    for (let d = 1; d <= last.getDate(); d++) {
+      cells.push(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d));
+    }
+    return cells;
+  }, [viewMonth]);
+
+  const canPrev = startOfMonth(viewMonth) > startOfMonth(minDate);
+  const canNext = startOfMonth(viewMonth) < startOfMonth(maxDate);
+
+  return (
+    <div className="border-2 border-gray-100 rounded-xl p-3 bg-white">
+      {/* 月ナビ */}
+      <div className="flex items-center justify-between mb-2">
+        <button
+          type="button"
+          onClick={() => canPrev && setViewMonth(addMonths(viewMonth, -1))}
+          disabled={!canPrev}
+          className="p-2 rounded-lg text-primary-500 disabled:text-gray-200"
+          aria-label="前の月"
+        >
+          <FiChevronLeft className="w-5 h-5" />
+        </button>
+        <p className="font-bold text-gray-800">{format(viewMonth, 'yyyy年 M月', { locale: ja })}</p>
+        <button
+          type="button"
+          onClick={() => canNext && setViewMonth(addMonths(viewMonth, 1))}
+          disabled={!canNext}
+          className="p-2 rounded-lg text-primary-500 disabled:text-gray-200"
+          aria-label="次の月"
+        >
+          <FiChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+      {/* 曜日見出し */}
+      <div className="grid grid-cols-7 mb-1">
+        {WEEKDAY_HEADERS.map((w, i) => (
+          <div
+            key={w}
+            className={clsx('text-center text-[11px] font-semibold py-1', i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400')}
+          >
+            {w}
+          </div>
+        ))}
+      </div>
+      {/* 日付グリッド */}
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((d, idx) => {
+          if (!d) return <div key={`b${idx}`} />;
+          const inRange = d >= startOfDay(minDate) && d <= startOfDay(maxDate);
+          const avail = getAvail(d);
+          const isFull = avail?.text === '×';
+          const selectable = inRange && !isFull;
+          const selected = selectedDate && isSameDay(d, selectedDate);
+          const dow = getDay(d);
+          return (
+            <button
+              key={d.toISOString()}
+              type="button"
+              onClick={() => selectable && onSelect(d)}
+              disabled={!selectable}
+              className={clsx(
+                'aspect-square rounded-lg flex flex-col items-center justify-center transition-all',
+                !inRange
+                  ? 'text-gray-200 cursor-not-allowed'
+                  : isFull
+                    ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
+                    : selected
+                      ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-sm'
+                      : 'hover:bg-primary-50 text-gray-700'
+              )}
+            >
+              <span className={clsx('text-sm font-semibold leading-none', !selected && inRange && (dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : ''))}>
+                {d.getDate()}
+              </span>
+              {inRange && avail && (
+                <span className={clsx('text-[11px] font-bold leading-none mt-0.5', selected ? 'text-white' : avail.color)}>
+                  {avail.text}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {/* 凡例 */}
+      <div className="flex items-center justify-center gap-3 mt-2 text-[11px] text-gray-500">
+        <span><span className="text-emerald-500 font-bold">○</span> 空きあり</span>
+        <span><span className="text-amber-500 font-bold">△</span> 残りわずか</span>
+        <span><span className="text-red-500 font-bold">×</span> 満員</span>
+      </div>
+    </div>
+  );
 };
 
 export const CheckinPage: React.FC = () => {
@@ -56,8 +167,10 @@ export const CheckinPage: React.FC = () => {
     }
   }, [location, facilityType, navigate]);
 
+  // 予約可能期間: 当日から90日先まで（通常会員、約3ヶ月）
+  const RESERVABLE_DAYS = 90;
   const dateOptions = React.useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => addDays(new Date(), i));
+    return Array.from({ length: RESERVABLE_DAYS }, (_, i) => addDays(new Date(), i));
   }, []);
 
   // 単一日の料金
@@ -273,31 +386,22 @@ export const CheckinPage: React.FC = () => {
             日時選択
           </h3>
 
-          {/* 単日モード: 日付はドロップダウン */}
+          {/* 単日モード: 月間カレンダーで空き状況を一覧表示 */}
           {!multiDateMode && (
             <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-600 mb-2">利用日</label>
-              <div className="relative">
-                <select
-                  value={date ? date.toISOString() : ''}
-                  onChange={(e) => setDate(new Date(e.target.value))}
-                  className="w-full px-4 py-3 pr-10 rounded-xl border-2 border-gray-100 bg-white text-gray-800 text-sm font-semibold appearance-none focus:border-primary-500 focus:outline-none shadow-sm"
-                >
-                  <option value="">日付を選択してください</option>
-                  {dateOptions.map((d) => {
-                    const avail = getAvailabilityLabel(d);
-                    const isFull = avail?.text === '×';
-                    return (
-                      <option key={d.toISOString()} value={d.toISOString()} disabled={isFull}>
-                        {avail ? `${avail.text} ` : ''}{formatDateLabel(d)}（{format(d, 'M/d', { locale: ja })}）{isFull ? ' - 予約済み' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-primary-400">
-                  <FiCalendar className="w-5 h-5" />
-                </div>
-              </div>
+              <MonthCalendar
+                selectedDate={date}
+                onSelect={(d) => setDate(d)}
+                minDate={dateOptions[0]}
+                maxDate={dateOptions[dateOptions.length - 1]}
+                getAvail={getAvailabilityLabel}
+              />
+              {date && (
+                <p className="text-sm text-primary-600 mt-2 font-semibold text-center">
+                  選択中: {formatDateLabel(date)}（{format(date, 'M/d(E)', { locale: ja })}）
+                </p>
+              )}
             </div>
           )}
 

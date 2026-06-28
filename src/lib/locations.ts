@@ -25,7 +25,7 @@ export const LOCATIONS: LocationInfo[] = [
     shortName: 'ASP',
     description: '体育館・トレーニングルーム',
     address: '秋田県秋田市八橋大畑1丁目3-20',
-    // サムネイル画像は管理画面「施設」タブで設定（imageUrl）
+    imageUrl: '/images/asp.webp', // 管理画面「施設」タブで上書き可
   },
   {
     id: 'YABASE',
@@ -33,7 +33,7 @@ export const LOCATIONS: LocationInfo[] = [
     shortName: 'やばせ',
     description: '体育館',
     address: '秋田県秋田市八橋南2丁目8-2',
-    // サムネイル画像は管理画面「施設」タブで設定（imageUrl）
+    imageUrl: '/images/yabase.jpg', // 管理画面「施設」タブで上書き可
   },
 ];
 
