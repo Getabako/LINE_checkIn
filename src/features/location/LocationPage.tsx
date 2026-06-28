@@ -160,25 +160,26 @@ export const LocationPage: React.FC = () => {
                   : 'border-gray-100 bg-white shadow-card hover:shadow-card-hover hover:border-primary-200'
               )}
             >
-              {loc.imageUrl && (
-                <div className="-mx-5 -mt-5 mb-4 h-36 bg-gray-100 overflow-hidden">
-                  <img
-                    src={loc.imageUrl}
-                    alt={loc.name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              )}
               <div className="flex items-start gap-4">
-                <div className={clsx(
-                  'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm',
-                  location === loc.id
-                    ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
-                    : 'bg-sky-50 text-primary-400'
-                )}>
-                  <FiMapPin className="w-7 h-7" />
-                </div>
+                {loc.imageUrl ? (
+                  <div className="w-14 h-14 rounded-xl overflow-hidden shadow-sm flex-shrink-0 bg-gray-100">
+                    <img
+                      src={loc.imageUrl}
+                      alt={loc.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                ) : (
+                  <div className={clsx(
+                    'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
+                    location === loc.id
+                      ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
+                      : 'bg-sky-50 text-primary-400'
+                  )}>
+                    <FiMapPin className="w-7 h-7" />
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-900">
