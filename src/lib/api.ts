@@ -249,6 +249,16 @@ export const checkinApi = {
     if (params.duration) qs.set('duration', params.duration.toString());
     return api.get<Record<string, AvailabilityInfo>>(`/checkins?${qs.toString()}`);
   },
+  getTimetable: (params: { location: LocationId; facilityType: FacilityType; dates: string[] }) => {
+    const qs = new URLSearchParams();
+    qs.set('type', 'timetable');
+    qs.set('location', params.location);
+    qs.set('facilityType', params.facilityType);
+    qs.set('dates', params.dates.join(','));
+    return api.get<{ openHour: number; closeHour: number; timetable: Record<string, Record<string, number>> }>(
+      `/checkins?${qs.toString()}`
+    );
+  },
 };
 
 // 料金マスタ（拠点 > 施設 > 曜日区分 > 時間帯 > 金額）

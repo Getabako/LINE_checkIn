@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, addDays, isToday, isTomorrow, startOfMonth, endOfMonth, addMonths, getDay, isSameDay, startOfDay } from 'date-fns';
+import { format, addDays, isToday, isTomorrow, getDay, isSameDay, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { FiCheck, FiCalendar, FiRepeat, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
@@ -14,7 +14,7 @@ import {
   calculateEndTime,
   getAvailableDurations,
 } from '../../lib/price';
-import { checkinApi, AvailabilityInfo } from '../../lib/api';
+import { checkinApi, AvailabilityInfo, LocationId, FacilityType } from '../../lib/api';
 import clsx from 'clsx';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
@@ -28,112 +28,152 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
   }
 };
 
-const WEEKDAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土'];
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
-// 月間カレンダー（空き状況を一覧表示）
-const MonthCalendar: React.FC<{
+// その週の日曜を返す
+const sundayOf = (d: Date): Date => {
+  const s = startOfDay(d);
+  return addDays(s, -getDay(s));
+};
+
+// 週間タイムテーブル（曜日 × 時間で空き状況を一覧表示・Labola風）
+const WeeklyTimetable: React.FC<{
+  location: LocationId;
+  facilityType: FacilityType;
   selectedDate: Date | null;
-  onSelect: (d: Date) => void;
+  selectedStartTime: string | null;
   minDate: Date;
   maxDate: Date;
-  getAvail: (d: Date) => { text: string; color: string } | null;
-}> = ({ selectedDate, onSelect, minDate, maxDate, getAvail }) => {
-  const [viewMonth, setViewMonth] = React.useState<Date>(() => startOfMonth(selectedDate || new Date()));
+  onSelectSlot: (date: Date, startTime: string) => void;
+}> = ({ location, facilityType, selectedDate, selectedStartTime, minDate, maxDate, onSelectSlot }) => {
+  const [weekStart, setWeekStart] = React.useState<Date>(() => sundayOf(selectedDate || new Date()));
+  const [data, setData] = React.useState<{ openHour: number; closeHour: number; timetable: Record<string, Record<string, number>> } | null>(null);
+  const [loading, setLoading] = React.useState(true);
 
-  const days = React.useMemo(() => {
-    const first = startOfMonth(viewMonth);
-    const last = endOfMonth(viewMonth);
-    const leading = getDay(first); // 日曜=0
-    const cells: (Date | null)[] = [];
-    for (let i = 0; i < leading; i++) cells.push(null);
-    for (let d = 1; d <= last.getDate(); d++) {
-      cells.push(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d));
-    }
-    return cells;
-  }, [viewMonth]);
+  const capacity = facilityType === 'TRAINING_SHARED' ? 10 : 1;
+  const weekDays = React.useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
+  const minD = startOfDay(minDate);
+  const maxD = startOfDay(maxDate);
 
-  const canPrev = startOfMonth(viewMonth) > startOfMonth(minDate);
-  const canNext = startOfMonth(viewMonth) < startOfMonth(maxDate);
+  React.useEffect(() => {
+    setLoading(true);
+    const dateStrs = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
+    checkinApi.getTimetable({ location, facilityType, dates: dateStrs })
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, [location, facilityType, weekStart]);
+
+  const openHour = data?.openHour ?? (location === 'ASP' ? 8 : 7);
+  const closeHour = data?.closeHour ?? 21;
+  const hours = React.useMemo(
+    () => Array.from({ length: closeHour - openHour }, (_, i) => openHour + i),
+    [openHour, closeHour]
+  );
+
+  const canPrev = weekStart > minD;
+  const canNext = addDays(weekStart, 6) < maxD;
 
   return (
-    <div className="border-2 border-gray-100 rounded-xl p-3 bg-white">
-      {/* 月ナビ */}
-      <div className="flex items-center justify-between mb-2">
-        <button
-          type="button"
-          onClick={() => canPrev && setViewMonth(addMonths(viewMonth, -1))}
-          disabled={!canPrev}
-          className="p-2 rounded-lg text-primary-500 disabled:text-gray-200"
-          aria-label="前の月"
-        >
+    <div className="border-2 border-gray-100 rounded-xl bg-white overflow-hidden">
+      {/* 週ナビ */}
+      <div className="flex items-center justify-between px-2 py-2 bg-gray-50 border-b border-gray-100">
+        <button type="button" onClick={() => canPrev && setWeekStart(addDays(weekStart, -7))} disabled={!canPrev}
+          className="p-1.5 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="前の週">
           <FiChevronLeft className="w-5 h-5" />
         </button>
-        <p className="font-bold text-gray-800">{format(viewMonth, 'yyyy年 M月', { locale: ja })}</p>
-        <button
-          type="button"
-          onClick={() => canNext && setViewMonth(addMonths(viewMonth, 1))}
-          disabled={!canNext}
-          className="p-2 rounded-lg text-primary-500 disabled:text-gray-200"
-          aria-label="次の月"
-        >
+        <div className="text-center">
+          <p className="text-sm font-bold text-gray-800">
+            {format(weekStart, 'M/d', { locale: ja })} 〜 {format(addDays(weekStart, 6), 'M/d', { locale: ja })}
+          </p>
+          <button type="button" onClick={() => setWeekStart(sundayOf(new Date()))}
+            className="text-[11px] text-primary-500 font-semibold">今週へ</button>
+        </div>
+        <button type="button" onClick={() => canNext && setWeekStart(addDays(weekStart, 7))} disabled={!canNext}
+          className="p-1.5 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="次の週">
           <FiChevronRight className="w-5 h-5" />
         </button>
       </div>
-      {/* 曜日見出し */}
-      <div className="grid grid-cols-7 mb-1">
-        {WEEKDAY_HEADERS.map((w, i) => (
-          <div
-            key={w}
-            className={clsx('text-center text-[11px] font-semibold py-1', i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400')}
-          >
-            {w}
-          </div>
-        ))}
-      </div>
-      {/* 日付グリッド */}
-      <div className="grid grid-cols-7 gap-1">
-        {days.map((d, idx) => {
-          if (!d) return <div key={`b${idx}`} />;
-          const inRange = d >= startOfDay(minDate) && d <= startOfDay(maxDate);
-          const avail = getAvail(d);
-          const isFull = avail?.text === '×';
-          const selectable = inRange && !isFull;
-          const selected = selectedDate && isSameDay(d, selectedDate);
-          const dow = getDay(d);
-          return (
-            <button
-              key={d.toISOString()}
-              type="button"
-              onClick={() => selectable && onSelect(d)}
-              disabled={!selectable}
-              className={clsx(
-                'aspect-square rounded-lg flex flex-col items-center justify-center transition-all',
-                !inRange
-                  ? 'text-gray-200 cursor-not-allowed'
-                  : isFull
-                    ? 'bg-gray-50 text-gray-300 cursor-not-allowed'
-                    : selected
-                      ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-sm'
-                      : 'hover:bg-primary-50 text-gray-700'
-              )}
-            >
-              <span className={clsx('text-sm font-semibold leading-none', !selected && inRange && (dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : ''))}>
-                {d.getDate()}
-              </span>
-              {inRange && avail && (
-                <span className={clsx('text-[11px] font-bold leading-none mt-0.5', selected ? 'text-white' : avail.color)}>
-                  {avail.text}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">空き状況を読み込み中...</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="border-collapse text-center select-none">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="sticky left-0 z-10 bg-gray-50 px-2 py-1.5 text-[11px] font-semibold text-gray-500 border-b border-r border-gray-100 min-w-[64px]">日付</th>
+                {hours.map((h) => (
+                  <th key={h} className="px-1 py-1.5 text-[10px] font-semibold text-gray-500 border-b border-gray-100 min-w-[40px]">
+                    {String(h).padStart(2, '0')}:00
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {weekDays.map((d) => {
+                const dStr = format(d, 'yyyy-MM-dd');
+                const inRange = d >= minD && d <= maxD;
+                const dow = getDay(d);
+                const dayHours = data?.timetable[dStr] || {};
+                return (
+                  <tr key={dStr}>
+                    <td className={clsx(
+                      'sticky left-0 z-10 bg-white px-2 py-1.5 text-[11px] font-semibold border-b border-r border-gray-100 whitespace-nowrap',
+                      dow === 0 ? 'text-red-400' : dow === 6 ? 'text-blue-400' : 'text-gray-700'
+                    )}>
+                      {format(d, 'M/d', { locale: ja })}({WEEKDAY_LABELS[dow]})
+                    </td>
+                    {hours.map((h) => {
+                      const count = Number(dayHours[h] || 0);
+                      const remaining = capacity - count;
+                      const bookable = inRange && remaining > 0;
+                      const selected = selectedDate != null && isSameDay(d, selectedDate) && selectedStartTime === `${String(h).padStart(2, '0')}:00`;
+                      let cell: React.ReactNode;
+                      if (!inRange) {
+                        cell = <span className="text-gray-200">-</span>;
+                      } else if (facilityType === 'TRAINING_SHARED') {
+                        cell = <span className={clsx('font-bold', bookable ? 'text-emerald-600' : 'text-red-400')}>{count}</span>;
+                      } else if (count > 0) {
+                        cell = '';
+                      } else {
+                        cell = <span className="text-emerald-600 font-bold">○</span>;
+                      }
+                      return (
+                        <td key={h} className="p-0 border-b border-gray-50">
+                          <button
+                            type="button"
+                            onClick={() => bookable && onSelectSlot(d, `${String(h).padStart(2, '0')}:00`)}
+                            disabled={!bookable}
+                            className={clsx(
+                              'w-full h-9 text-[12px] flex items-center justify-center transition-colors',
+                              selected
+                                ? 'bg-primary-500 text-white'
+                                : !inRange
+                                  ? 'bg-gray-50 cursor-not-allowed'
+                                  : count >= capacity
+                                    ? 'bg-blue-100 cursor-not-allowed'
+                                    : 'hover:bg-emerald-50'
+                            )}
+                          >
+                            {selected ? <FiCheck className="w-3.5 h-3.5" /> : cell}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* 凡例 */}
-      <div className="flex items-center justify-center gap-3 mt-2 text-[11px] text-gray-500">
-        <span><span className="text-emerald-500 font-bold">○</span> 空きあり</span>
-        <span><span className="text-amber-500 font-bold">△</span> 残りわずか</span>
-        <span><span className="text-red-500 font-bold">×</span> 満員</span>
+      <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 px-2 py-2 text-[11px] text-gray-500 border-t border-gray-100">
+        <span><span className="text-emerald-600 font-bold">○</span> 空き（予約可能）</span>
+        <span><span className="inline-block w-3 h-3 align-middle bg-blue-100 rounded-sm"></span> 予約済</span>
+        {facilityType === 'TRAINING_SHARED' && <span>数字 = 現在の利用人数（定員{capacity}名）</span>}
       </div>
     </div>
   );
@@ -386,20 +426,24 @@ export const CheckinPage: React.FC = () => {
             日時選択
           </h3>
 
-          {/* 単日モード: 月間カレンダーで空き状況を一覧表示 */}
-          {!multiDateMode && (
+          {/* 単日モード: 週間タイムテーブルで空き状況を一覧表示 */}
+          {!multiDateMode && location && facilityType && (
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-600 mb-2">利用日</label>
-              <MonthCalendar
+              <label className="block text-sm font-semibold text-gray-600 mb-2">
+                利用日・開始時間（空いている枠をタップ）
+              </label>
+              <WeeklyTimetable
+                location={location}
+                facilityType={facilityType}
                 selectedDate={date}
-                onSelect={(d) => setDate(d)}
+                selectedStartTime={startTime}
                 minDate={dateOptions[0]}
                 maxDate={dateOptions[dateOptions.length - 1]}
-                getAvail={getAvailabilityLabel}
+                onSelectSlot={(d, st) => { setDate(d); setStartTime(st); }}
               />
-              {date && (
+              {date && startTime && (
                 <p className="text-sm text-primary-600 mt-2 font-semibold text-center">
-                  選択中: {formatDateLabel(date)}（{format(date, 'M/d(E)', { locale: ja })}）
+                  選択中: {formatDateLabel(date)}（{format(date, 'M/d(E)', { locale: ja })}）{startTime}〜
                 </p>
               )}
             </div>

@@ -144,6 +144,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(result);
       }
 
+      // 週間タイムテーブル（時間帯別の空き状況）
+      if (type === 'timetable') {
+        const { location: loc, facilityType: ft, dates: datesParam } = req.query;
+        if (!loc || !ft || !datesParam) {
+          return res.status(400).json({ error: 'Missing location, facilityType, dates' });
+        }
+        const dateList = (datesParam as string).split(',').filter(Boolean);
+        const OPEN_HOUR = loc === 'ASP' ? 8 : 7;
+        const CLOSE_HOUR = 21;
+
+        const out: Record<string, Record<number, number>> = {};
+        for (const d of dateList) {
+          const snap = await db.collection(COLLECTIONS.CHECKINS).where('date', '==', d).get();
+          const hours: Record<number, number> = {};
+          for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++) hours[h] = 0;
+          for (const doc of snap.docs) {
+            const ex = doc.data();
+            if (ex.location !== loc || ex.facilityType !== ft) continue;
+            if (ex.status !== 'PENDING' && ex.status !== 'PAID') continue;
+            const exStart = parseInt(String(ex.startTime).split(':')[0], 10);
+            const exEnd = exStart + (ex.duration || 0);
+            for (let h = Math.max(exStart, OPEN_HOUR); h < Math.min(exEnd, CLOSE_HOUR); h++) {
+              hours[h] = (hours[h] || 0) + 1;
+            }
+          }
+          out[d] = hours;
+        }
+        return res.status(200).json({ openHour: OPEN_HOUR, closeHour: CLOSE_HOUR, timetable: out });
+      }
+
       // 公開イベント一覧
       if (type === 'events') {
         // 複合インデックス回避のため isActive のみで取得しメモリでソート
