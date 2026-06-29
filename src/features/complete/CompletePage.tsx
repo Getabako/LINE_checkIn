@@ -57,6 +57,11 @@ export const CompletePage: React.FC = () => {
   const [error, setError] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState<string | null>(null);
   const [receiptLoading, setReceiptLoading] = React.useState(false);
+  const [showReceipt, setShowReceipt] = React.useState(false);
+  const [recipientInput, setRecipientInput] = React.useState('');
+  const [emailInput, setEmailInput] = React.useState('');
+  const [emailSending, setEmailSending] = React.useState(false);
+  const [emailMsg, setEmailMsg] = React.useState('');
 
   const isMultiDate = groupCheckins.length > 1;
 
@@ -147,7 +152,7 @@ export const CompletePage: React.FC = () => {
     if (!targetId || isMock) return;
     setReceiptLoading(true);
     try {
-      const { pdf } = await checkinApi.getReceipt(targetId);
+      const { pdf } = await checkinApi.getReceipt(targetId, recipientInput);
       // Base64をBlobに変換してダウンロード
       const byteCharacters = atob(pdf);
       const byteNumbers = new Array(byteCharacters.length);
@@ -164,11 +169,39 @@ export const CompletePage: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      setShowReceipt(false);
     } catch (e) {
       console.error('Receipt download error:', e);
     } finally {
       setReceiptLoading(false);
     }
+  };
+
+  const handleEmailReceipt = async () => {
+    const targetId = checkinId || checkin?.id;
+    if (!targetId || isMock) return;
+    if (!emailInput.trim()) {
+      setEmailMsg('メールアドレスを入力してください');
+      return;
+    }
+    setEmailSending(true);
+    setEmailMsg('');
+    try {
+      await checkinApi.emailReceipt(targetId, emailInput, recipientInput);
+      setEmailMsg('送信しました');
+      setTimeout(() => { setShowReceipt(false); setEmailMsg(''); }, 1500);
+    } catch (err) {
+      setEmailMsg(err instanceof Error ? err.message : 'メール送信に失敗しました');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  const openReceipt = () => {
+    setRecipientInput('');
+    setEmailInput('');
+    setEmailMsg('');
+    setShowReceipt(true);
   };
 
   const handleBackHome = () => {
@@ -410,11 +443,11 @@ export const CompletePage: React.FC = () => {
           <Button
             variant="secondary"
             fullWidth
-            onClick={handleDownloadReceipt}
+            onClick={openReceipt}
             disabled={receiptLoading}
           >
             {receiptLoading ? <FiLoader className="w-5 h-5 animate-spin" /> : <FiFileText className="w-5 h-5" />}
-            領収書ダウンロード
+            領収書を発行
           </Button>
         )}
         <Button variant="secondary" fullWidth onClick={handleBackHome}>
@@ -422,6 +455,61 @@ export const CompletePage: React.FC = () => {
           ホームに戻る
         </Button>
       </div>
+
+      {/* 領収書 宛名編集モーダル */}
+      {showReceipt && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+          onClick={() => (receiptLoading || emailSending ? null : setShowReceipt(false))}
+        >
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+              <FiFileText className="w-4 h-4 text-primary-500" />
+              領収書の宛名
+            </h3>
+            <p className="text-xs text-gray-500 mb-3">
+              宛名を入力してください。空欄の場合はご登録のお名前で発行されます。
+            </p>
+            <input
+              type="text"
+              value={recipientInput}
+              onChange={(e) => setRecipientInput(e.target.value)}
+              placeholder="例: 株式会社○○ / 山田 太郎"
+              className="w-full px-3 py-2.5 border-2 border-gray-100 rounded-xl text-sm focus:border-primary-300 focus:outline-none mb-2"
+              autoFocus
+            />
+            <p className="text-[11px] text-gray-400 mb-4">
+              ※「様」は自動で付きます。但し書きは「利用施設名（利用年月日）ご利用分として」です。
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" fullWidth onClick={() => setShowReceipt(false)} disabled={receiptLoading || emailSending}>
+                閉じる
+              </Button>
+              <Button fullWidth onClick={handleDownloadReceipt} disabled={receiptLoading || emailSending}>
+                {receiptLoading ? '生成中...' : 'ダウンロード'}
+              </Button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-600 mb-2">メールで送る</p>
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="送信先メールアドレス"
+                className="w-full px-3 py-2.5 border-2 border-gray-100 rounded-xl text-sm focus:border-primary-300 focus:outline-none mb-2"
+              />
+              <Button variant="secondary" fullWidth onClick={handleEmailReceipt} disabled={emailSending || receiptLoading}>
+                {emailSending ? '送信中...' : 'メールで領収書を送る'}
+              </Button>
+              {emailMsg && (
+                <p className={`text-xs mt-2 text-center ${emailMsg === '送信しました' ? 'text-green-600' : 'text-red-500'}`}>
+                  {emailMsg}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

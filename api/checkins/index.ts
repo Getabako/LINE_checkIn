@@ -154,12 +154,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const OPEN_HOUR = loc === 'ASP' ? 8 : 7;
         const CLOSE_HOUR = 21;
 
+        // 7日分を並列取得（逐次だと遅いため）
+        const snaps = await Promise.all(
+          dateList.map((d) => db.collection(COLLECTIONS.CHECKINS).where('date', '==', d).get())
+        );
         const out: Record<string, Record<number, number>> = {};
-        for (const d of dateList) {
-          const snap = await db.collection(COLLECTIONS.CHECKINS).where('date', '==', d).get();
+        dateList.forEach((d, i) => {
           const hours: Record<number, number> = {};
           for (let h = OPEN_HOUR; h < CLOSE_HOUR; h++) hours[h] = 0;
-          for (const doc of snap.docs) {
+          for (const doc of snaps[i].docs) {
             const ex = doc.data();
             if (ex.location !== loc || ex.facilityType !== ft) continue;
             if (ex.status !== 'PENDING' && ex.status !== 'PAID') continue;
@@ -170,7 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
           out[d] = hours;
-        }
+        });
         return res.status(200).json({ openHour: OPEN_HOUR, closeHour: CLOSE_HOUR, timetable: out });
       }
 

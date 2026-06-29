@@ -6,6 +6,7 @@ import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { FiCheck, FiCalendar, FiRepeat, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
+import { Loading } from '../../components/common/Loading';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { LOCATION_FACILITIES } from '../../lib/locations';
 import {
@@ -96,7 +97,9 @@ const WeeklyTimetable: React.FC<{
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-sm text-gray-400">空き状況を読み込み中...</div>
+        <div className="py-10">
+          <Loading text="空き状況を読み込み中..." />
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="border-collapse text-center select-none">
