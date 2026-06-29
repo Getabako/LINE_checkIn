@@ -15,6 +15,11 @@ const FACILITY_NAMES: Record<string, string> = {
   TRAINING_SHARED: 'トレーニングルーム（相席）',
 };
 
+const LOCATION_ADDRESSES: Record<string, string> = {
+  ASP: '秋田県秋田市八橋大畑1丁目3-20',
+  YABASE: '秋田県秋田市八橋南2丁目8-2',
+};
+
 interface CheckinData {
   id: string;
   location?: string;
@@ -57,8 +62,9 @@ export async function generateReceipt(
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   const fontBytes = loadJapaneseFont();
-  // サブセット埋め込みでPDFを軽量化
-  const font = await doc.embedFont(fontBytes, { subset: true });
+  // 注意: subset:true は pdf-lib の CJK サブセット不具合で文字が欠落するため、
+  // フォント全体を埋め込む（日本語が確実にレンダリングされる）
+  const font = await doc.embedFont(fontBytes, { subset: false });
 
   const page = doc.addPage([595, 842]); // A4
   const { width, height } = page.getSize();
@@ -201,12 +207,15 @@ export async function generateReceipt(
   drawLine(y);
   y -= 28;
 
-  // 発行元
+  // 発行元（運営会社）
+  const issuerAddress = LOCATION_ADDRESSES[checkin.location || ''] || '秋田県秋田市';
   drawText('発行元', margin, y, 10, sub);
-  y -= 18;
-  drawText('if(juku) ／ みんなの体育館', margin, y, 11);
-  y -= 18;
-  drawText('秋田県秋田市', margin, y, 9, sub);
+  y -= 19;
+  drawText('株式会社Local Power', margin, y, 12);
+  y -= 17;
+  drawText('代表取締役　寺田 耕也', margin, y, 9, sub);
+  y -= 15;
+  drawText(`${locationName}　${issuerAddress}`, margin, y, 9, sub);
 
   // フッタ注記
   drawText(
