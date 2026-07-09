@@ -104,6 +104,10 @@ export async function createBooking(params: {
     throw new Error('No RemoteLock device IDs configured for this facility type');
   }
 
+  // RemoteLock APIは yyyy-MM-dd'T'HH:mm:ss（タイムゾーンオフセットなし・JSTローカル時刻）のみ受け付ける
+  const startsAt = params.startsAt.replace(/(\+|-)\d{2}:\d{2}$|Z$/, '');
+  const endsAt = params.endsAt.replace(/(\+|-)\d{2}:\d{2}$|Z$/, '');
+
   let pinCode = '';
   let universalAccessKeyUrl = '';
   const bookingIds: string[] = [];
@@ -124,8 +128,8 @@ export async function createBooking(params: {
       attributes: {
         name: params.name,
         device_id: deviceId,
-        starts_at: params.startsAt,
-        ends_at: params.endsAt,
+        starts_at: startsAt,
+        ends_at: endsAt,
         validation: false,
         ...(shouldSetPin && pinToUse ? { pin: pinToUse } : {}),
       },
