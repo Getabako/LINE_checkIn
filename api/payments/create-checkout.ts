@@ -106,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       userId = userSnapshot.docs[0].id;
     }
 
-    const { location, facilityType, date, dates, startTime, duration, couponCode, skipPayment: clientSkipPayment, skipRemoteLock: clientSkipRemoteLock, recurring } = req.body;
+    const { location, facilityType, date, dates, startTime, duration, couponCode, recurring } = req.body;
 
     // 定期予約の場合、日付を自動計算
     let resolvedDates: string[] | null = null;
@@ -286,10 +286,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const finalPrice = Math.max(0, grandTotalPrice - totalMemberDiscount - couponDiscount);
 
-    // スキップフラグ
+    // スキップフラグ（環境変数のみで制御。クライアントからの指定は受け付けない）
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const skipPayment = clientSkipPayment || !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
-    const skipRemoteLock = clientSkipRemoteLock || false;
+    const skipPayment = !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    const skipRemoteLock = process.env.SKIP_REMOTELOCK === 'true';
 
     // Firestore: 各日付のCheckin作成 (status: PENDING)
     const now = new Date().toISOString();

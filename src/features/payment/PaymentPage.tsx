@@ -10,7 +10,6 @@ import { useCheckinStore } from '../../stores/checkinStore';
 import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
 import { calculateEndTime, calcMemberDiscount, getEffectiveDiscount } from '../../lib/price';
 import { api, couponApi, membershipApi } from '../../lib/api';
-import { useDebugStore } from '../../stores/debugStore';
 
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
@@ -41,7 +40,6 @@ export const PaymentPage: React.FC = () => {
     multiDateMode, dates, recurringType,
     setCoupon, setMemberDiscount,
   } = useCheckinStore();
-  const { paymentEnabled, remoteLockEnabled } = useDebugStore();
 
   React.useEffect(() => {
     if (!location || !facilityType || !date || !startTime || !totalPrice) {
@@ -113,7 +111,7 @@ export const PaymentPage: React.FC = () => {
 
     try {
       const isMulti = multiDateMode && dates.length > 0;
-      // Pay=OFF のときは skipPayment=true で Stripe を呼ばずに Firestore へ PAID 保存（テスト用）
+      // 決済/RemoteLockのスキップはサーバー側の環境変数のみで制御する
       const payload: Record<string, unknown> = {
         location,
         facilityType,
@@ -121,8 +119,6 @@ export const PaymentPage: React.FC = () => {
         startTime,
         duration,
         couponCode: couponCode || undefined,
-        skipRemoteLock: !remoteLockEnabled,
-        skipPayment: !paymentEnabled,
       };
 
       if (isMulti) {

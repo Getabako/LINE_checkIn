@@ -5,7 +5,6 @@ import { initializeLiff } from './lib/liff';
 import { userApi } from './lib/api';
 import { createLogger } from './lib/logger';
 import { Loading } from './components/common/Loading';
-import { DebugPanel } from './components/common/DebugPanel';
 import { LocationPage } from './features/location/LocationPage';
 import { HomePage } from './features/home/HomePage';
 import { CheckinPage } from './features/checkin/CheckinPage';
@@ -84,7 +83,6 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <DebugPanel />
         <Routes>
           <Route path="/" element={<LocationPage />} />
           <Route path="/facility" element={<HomePage />} />
