@@ -163,12 +163,16 @@ export const PaymentPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+    <div className="min-h-screen bg-[#eef2f7]">
       <Header title="ご利用内容確認" showBack />
 
       <main className="p-4 pb-36">
         {/* 確認カード */}
-        <div className="bg-white rounded-2xl shadow-card border border-gray-100/50 overflow-hidden animate-fade-in-up">
+        <div className="panel animate-fade-in-up">
+          <div className="panel-header">
+            <FiCheckCircle className="w-4 h-4" />
+            ご予約内容
+          </div>
           {/* 施設 */}
           <div className="p-5 border-b border-gray-100">
             <div className="flex items-center gap-4">
@@ -253,11 +257,12 @@ export const PaymentPage: React.FC = () => {
         </div>
 
         {/* クーポンコード入力 */}
-        <div className="mt-6 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
-          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
-            <FiTag className="w-4 h-4 text-primary-500" />
+        <div className="mt-6 panel animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+          <div className="panel-header">
+            <FiTag className="w-4 h-4" />
             クーポンコード
-          </h3>
+          </div>
+          <div className="panel-body">
           {couponCode ? (
             <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
               <FiCheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
@@ -292,15 +297,16 @@ export const PaymentPage: React.FC = () => {
               {couponMessage.text}
             </p>
           )}
+          </div>
         </div>
 
         {/* 注意事項 */}
-        <div className="mt-6 p-5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-          <h3 className="font-bold text-amber-800 mb-3 flex items-center gap-2">
-            <span className="text-lg">&#x1F4A1;</span>
+        <div className="mt-6 rounded-2xl border border-amber-300 shadow-card overflow-hidden animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <div className="px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-400 text-white font-bold text-sm flex items-center gap-2">
+            <span className="text-base">&#x1F4A1;</span>
             ご利用にあたって
-          </h3>
-          <ul className="text-sm text-amber-700 space-y-2">
+          </div>
+          <ul className="p-4 bg-amber-50 text-sm text-amber-800 space-y-2">
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0"></span>
               決済完了後、入館用の4桁暗証番号が発行されます
@@ -321,11 +327,12 @@ export const PaymentPage: React.FC = () => {
         </div>
 
         {/* 決済方法 */}
-        <div className="mt-6 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-          <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+        <div className="mt-6 panel animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+          <div className="panel-header">
+            <FiCreditCard className="w-4 h-4" />
             お支払い方法
-          </h3>
+          </div>
+          <div className="panel-body">
           {isInvoicePayment ? (
             <>
               <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
@@ -373,6 +380,7 @@ export const PaymentPage: React.FC = () => {
               </div>
             </>
           )}
+          </div>
         </div>
 
         {/* キャンセルメッセージ */}

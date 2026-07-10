@@ -76,9 +76,9 @@ const WeeklyTimetable: React.FC<{
   const canNext = addDays(weekStart, 6) < maxD;
 
   return (
-    <div className="border-2 border-gray-100 rounded-xl bg-white overflow-hidden">
+    <div className="border border-gray-300 rounded-xl bg-white overflow-hidden">
       {/* 週ナビ */}
-      <div className="flex items-center justify-between px-2 py-2 bg-gray-50 border-b border-gray-100">
+      <div className="flex items-center justify-between px-2 py-2 bg-primary-50 border-b border-primary-100">
         <button type="button" onClick={() => canPrev && setWeekStart(addDays(weekStart, -7))} disabled={!canPrev}
           className="p-1.5 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="前の週">
           <FiChevronLeft className="w-5 h-5" />
@@ -104,10 +104,10 @@ const WeeklyTimetable: React.FC<{
         <div className="overflow-x-auto">
           <table className="border-collapse text-center select-none">
             <thead>
-              <tr className="bg-gray-50">
-                <th className="sticky left-0 z-10 bg-gray-50 px-2 py-1.5 text-[11px] font-semibold text-gray-500 border-b border-r border-gray-100 min-w-[64px]">日付</th>
+              <tr className="bg-gray-700">
+                <th className="sticky left-0 z-10 bg-gray-700 px-2 py-2 text-[11px] font-semibold text-white border-b border-r border-gray-600 min-w-[64px]">日付</th>
                 {hours.map((h) => (
-                  <th key={h} className="px-1 py-1.5 text-[10px] font-semibold text-gray-500 border-b border-gray-100 min-w-[40px]">
+                  <th key={h} className="px-1 py-2 text-[10px] font-semibold text-white border-b border-gray-600 min-w-[40px]">
                     {String(h).padStart(2, '0')}:00
                   </th>
                 ))}
@@ -322,31 +322,32 @@ export const CheckinPage: React.FC = () => {
   const canProceed = startTime && priceInfo && (multiDateMode ? dates.length > 0 : !!date);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+    <div className="min-h-screen bg-[#eef2f7]">
       <Header title="日時選択" showBack />
 
       <main className="p-4 pb-36">
         {/* 選択中の施設 */}
-        <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-2xl mb-6 border border-primary-100/50 animate-fade-in">
-          <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-400 text-white rounded-xl flex items-center justify-center shadow-sm">
+        <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl mb-6 shadow-card animate-fade-in">
+          <div className="w-11 h-11 bg-white/20 text-white rounded-xl flex items-center justify-center">
             <FacilityIcon name={facility?.iconName || ''} className="w-5 h-5" />
           </div>
           <div>
-            <p className="font-bold text-primary-800">{facility?.name}</p>
-            <p className="text-xs text-primary-400">を利用予定</p>
+            <p className="text-[10px] text-primary-100 font-semibold">利用する施設</p>
+            <p className="font-bold text-white">{facility?.name}</p>
           </div>
         </div>
 
-        {/* 予約モード選択 */}
+        {/* 予約モード選択（セグメントコントロール） */}
         <section className="mb-6 animate-fade-in-up">
-          <div className="flex gap-2">
+          <p className="text-xs font-bold text-gray-500 mb-1.5 ml-1">予約タイプを選択</p>
+          <div className="flex gap-1 p-1 bg-gray-300/60 rounded-xl">
             <button
               onClick={() => setMultiDateMode(false)}
               className={clsx(
-                'flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-1.5',
+                'flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-1.5',
                 !multiDateMode
-                  ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
-                  : 'border-gray-100 bg-white text-gray-500'
+                  ? 'bg-primary-500 text-white shadow-button'
+                  : 'text-gray-600 hover:bg-white/60'
               )}
             >
               <FiCalendar className="w-4 h-4" />
@@ -355,10 +356,10 @@ export const CheckinPage: React.FC = () => {
             <button
               onClick={() => setMultiDateMode(true)}
               className={clsx(
-                'flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-1.5',
+                'flex-1 py-2.5 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-1.5',
                 multiDateMode
-                  ? 'border-primary-500 bg-gradient-to-br from-primary-50 to-sky-50 text-primary-700 shadow-card'
-                  : 'border-gray-100 bg-white text-gray-500'
+                  ? 'bg-primary-500 text-white shadow-button'
+                  : 'text-gray-600 hover:bg-white/60'
               )}
             >
               <FiRepeat className="w-4 h-4" />
@@ -423,11 +424,12 @@ export const CheckinPage: React.FC = () => {
         )}
 
         {/* 日時選択セクション（まとめてスッキリ） */}
-        <section className="mb-6 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up">
-          <h3 className="font-bold text-primary-800 mb-4 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
-            日時選択
-          </h3>
+        <section className="mb-6 panel animate-fade-in-up">
+          <div className="panel-header">
+            <FiCalendar className="w-4 h-4" />
+            日時を選択
+          </div>
+          <div className="panel-body">
 
           {/* 単日モード: 週間タイムテーブルで空き状況を一覧表示 */}
           {!multiDateMode && location && facilityType && (
@@ -543,16 +545,17 @@ export const CheckinPage: React.FC = () => {
               {startTime} 〜 {calculateEndTime(startTime, duration)}
             </p>
           )}
+          </div>
         </section>
 
         {/* 料金内訳 */}
         {priceInfo && (
-          <section className="p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-scale-in">
-            <h3 className="font-bold text-primary-800 mb-3 flex items-center gap-2">
-              <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+          <section className="panel animate-scale-in">
+            <div className="panel-header">
+              <span className="text-sm">¥</span>
               料金内訳
-            </h3>
-            <div className="space-y-2">
+            </div>
+            <div className="panel-body space-y-2">
               {!multiDateMode ? (
                 // 単日: 時間帯別
                 priceInfo.breakdown.map((item, index) => (

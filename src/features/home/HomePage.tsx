@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
-import { FiClock, FiMapPin } from 'react-icons/fi';
+import { FiClock, FiMapPin, FiCheck, FiChevronRight } from 'react-icons/fi';
+import { FaYenSign } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
@@ -59,7 +60,7 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+    <div className="min-h-screen bg-[#eef2f7]">
       <Header title={locationName} showBack />
 
       <main className="p-4 pb-28">
@@ -82,33 +83,21 @@ export const HomePage: React.FC = () => {
             <button
               key={facility.id}
               onClick={() => handleFacilitySelect(facility.id)}
-              className={clsx(
-                'w-full p-5 rounded-2xl border-2 text-left transition-all duration-300 transform hover:-translate-y-1',
-                facilityType === facility.id
-                  ? 'border-primary-500 bg-gradient-to-br from-white to-sky-50 shadow-card-hover scale-[1.01]'
-                  : 'border-gray-100 bg-white shadow-card hover:shadow-card-hover hover:border-primary-200'
-              )}
+              className={clsx('choice-card overflow-hidden', facilityType === facility.id && 'selected')}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 p-5 pb-3">
                 <div className={clsx(
-                  'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm',
+                  'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
                   facilityType === facility.id
                     ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
                     : 'bg-sky-50 text-primary-400'
                 )}>
                   <FacilityIcon name={facility.iconName} className="w-7 h-7" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      {facility.name}
-                    </h3>
-                    {facilityType === facility.id && (
-                      <span className="px-3 py-1 bg-gradient-to-r from-primary-500 to-primary-400 text-white text-xs font-bold rounded-full shadow-sm animate-scale-in">
-                        選択中
-                      </span>
-                    )}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {facility.name}
+                  </h3>
                   <p className="text-gray-500 text-sm mt-1">
                     {facility.description}
                   </p>
@@ -119,19 +108,48 @@ export const HomePage: React.FC = () => {
                     </p>
                   </div>
                 </div>
+                {/* 選択インジケーター */}
+                <div className={clsx(
+                  'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 transition-all',
+                  facilityType === facility.id
+                    ? 'border-primary-500 bg-primary-500 text-white'
+                    : 'border-gray-300 bg-white text-transparent'
+                )}>
+                  <FiCheck className="w-4 h-4" />
+                </div>
+              </div>
+              {/* タップ可能であることを示すフッター帯 */}
+              <div className={clsx(
+                'px-5 py-2 text-xs font-bold flex items-center justify-center gap-1 border-t',
+                facilityType === facility.id
+                  ? 'bg-primary-500 text-white border-primary-500'
+                  : 'bg-sky-50 text-primary-600 border-gray-100'
+              )}>
+                {facilityType === facility.id ? (
+                  <>
+                    <FiCheck className="w-3.5 h-3.5" />
+                    選択中
+                  </>
+                ) : (
+                  <>
+                    タップして選択
+                    <FiChevronRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </div>
             </button>
           ))}
         </div>
 
         {/* 料金表 */}
-        <div className="mt-8 p-5 bg-white rounded-2xl shadow-card border border-gray-100/50 animate-fade-in-up">
-          <h3 className="font-bold text-primary-800 mb-4 flex items-center gap-2">
-            <span className="w-1 h-5 bg-gradient-to-b from-primary-500 to-primary-300 rounded-full"></span>
+        <div className="mt-8 panel animate-fade-in-up">
+          <div className="panel-header">
+            <FaYenSign className="w-4 h-4" />
             料金表（税込）
-          </h3>
+            <span className="ml-auto text-[10px] font-normal text-primary-100">※ご参考</span>
+          </div>
 
-          <div className="space-y-6">
+          <div className="panel-body space-y-6">
             {/* 体育館料金 */}
             {locationPrices.GYM && (
               <div>
@@ -141,32 +159,34 @@ export const HomePage: React.FC = () => {
                   </div>
                   体育館
                 </h4>
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-sky-50 text-gray-600">
-                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">区分</th>
-                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
-                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-700">平日</td>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">{dayRange}</td>
-                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                    </tr>
-                    <tr className="bg-gray-50/50">
-                      <td className="px-3 py-2 border border-sky-100 text-gray-700">平日</td>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">17:00-21:00</td>
-                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-700">土日祝</td>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">終日</td>
-                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="rounded-xl overflow-hidden border border-gray-300">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-700 text-white">
+                        <th className="text-left px-3 py-2.5 font-semibold">区分</th>
+                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
+                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      <tr className="bg-white">
+                        <td className="px-3 py-2.5 text-gray-700 font-medium">平日</td>
+                        <td className="px-3 py-2.5 text-gray-500">{dayRange}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                      </tr>
+                      <tr className="bg-sky-50/60">
+                        <td className="px-3 py-2.5 text-gray-700 font-medium">平日</td>
+                        <td className="px-3 py-2.5 text-gray-500">17:00-21:00</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                      </tr>
+                      <tr className="bg-white">
+                        <td className="px-3 py-2.5 text-gray-700 font-medium">土日祝</td>
+                        <td className="px-3 py-2.5 text-gray-500">終日</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -179,20 +199,22 @@ export const HomePage: React.FC = () => {
                   </div>
                   トレーニングルーム（貸切）
                 </h4>
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-sky-50 text-gray-600">
-                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
-                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">{allDayRange}</td>
-                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="rounded-xl overflow-hidden border border-gray-300">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-700 text-white">
+                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
+                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="bg-white">
+                        <td className="px-3 py-2.5 text-gray-500">{allDayRange}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -205,20 +227,22 @@ export const HomePage: React.FC = () => {
                   </div>
                   トレーニングルーム（相席）
                 </h4>
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-sky-50 text-gray-600">
-                      <th className="text-left px-3 py-2 font-semibold border border-sky-100">時間帯</th>
-                      <th className="text-right px-3 py-2 font-semibold border border-sky-100">料金</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="px-3 py-2 border border-sky-100 text-gray-500">{allDayRange}</td>
-                      <td className="px-3 py-2 border border-sky-100 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/人</span></td>
-                    </tr>
-                  </tbody>
-                </table>
+                <div className="rounded-xl overflow-hidden border border-gray-300">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-700 text-white">
+                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
+                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="bg-white">
+                        <td className="px-3 py-2.5 text-gray-500">{allDayRange}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/人</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

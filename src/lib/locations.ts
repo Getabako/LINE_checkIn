@@ -7,6 +7,7 @@ export interface LocationInfo {
   description: string;
   address: string;
   imageUrl?: string;
+  overview?: string; // 施設概要（管理画面「施設」タブで上書き可）
 }
 
 export interface FacilityInfo {
@@ -34,6 +35,13 @@ export const LOCATIONS: LocationInfo[] = [
     description: '体育館',
     address: '秋田県秋田市八橋南2丁目8-2',
     imageUrl: '/images/yabase.jpg', // 管理画面「施設」タブで上書き可
+    overview:
+      '1時間単位で、1人から使えるプライベート体育館です！\n' +
+      '予約〜決済まですべてwebで完結する無人営業店舗です。\n' +
+      'フットサル・バスケ・卓球などのスポーツはもちろん、トランポリン・スラックライン・バランスボールなど、小さなお子様でも楽しめる設備が盛りだくさん！！⚽🏀🏓\n' +
+      '冷暖房完備の待合室もあるため、夏場や冬場も安心です！\n' +
+      '広さは概ね横11m×縦25m=275㎡、高さは約3.7mです。\n' +
+      '専用の無料駐車場に最大15台駐車可能です！',
   },
 ];
 
@@ -86,7 +94,7 @@ export function mergeLocations(profiles?: FacilityProfiles): (LocationInfo & { o
       description: o.description || loc.description,
       address: o.address || loc.address,
       imageUrl: o.imageUrl || loc.imageUrl,
-      overview: o.overview,
+      overview: o.overview || loc.overview,
     };
   });
 }

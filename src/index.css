@@ -10,8 +10,8 @@
   }
 
   body {
-    @apply bg-white text-gray-900;
-    background: linear-gradient(180deg, #eef6fb 0%, #ffffff 40%);
+    @apply text-gray-900;
+    background: #eef2f7;
     min-height: 100vh;
   }
 }
@@ -73,6 +73,32 @@
 
   .facility-card.selected {
     @apply border-primary-500 bg-gradient-to-br from-white to-sky-50 shadow-card-hover;
+  }
+
+  /* セクションパネル: 濃色ヘッダー帯＋白ボディで役割を明確に区切る */
+  .panel {
+    @apply bg-white rounded-2xl shadow-card border border-gray-200 overflow-hidden;
+  }
+
+  .panel-header {
+    @apply px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white
+           font-bold text-sm flex items-center gap-2;
+  }
+
+  .panel-body {
+    @apply p-4;
+  }
+
+  /* 選択式カードボタン: 「押せる」ことがひと目で分かる装飾 */
+  .choice-card {
+    @apply w-full text-left rounded-2xl border-2 transition-all duration-200
+           bg-white border-gray-300 shadow-card
+           active:scale-[0.99] hover:border-primary-300 hover:shadow-card-hover;
+  }
+
+  .choice-card.selected {
+    @apply border-primary-500 bg-gradient-to-br from-sky-50 to-white
+           shadow-card-hover ring-2 ring-primary-200;
   }
 
   /* Glass morphism effect */
