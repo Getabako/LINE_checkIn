@@ -19,6 +19,7 @@ import { AdminPage } from './features/admin/AdminPage';
 import { ReservationsPage } from './features/reservations/ReservationsPage';
 import { PrivacyPolicyPage } from './features/legal/PrivacyPolicyPage';
 import { CommerceLawPage } from './features/legal/CommerceLawPage';
+import { GuidePage } from './features/guide/GuidePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +96,7 @@ const App: React.FC = () => {
           <Route path="/schools" element={<SchoolListPage />} />
           <Route path="/schools/:id" element={<SchoolDetailPage />} />
           <Route path="/reservations" element={<ReservationsPage />} />
+          <Route path="/guide" element={<GuidePage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/commerce-law" element={<CommerceLawPage />} />
           <Route path="/admin" element={<AdminPage />} />

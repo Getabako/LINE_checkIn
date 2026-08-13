@@ -164,7 +164,11 @@ export const PaymentPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#eef2f7]">
-      <Header title="ご利用内容確認" showBack />
+      <Header
+        title="ご利用内容確認"
+        subtitle={locationName ? `${locationName}｜${facility?.name || ''}` : undefined}
+        showBack
+      />
 
       <main className="p-4 pb-36">
         {/* 確認カード */}

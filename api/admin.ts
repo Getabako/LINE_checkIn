@@ -766,6 +766,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(users);
     }
 
+    // ユーザー情報の編集（氏名・電話・会員番号など）
+    if (action === 'updateUser' && req.method === 'PUT') {
+      const { userId, displayName, name, kana, phone, mobile, email, customerNumber } = req.body || {};
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const ref = db.collection(COLLECTIONS.USERS).doc(userId);
+      const doc = await ref.get();
+      if (!doc.exists) return res.status(404).json({ error: 'User not found' });
+      const patch: Record<string, string> = { updatedAt: new Date().toISOString() };
+      if (displayName !== undefined) patch.displayName = String(displayName);
+      if (name !== undefined) patch.name = String(name);
+      if (kana !== undefined) patch.kana = String(kana);
+      if (phone !== undefined) patch.phone = String(phone);
+      if (mobile !== undefined) patch.mobile = String(mobile);
+      if (email !== undefined) patch.email = String(email);
+      if (customerNumber !== undefined) patch.customerNumber = String(customerNumber);
+      await ref.update(patch);
+      const updatedDoc = await ref.get();
+      return res.status(200).json({ id: updatedDoc.id, ...updatedDoc.data() });
+    }
+
     // ============ ユーザー会員区分の管理 ============
     if (action === 'memberships' && req.method === 'GET') {
       const snapshot = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)

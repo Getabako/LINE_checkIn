@@ -5,7 +5,7 @@ import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, 
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
@@ -443,6 +443,33 @@ const SalesTab: React.FC = () => {
     }
   };
 
+  // 経理用CSV 一括出力（一般×2拠点＋定期×2拠点＋月次サマリーを1ファイルに統合）
+  const handleKeiriCsvAll = async () => {
+    setKeiriBusy('all_');
+    try {
+      const checkins = (await adminApi.getCheckins({ from, to })) as KeiriCheckin[];
+      const sections: { title: string; rows: (string | number)[][] }[] = [];
+      for (const loc of ['ASP', 'YABASE'] as LocationId[]) {
+        sections.push({ title: `【${getLocationName(loc)} 一般利用明細】`, rows: buildGeneralDetail(checkins, loc, from).rows });
+        sections.push({ title: `【${getLocationName(loc)} 定期利用明細】`, rows: buildRecurringDetail(checkins, loc, from).rows });
+      }
+      sections.push({ title: '【月次サマリー】', rows: buildMonthlySummary(checkins, from).rows });
+
+      const combined: (string | number)[][] = [];
+      sections.forEach((s, i) => {
+        if (i > 0) combined.push([]);
+        combined.push([s.title]);
+        combined.push(...s.rows);
+      });
+      downloadCsv(`経理用CSV一括_${from.slice(0, 7)}.csv`, combined);
+    } catch (e) {
+      console.error(e);
+      alert('経理用CSVの生成に失敗しました');
+    } finally {
+      setKeiriBusy('');
+    }
+  };
+
   const entries = salesData
     ? Object.entries(salesData.sales).sort(([a], [b]) => a.localeCompare(b))
     : [];
@@ -557,6 +584,14 @@ const SalesTab: React.FC = () => {
               >
                 <FiDownload className="w-4 h-4" />
                 {keiriBusy === 'summary_' ? '生成中...' : '月次サマリー'}
+              </button>
+              <button
+                onClick={handleKeiriCsvAll}
+                disabled={!!keiriBusy}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold disabled:opacity-40"
+              >
+                <FiDownload className="w-4 h-4" />
+                {keiriBusy === 'all_' ? '生成中...' : '一括出力（全明細＋サマリーを1ファイルに）'}
               </button>
             </div>
           </div>
@@ -1080,8 +1115,14 @@ const AnnouncementsTab: React.FC = () => {
 const MembersTab: React.FC = () => {
   const [memberTypes, setMemberTypes] = React.useState<MemberType[]>([]);
   const [memberships, setMemberships] = React.useState<UserMembership[]>([]);
-  const [users, setUsers] = React.useState<Array<{ id: string; lineUserId: string; displayName: string }>>([]);
+  const [users, setUsers] = React.useState<AdminUser[]>([]);
   const [search, setSearch] = React.useState('');
+  // 会員情報の編集
+  const [editSearch, setEditSearch] = React.useState('');
+  const [editUsers, setEditUsers] = React.useState<AdminUser[]>([]);
+  const [editTarget, setEditTarget] = React.useState<AdminUser | null>(null);
+  const [editForm, setEditForm] = React.useState({ displayName: '', name: '', kana: '', phone: '', mobile: '', email: '', customerNumber: '', memberTypeId: '' });
+  const [editSaving, setEditSaving] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [showTypeForm, setShowTypeForm] = React.useState(false);
   const [showAssignForm, setShowAssignForm] = React.useState(false);
@@ -1223,6 +1264,72 @@ const MembersTab: React.FC = () => {
       setUsers(list);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  // 会員情報編集: 検索
+  const handleEditSearch = async () => {
+    try {
+      const list = await adminApi.getUsers(editSearch);
+      setEditUsers(list);
+    } catch (e) {
+      console.error(e);
+      alert('ユーザーの取得に失敗しました');
+    }
+  };
+
+  // 会員情報編集: モーダルを開く
+  const openEditUser = (u: AdminUser) => {
+    const current = memberships.find((m) => m.lineUserId === u.lineUserId && m.isActive);
+    setEditForm({
+      displayName: u.displayName || '',
+      name: u.name || '',
+      kana: u.kana || '',
+      phone: u.phone || '',
+      mobile: u.mobile || '',
+      email: u.email || '',
+      customerNumber: u.customerNumber || '',
+      memberTypeId: current?.memberTypeId || '',
+    });
+    setEditTarget(u);
+  };
+
+  // 会員情報編集: 保存（基本情報 + 会員区分が変わっていれば付け替え）
+  const handleSaveEditUser = async () => {
+    if (!editTarget) return;
+    setEditSaving(true);
+    try {
+      await adminApi.updateUser({
+        userId: editTarget.id,
+        displayName: editForm.displayName,
+        name: editForm.name,
+        kana: editForm.kana,
+        phone: editForm.phone,
+        mobile: editForm.mobile,
+        email: editForm.email,
+        customerNumber: editForm.customerNumber,
+      });
+      const current = memberships.find((m) => m.lineUserId === editTarget.lineUserId && m.isActive);
+      if (editForm.memberTypeId && editForm.memberTypeId !== (current?.memberTypeId || '')) {
+        if (!editTarget.lineUserId) {
+          alert('基本情報は保存しました。このユーザーはLINE未連携のため、会員区分の変更はできません。');
+        } else {
+          await adminApi.assignMembership({
+            lineUserId: editTarget.lineUserId,
+            userId: editTarget.id,
+            displayName: editForm.displayName,
+            memberTypeId: editForm.memberTypeId,
+          });
+        }
+      }
+      setEditTarget(null);
+      setEditUsers((prev) => prev.map((u) => (u.id === editTarget.id ? { ...u, ...editForm } : u)));
+      load();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '保存に失敗しました';
+      alert(msg);
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -1649,6 +1756,114 @@ const MembersTab: React.FC = () => {
           ))}
         </div>
       </section>
+
+      {/* 会員情報の編集 */}
+      <section className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
+        <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-1">
+          <FiUser className="w-4 h-4 text-primary-500" />
+          会員情報の編集
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">
+          氏名・電話番号・会員番号などの登録情報と会員区分を変更できます。
+        </p>
+        <div className="flex gap-2">
+          <input
+            placeholder="氏名・LINE IDで検索（空欄で全件）"
+            value={editSearch}
+            onChange={(e) => setEditSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleEditSearch()}
+            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+          />
+          <button onClick={handleEditSearch} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
+            <FiSearch className="w-4 h-4" />
+          </button>
+        </div>
+        {editUsers.length > 0 && (
+          <div className="mt-3 max-h-72 overflow-y-auto border rounded-lg divide-y">
+            {editUsers.map((u) => {
+              const current = memberships.find((m) => m.lineUserId === u.lineUserId && m.isActive);
+              return (
+                <div key={u.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{u.displayName || u.name || '(名前なし)'}</p>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {[u.customerNumber && `会員番号:${u.customerNumber}`, u.mobile || u.phone, current?.memberTypeName]
+                        .filter(Boolean).join(' / ') || u.lineUserId || 'LINE未連携'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openEditUser(u)}
+                    className="flex-shrink-0 px-3 py-1.5 rounded-lg border-2 border-primary-300 text-primary-700 text-xs font-semibold"
+                  >
+                    編集
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 会員情報編集モーダル */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !editSaving && setEditTarget(null)}>
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-gray-900 mb-4">会員情報の編集</h3>
+            <div className="space-y-3">
+              {([
+                ['displayName', '表示名'],
+                ['name', '氏名'],
+                ['kana', 'フリガナ'],
+                ['phone', '電話番号'],
+                ['mobile', '携帯番号'],
+                ['email', 'メールアドレス'],
+                ['customerNumber', '会員番号'],
+              ] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label className="text-xs text-gray-500">{label}</label>
+                  <input
+                    value={editForm[key]}
+                    onChange={(e) => setEditForm({ ...editForm, [key]: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="text-xs text-gray-500">会員区分</label>
+                <select
+                  value={editForm.memberTypeId}
+                  onChange={(e) => setEditForm({ ...editForm, memberTypeId: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 border rounded-lg text-sm"
+                >
+                  <option value="">（変更しない / 未設定）</option>
+                  {memberTypes.filter((m) => m.isActive).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                {!editTarget.lineUserId && (
+                  <p className="text-[10px] text-amber-600 mt-1">※ LINE未連携ユーザーのため会員区分の変更はできません</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setEditTarget(null)}
+                disabled={editSaving}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 text-sm font-semibold"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleSaveEditUser}
+                disabled={editSaving}
+                className="flex-1 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold disabled:opacity-40"
+              >
+                {editSaving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

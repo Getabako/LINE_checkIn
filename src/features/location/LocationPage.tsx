@@ -86,6 +86,33 @@ export const LocationPage: React.FC = () => {
       <Header title="みんなの体育館" />
 
       <main className="p-4 pb-28">
+        {/* クイックナビ（主要導線） */}
+        <div className="grid grid-cols-3 gap-2 mb-4 animate-fade-in-up">
+          <button
+            onClick={() => {
+              document.getElementById('location-select')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-primary-500 text-white shadow-button"
+          >
+            <FiCalendar className="w-5 h-5" />
+            <span className="text-xs font-bold">新規予約</span>
+          </button>
+          <button
+            onClick={() => navigate('/reservations')}
+            className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white border border-gray-200 text-primary-700 shadow-card"
+          >
+            <FiClock className="w-5 h-5" />
+            <span className="text-xs font-bold leading-tight">予約確認<br />キャンセル</span>
+          </button>
+          <button
+            onClick={() => navigate('/guide')}
+            className="flex flex-col items-center gap-1.5 py-3 rounded-2xl bg-white border border-gray-200 text-primary-700 shadow-card"
+          >
+            <FiBook className="w-5 h-5" />
+            <span className="text-xs font-bold">利用ガイド</span>
+          </button>
+        </div>
+
         {/* 会員ステータス */}
         {membership?.memberType && (
           <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-primary-500 to-primary-400 text-white shadow-button flex items-center gap-3 animate-fade-in-up">
@@ -135,7 +162,7 @@ export const LocationPage: React.FC = () => {
         )}
 
         {/* ヒーローセクション */}
-        <div className="text-center mb-8 pt-4 animate-fade-in-up">
+        <div id="location-select" className="text-center mb-8 pt-4 animate-fade-in-up scroll-mt-16">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-400 rounded-2xl shadow-glow mb-4 animate-float">
             <FiMapPin className="w-8 h-8 text-white" />
           </div>

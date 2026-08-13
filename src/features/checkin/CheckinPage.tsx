@@ -8,7 +8,7 @@ import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { useCheckinStore } from '../../stores/checkinStore';
-import { LOCATION_FACILITIES } from '../../lib/locations';
+import { LOCATION_FACILITIES, getLocationName } from '../../lib/locations';
 import {
   LOCATION_TIME_SLOTS,
   calculatePrice,
@@ -37,6 +37,84 @@ const sundayOf = (d: Date): Date => {
   return addDays(s, -getDay(s));
 };
 
+// 月カレンダーで日付を選んでジャンプするポップオーバー
+const MonthJumpCalendar: React.FC<{
+  minDate: Date;
+  maxDate: Date;
+  onPick: (d: Date) => void;
+  onClose: () => void;
+}> = ({ minDate, maxDate, onPick, onClose }) => {
+  const [viewMonth, setViewMonth] = React.useState<Date>(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  const minD = startOfDay(minDate);
+  const maxD = startOfDay(maxDate);
+  const firstDay = viewMonth;
+  const daysInMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 0).getDate();
+  const leadingBlanks = getDay(firstDay);
+  const cells: (Date | null)[] = [
+    ...Array.from({ length: leadingBlanks }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(viewMonth.getFullYear(), viewMonth.getMonth(), i + 1)),
+  ];
+
+  const prevMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1);
+  const nextMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1);
+  // 前月/翌月に予約可能日が1日でもあるか
+  const canPrevMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 0) >= minD;
+  const canNextMonth = nextMonth <= maxD;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6" onClick={onClose}>
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <button type="button" onClick={() => canPrevMonth && setViewMonth(prevMonth)} disabled={!canPrevMonth}
+            className="p-2 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="前の月">
+            <FiChevronLeft className="w-5 h-5" />
+          </button>
+          <p className="font-bold text-gray-800">{format(viewMonth, 'yyyy年M月', { locale: ja })}</p>
+          <button type="button" onClick={() => canNextMonth && setViewMonth(nextMonth)} disabled={!canNextMonth}
+            className="p-2 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="次の月">
+            <FiChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center mb-1">
+          {WEEKDAY_LABELS.map((w, i) => (
+            <span key={w} className={clsx('text-[11px] font-semibold', i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400')}>{w}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (!d) return <span key={`b${i}`} />;
+            const selectable = d >= minD && d <= maxD;
+            const dow = getDay(d);
+            return (
+              <button
+                key={d.toISOString()}
+                type="button"
+                disabled={!selectable}
+                onClick={() => { onPick(d); onClose(); }}
+                className={clsx(
+                  'h-9 rounded-lg text-sm font-semibold transition-colors',
+                  !selectable
+                    ? 'text-gray-200 cursor-not-allowed'
+                    : isToday(d)
+                      ? 'bg-primary-500 text-white'
+                      : clsx('hover:bg-primary-50', dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-gray-700')
+                )}
+              >
+                {d.getDate()}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-gray-400 text-center mt-3">日付をタップするとその週の空き状況へ移動します（本日〜90日先まで）</p>
+      </div>
+    </div>
+  );
+};
+
 // 週間タイムテーブル（曜日 × 時間で空き状況を一覧表示・Labola風）
 const WeeklyTimetable: React.FC<{
   location: LocationId;
@@ -50,6 +128,7 @@ const WeeklyTimetable: React.FC<{
   const [weekStart, setWeekStart] = React.useState<Date>(() => sundayOf(selectedDate || new Date()));
   const [data, setData] = React.useState<{ openHour: number; closeHour: number; timetable: Record<string, Record<string, number>> } | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [showJump, setShowJump] = React.useState(false);
 
   const capacity = facilityType === 'TRAINING_SHARED' ? 10 : 1;
   const weekDays = React.useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -87,8 +166,15 @@ const WeeklyTimetable: React.FC<{
           <p className="text-sm font-bold text-gray-800">
             {format(weekStart, 'M/d', { locale: ja })} 〜 {format(addDays(weekStart, 6), 'M/d', { locale: ja })}
           </p>
-          <button type="button" onClick={() => setWeekStart(sundayOf(new Date()))}
-            className="text-[11px] text-primary-500 font-semibold">今週へ</button>
+          <div className="flex items-center justify-center gap-3">
+            <button type="button" onClick={() => setWeekStart(sundayOf(new Date()))}
+              className="text-[11px] text-primary-500 font-semibold">今週へ</button>
+            <button type="button" onClick={() => setShowJump(true)}
+              className="text-[11px] text-primary-500 font-semibold flex items-center gap-0.5">
+              <FiCalendar className="w-3 h-3" />
+              日付を指定
+            </button>
+          </div>
         </div>
         <button type="button" onClick={() => canNext && setWeekStart(addDays(weekStart, 7))} disabled={!canNext}
           className="p-1.5 rounded-lg text-primary-500 disabled:text-gray-200" aria-label="次の週">
@@ -172,6 +258,16 @@ const WeeklyTimetable: React.FC<{
         </div>
       )}
 
+      {/* 月カレンダーで日付ジャンプ */}
+      {showJump && (
+        <MonthJumpCalendar
+          minDate={minD}
+          maxDate={maxD}
+          onPick={(d) => setWeekStart(sundayOf(d))}
+          onClose={() => setShowJump(false)}
+        />
+      )}
+
       {/* 凡例 */}
       <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 px-2 py-2 text-[11px] text-gray-500 border-t border-gray-100">
         <span><span className="text-emerald-600 font-bold">○</span> 空き（予約可能）</span>
@@ -194,6 +290,8 @@ export const CheckinPage: React.FC = () => {
     dates,
     recurringType,
     recurringCount,
+    recurringEndDate,
+    setRecurringEndDate,
     setDate,
     setStartTime,
     setDuration,
@@ -247,17 +345,26 @@ export const CheckinPage: React.FC = () => {
     }
   }, [startTime, duration, availableDurations, setDuration]);
 
-  // 定期予約: 日付自動生成
+  // 定期予約: 日付自動生成（期間指定があれば終了日まで、なければ回数分）
   React.useEffect(() => {
     if (!multiDateMode || !recurringType || !date) return;
     const interval = recurringType === 'BIWEEKLY' ? 14 : 7;
+    const maxDate = addDays(startOfDay(new Date()), RESERVABLE_DAYS - 1);
     const generated: Date[] = [];
-    for (let i = 0; i < recurringCount; i++) {
-      const d = addDays(date, interval * i);
-      generated.push(d);
+    if (recurringEndDate) {
+      const end = startOfDay(recurringEndDate) <= maxDate ? startOfDay(recurringEndDate) : maxDate;
+      for (let d = date; startOfDay(d) <= end; d = addDays(d, interval)) {
+        generated.push(d);
+      }
+    } else {
+      for (let i = 0; i < recurringCount; i++) {
+        const d = addDays(date, interval * i);
+        if (startOfDay(d) > maxDate) break;
+        generated.push(d);
+      }
     }
     setDates(generated);
-  }, [recurringType, recurringCount, date, multiDateMode, setDates]);
+  }, [recurringType, recurringCount, recurringEndDate, date, multiDateMode, setDates]);
 
   // 空き状況の取得
   const [availability, setAvailability] = React.useState<Record<string, AvailabilityInfo>>({});
@@ -323,7 +430,11 @@ export const CheckinPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#eef2f7]">
-      <Header title="日時選択" showBack />
+      <Header
+        title="日時選択"
+        subtitle={location ? `${getLocationName(location)}｜${facility?.name || ''}` : undefined}
+        showBack
+      />
 
       <main className="p-4 pb-36">
         {/* 選択中の施設 */}
@@ -400,23 +511,52 @@ export const CheckinPage: React.FC = () => {
               </button>
             </div>
             {recurringType && (
-              <div>
-                <p className="text-xs text-indigo-600 mb-2">回数を選択（基準日を下から選んでください）</p>
-                <div className="flex gap-2">
-                  {[2, 3, 4, 5, 6, 7, 8].map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setRecurring(recurringType, c)}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-indigo-600 mb-2">回数を選択（基準日を下から選んでください）</p>
+                  <div className="flex gap-2">
+                    {[2, 3, 4, 5, 6, 7, 8].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => { setRecurringEndDate(null); setRecurring(recurringType, c); }}
+                        className={clsx(
+                          'w-9 h-9 rounded-lg border-2 text-xs font-bold transition-all',
+                          !recurringEndDate && recurringCount === c
+                            ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
+                            : 'border-gray-200 bg-white text-gray-500'
+                        )}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-indigo-600 mb-2">
+                    または期間で指定（基準日の曜日で、終了日まで{recurringType === 'BIWEEKLY' ? '隔週' : '毎週'}繰り返し）
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : ''}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      max={format(addDays(new Date(), RESERVABLE_DAYS - 1), 'yyyy-MM-dd')}
+                      onChange={(e) => setRecurringEndDate(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null)}
                       className={clsx(
-                        'w-9 h-9 rounded-lg border-2 text-xs font-bold transition-all',
-                        recurringCount === c
-                          ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
-                          : 'border-gray-200 bg-white text-gray-500'
+                        'flex-1 px-3 py-2 rounded-lg border-2 text-sm font-semibold bg-white',
+                        recurringEndDate ? 'border-indigo-500 text-indigo-700' : 'border-gray-200 text-gray-500'
                       )}
-                    >
-                      {c}
-                    </button>
-                  ))}
+                    />
+                    {recurringEndDate && (
+                      <button
+                        onClick={() => setRecurringEndDate(null)}
+                        className="px-3 py-2 rounded-lg border-2 border-gray-200 bg-white text-xs font-semibold text-gray-500"
+                      >
+                        解除
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-indigo-400 mt-1">※予約は{RESERVABLE_DAYS}日先まで。年間予約は運営にご相談ください。</p>
                 </div>
               </div>
             )}

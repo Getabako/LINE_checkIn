@@ -71,6 +71,21 @@ export interface User {
   pictureUrl?: string;
 }
 
+// 管理画面で扱うユーザー（Laboraインポート項目を含む）
+export interface AdminUser {
+  id: string;
+  lineUserId: string;
+  displayName: string;
+  name?: string;
+  kana?: string;
+  phone?: string;
+  mobile?: string;
+  email?: string;
+  customerNumber?: string;
+  customerType?: string;
+  isImported?: boolean;
+}
+
 export interface PricePlan {
   id: string;
   location: LocationId;
@@ -529,8 +544,11 @@ export const adminApi = {
   getUsers: (search?: string) => {
     const qs = new URLSearchParams({ action: 'users' });
     if (search) qs.set('search', search);
-    return api.get<Array<{ id: string; lineUserId: string; displayName: string }>>(`/admin?${qs.toString()}`);
+    return api.get<AdminUser[]>(`/admin?${qs.toString()}`);
   },
+  // ユーザー情報の編集
+  updateUser: (data: { userId: string; displayName?: string; name?: string; kana?: string; phone?: string; mobile?: string; email?: string; customerNumber?: string }) =>
+    api.put<AdminUser>('/admin?action=updateUser', data),
   getMemberships: () => api.get<UserMembership[]>('/admin?action=memberships'),
   assignMembership: (data: { lineUserId: string; userId: string; displayName?: string; memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
     api.post<UserMembership>('/admin?action=assignMembership', data),

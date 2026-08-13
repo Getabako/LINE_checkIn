@@ -4,11 +4,12 @@ import { FiChevronLeft } from 'react-icons/fi';
 
 interface HeaderProps {
   title: string;
+  subtitle?: string;
   showBack?: boolean;
   onBack?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, showBack = false, onBack }) => {
+export const Header: React.FC<HeaderProps> = ({ title, subtitle, showBack = false, onBack }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
@@ -30,9 +31,16 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack = false, onBack 
             <FiChevronLeft className="w-6 h-6" />
           </button>
         )}
-        <h1 className="flex-1 text-lg font-bold text-primary-800 text-center pr-8">
-          {title}
-        </h1>
+        <div className="flex-1 text-center pr-8">
+          <h1 className="text-lg font-bold text-primary-800 leading-tight">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-[11px] font-semibold text-primary-500 leading-tight truncate">
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
     </header>
   );

@@ -16,6 +16,8 @@ interface CheckinState {
   // 定期予約
   recurringType: 'WEEKLY' | 'BIWEEKLY' | null;
   recurringCount: number;
+  // 期間指定（設定時は回数より優先し、この日まで繰り返し生成）
+  recurringEndDate: Date | null;
 
   // 計算結果
   totalPrice: number;
@@ -43,6 +45,7 @@ interface CheckinState {
   toggleDate: (date: Date) => void;
   setDates: (dates: Date[]) => void;
   setRecurring: (type: 'WEEKLY' | 'BIWEEKLY' | null, count: number) => void;
+  setRecurringEndDate: (date: Date | null) => void;
   reset: () => void;
 }
 
@@ -56,6 +59,7 @@ const initialState = {
   dates: [] as Date[],
   recurringType: null as 'WEEKLY' | 'BIWEEKLY' | null,
   recurringCount: 4,
+  recurringEndDate: null as Date | null,
   totalPrice: 0,
   couponCode: null,
   couponDiscount: 0,
@@ -75,7 +79,7 @@ export const useCheckinStore = create<CheckinState>((set) => ({
   setTotalPrice: (price) => set({ totalPrice: price }),
   setCoupon: (code, discount) => set({ couponCode: code, couponDiscount: discount }),
   setMemberDiscount: (discount, typeName, isInvoice) => set({ memberDiscount: discount, memberTypeName: typeName, isInvoicePayment: !!isInvoice }),
-  setMultiDateMode: (enabled) => set({ multiDateMode: enabled, dates: [], recurringType: null }),
+  setMultiDateMode: (enabled) => set({ multiDateMode: enabled, dates: [], recurringType: null, recurringEndDate: null }),
   toggleDate: (date) => set((state) => {
     const exists = state.dates.some((d) => d.toDateString() === date.toDateString());
     if (exists) {
@@ -84,6 +88,7 @@ export const useCheckinStore = create<CheckinState>((set) => ({
     return { dates: [...state.dates, date].sort((a, b) => a.getTime() - b.getTime()) };
   }),
   setDates: (dates) => set({ dates }),
-  setRecurring: (type, count) => set({ recurringType: type, recurringCount: count }),
+  setRecurring: (type, count) => set((state) => ({ recurringType: type, recurringCount: count, recurringEndDate: type ? state.recurringEndDate : null })),
+  setRecurringEndDate: (date) => set({ recurringEndDate: date }),
   reset: () => set(initialState),
 }));
