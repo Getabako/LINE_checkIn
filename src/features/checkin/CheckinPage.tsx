@@ -31,32 +31,51 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
-// ダイヤル式の数値ピッカー（1列分）: スクロールして止まった位置の値を採用
+// ダイヤル式の数値ピッカー（1列分・無限ループ）: 値のリストを複数回並べ、
+// 端に近づいたら中央のコピーへ巻き戻すことで永久に回せるようにする
 const DIAL_ITEM_H = 36;
+const DIAL_REPEAT = 7; // 奇数にして中央のコピーを基準にする
 const DialColumn: React.FC<{
   values: number[];
   value: number;
   onChange: (v: number) => void;
 }> = ({ values, value, onChange }) => {
+  const len = values.length;
+  const base = Math.floor(DIAL_REPEAT / 2) * len;
   const ref = React.useRef<HTMLDivElement>(null);
   const timer = React.useRef<number | null>(null);
-  const idx = Math.max(0, values.indexOf(value));
 
+  const centerTo = (v: number) => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollTop = (base + Math.max(0, values.indexOf(v))) * DIAL_ITEM_H;
+  };
+
+  // 初期位置は中央のコピーへ
+  React.useEffect(() => {
+    centerTo(value);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 外部から値が変わったときだけ位置を合わせる
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const target = idx * DIAL_ITEM_H;
-    if (Math.abs(el.scrollTop - target) > 1) el.scrollTop = target;
+    const cur = Math.round(el.scrollTop / DIAL_ITEM_H);
+    if (values[((cur % len) + len) % len] !== value) centerTo(value);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+  }, [value]);
 
   const handleScroll = () => {
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       const el = ref.current;
       if (!el) return;
-      const i = Math.min(values.length - 1, Math.max(0, Math.round(el.scrollTop / DIAL_ITEM_H)));
-      if (values[i] !== value) onChange(values[i]);
+      const i = Math.round(el.scrollTop / DIAL_ITEM_H);
+      const v = values[((i % len) + len) % len];
+      // 端に寄ってきたら同じ数字を指したまま中央のコピーへ巻き戻す
+      if (i < len || i >= (DIAL_REPEAT - 1) * len) centerTo(v);
+      if (v !== value) onChange(v);
     }, 120);
   };
 
@@ -69,18 +88,20 @@ const DialColumn: React.FC<{
         style={{ height: DIAL_ITEM_H * 3, scrollbarWidth: 'none' }}
       >
         <div style={{ height: DIAL_ITEM_H }} />
-        {values.map((v) => (
-          <div
-            key={v}
-            className={clsx(
-              'flex items-center justify-center snap-center transition-colors',
-              v === value ? 'text-indigo-700 text-xl font-bold' : 'text-gray-300 text-base font-semibold'
-            )}
-            style={{ height: DIAL_ITEM_H }}
-          >
-            {v}
-          </div>
-        ))}
+        {Array.from({ length: DIAL_REPEAT }, (_, copy) =>
+          values.map((v) => (
+            <div
+              key={`${copy}-${v}`}
+              className={clsx(
+                'flex items-center justify-center snap-center transition-colors',
+                v === value ? 'text-indigo-700 text-xl font-bold' : 'text-gray-300 text-base font-semibold'
+              )}
+              style={{ height: DIAL_ITEM_H }}
+            >
+              {v}
+            </div>
+          ))
+        )}
         <div style={{ height: DIAL_ITEM_H }} />
       </div>
       {/* 中央の選択帯 */}
@@ -388,6 +409,9 @@ export const CheckinPage: React.FC = () => {
     }
   }, [location, facilityType, navigate]);
 
+  // 繰り返しの指定方法: 回数 or 終了日（カードのタップで切り替え）
+  const [recurMode, setRecurMode] = React.useState<'COUNT' | 'UNTIL'>('COUNT');
+
   // 予約可能期間: 当日から90日先まで（通常会員、約3ヶ月）
   const RESERVABLE_DAYS = 90;
   const dateOptions = React.useMemo(() => {
@@ -425,13 +449,13 @@ export const CheckinPage: React.FC = () => {
     }
   }, [startTime, duration, availableDurations, setDuration]);
 
-  // 定期予約: 日付自動生成（期間指定があれば終了日まで、なければ回数分）
+  // 定期予約: 日付自動生成（終了日モードなら終了日まで、回数モードなら回数分）
   React.useEffect(() => {
     if (!multiDateMode || !recurringType || !date) return;
     const interval = recurringType === 'BIWEEKLY' ? 14 : 7;
     const maxDate = addDays(startOfDay(new Date()), RESERVABLE_DAYS - 1);
     const generated: Date[] = [];
-    if (recurringEndDate) {
+    if (recurMode === 'UNTIL' && recurringEndDate) {
       const end = startOfDay(recurringEndDate) <= maxDate ? startOfDay(recurringEndDate) : maxDate;
       for (let d = date; startOfDay(d) <= end; d = addDays(d, interval)) {
         generated.push(d);
@@ -444,7 +468,7 @@ export const CheckinPage: React.FC = () => {
       }
     }
     setDates(generated);
-  }, [recurringType, recurringCount, recurringEndDate, date, multiDateMode, setDates]);
+  }, [recurringType, recurringCount, recurringEndDate, recurMode, date, multiDateMode, setDates]);
 
   // 空き状況の取得
   const [availability, setAvailability] = React.useState<Record<string, AvailabilityInfo>>({});
@@ -722,16 +746,44 @@ export const CheckinPage: React.FC = () => {
             </div>
             {recurringType && (
               <div className="space-y-4">
-                <div className={clsx('rounded-xl p-3 border-2 transition-all', !recurringEndDate ? 'border-indigo-300 bg-white/70' : 'border-transparent bg-white/40 opacity-60')}>
-                  <p className="text-xs font-bold text-indigo-600 mb-2">回数で指定（ダイヤルを回して選択）</p>
+                {/* 回数で指定: カードのどこをタップしても選択される */}
+                <div
+                  onClick={() => setRecurMode('COUNT')}
+                  className={clsx(
+                    'rounded-xl p-3 border-2 transition-all cursor-pointer',
+                    recurMode === 'COUNT' ? 'border-indigo-400 bg-white shadow-sm' : 'border-indigo-100 bg-white/40 opacity-70'
+                  )}
+                >
+                  <p className="text-xs font-bold text-indigo-600 mb-2 flex items-center gap-1.5">
+                    <span className={clsx(
+                      'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                      recurMode === 'COUNT' ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 bg-white'
+                    )}>
+                      {recurMode === 'COUNT' && <FiCheck className="w-2.5 h-2.5 text-white" />}
+                    </span>
+                    回数で指定（ダイヤルを回して選択）
+                  </p>
                   <CountDial
                     value={recurringCount}
-                    onChange={(c) => { setRecurringEndDate(null); setRecurring(recurringType, c); }}
+                    onChange={(c) => { setRecurMode('COUNT'); setRecurring(recurringType, c); }}
                   />
                 </div>
-                <div className={clsx('rounded-xl p-3 border-2 transition-all', recurringEndDate ? 'border-indigo-300 bg-white/70' : 'border-transparent bg-white/40')}>
-                  <p className="text-xs font-bold text-indigo-600 mb-2">
-                    または終了日で指定（終了日まで{recurringType === 'BIWEEKLY' ? '隔週' : '毎週'}繰り返し）
+                {/* 終了日で指定: カードのどこをタップしても選択される */}
+                <div
+                  onClick={() => setRecurMode('UNTIL')}
+                  className={clsx(
+                    'rounded-xl p-3 border-2 transition-all cursor-pointer',
+                    recurMode === 'UNTIL' ? 'border-indigo-400 bg-white shadow-sm' : 'border-indigo-100 bg-white/40 opacity-70'
+                  )}
+                >
+                  <p className="text-xs font-bold text-indigo-600 mb-2 flex items-center gap-1.5">
+                    <span className={clsx(
+                      'w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                      recurMode === 'UNTIL' ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300 bg-white'
+                    )}>
+                      {recurMode === 'UNTIL' && <FiCheck className="w-2.5 h-2.5 text-white" />}
+                    </span>
+                    終了日で指定（終了日まで{recurringType === 'BIWEEKLY' ? '隔週' : '毎週'}繰り返し）
                   </p>
                   <div className="flex items-center gap-2">
                     <input
@@ -739,21 +791,19 @@ export const CheckinPage: React.FC = () => {
                       value={recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : ''}
                       min={format(new Date(), 'yyyy-MM-dd')}
                       max={format(addDays(new Date(), RESERVABLE_DAYS - 1), 'yyyy-MM-dd')}
-                      onChange={(e) => setRecurringEndDate(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null)}
+                      onChange={(e) => {
+                        setRecurMode('UNTIL');
+                        setRecurringEndDate(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null);
+                      }}
                       className={clsx(
                         'flex-1 px-3 py-2 rounded-lg border-2 text-sm font-semibold bg-white',
-                        recurringEndDate ? 'border-indigo-500 text-indigo-700' : 'border-gray-200 text-gray-500'
+                        recurMode === 'UNTIL' && recurringEndDate ? 'border-indigo-500 text-indigo-700' : 'border-gray-200 text-gray-500'
                       )}
                     />
-                    {recurringEndDate && (
-                      <button
-                        onClick={() => setRecurringEndDate(null)}
-                        className="px-3 py-2 rounded-lg border-2 border-gray-200 bg-white text-xs font-semibold text-gray-500"
-                      >
-                        解除
-                      </button>
-                    )}
                   </div>
+                  {recurMode === 'UNTIL' && !recurringEndDate && (
+                    <p className="text-[10px] text-indigo-400 mt-1.5">終了日を選ぶと、その日まで自動で予約日が追加されます</p>
+                  )}
                 </div>
                 <p className="text-[10px] text-indigo-400">
                   ※予約は{RESERVABLE_DAYS}日先まで（それを超える分は自動で除外）。年間予約は運営にご相談ください。
