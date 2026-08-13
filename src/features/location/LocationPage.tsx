@@ -161,12 +161,9 @@ export const LocationPage: React.FC = () => {
           </div>
         )}
 
-        {/* ヒーローセクション */}
-        <div id="location-select" className="text-center mb-8 pt-4 animate-fade-in-up scroll-mt-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-400 rounded-2xl shadow-glow mb-4 animate-float">
-            <FiMapPin className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-primary-800 mb-2">
+        {/* セクション見出し */}
+        <div id="location-select" className="text-center mb-5 pt-2 animate-fade-in-up scroll-mt-16">
+          <h2 className="text-xl font-bold text-primary-800 mb-1">
             拠点を選択してください
           </h2>
           <p className="text-gray-500 text-sm">
