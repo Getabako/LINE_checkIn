@@ -31,6 +31,82 @@ const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, cl
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
+// ダイヤル式の数値ピッカー（1列分）: スクロールして止まった位置の値を採用
+const DIAL_ITEM_H = 36;
+const DialColumn: React.FC<{
+  values: number[];
+  value: number;
+  onChange: (v: number) => void;
+}> = ({ values, value, onChange }) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const timer = React.useRef<number | null>(null);
+  const idx = Math.max(0, values.indexOf(value));
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const target = idx * DIAL_ITEM_H;
+    if (Math.abs(el.scrollTop - target) > 1) el.scrollTop = target;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx]);
+
+  const handleScroll = () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const i = Math.min(values.length - 1, Math.max(0, Math.round(el.scrollTop / DIAL_ITEM_H)));
+      if (values[i] !== value) onChange(values[i]);
+    }, 120);
+  };
+
+  return (
+    <div className="relative">
+      <div
+        ref={ref}
+        onScroll={handleScroll}
+        className="w-14 overflow-y-auto snap-y snap-mandatory rounded-xl bg-white border-2 border-indigo-200 [&::-webkit-scrollbar]:hidden"
+        style={{ height: DIAL_ITEM_H * 3, scrollbarWidth: 'none' }}
+      >
+        <div style={{ height: DIAL_ITEM_H }} />
+        {values.map((v) => (
+          <div
+            key={v}
+            className={clsx(
+              'flex items-center justify-center snap-center transition-colors',
+              v === value ? 'text-indigo-700 text-xl font-bold' : 'text-gray-300 text-base font-semibold'
+            )}
+            style={{ height: DIAL_ITEM_H }}
+          >
+            {v}
+          </div>
+        ))}
+        <div style={{ height: DIAL_ITEM_H }} />
+      </div>
+      {/* 中央の選択帯 */}
+      <div
+        className="pointer-events-none absolute left-1 right-1 top-1/2 -translate-y-1/2 border-y-2 border-indigo-300/70"
+        style={{ height: DIAL_ITEM_H }}
+      />
+    </div>
+  );
+};
+
+// 回数ダイヤル: 10の位と1の位を別々のダイヤルで選択
+const DIGITS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const CountDial: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => {
+  const tens = Math.floor(value / 10);
+  const ones = value % 10;
+  const set = (t: number, o: number) => onChange(Math.max(1, t * 10 + o));
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <DialColumn values={DIGITS} value={tens} onChange={(t) => set(t, ones)} />
+      <DialColumn values={DIGITS} value={ones} onChange={(o) => set(tens, o)} />
+      <span className="text-base font-bold text-indigo-700 ml-1">回</span>
+    </div>
+  );
+};
+
 // その週の日曜を返す
 const sundayOf = (d: Date): Date => {
   const s = startOfDay(d);
@@ -483,90 +559,6 @@ export const CheckinPage: React.FC = () => {
           </div>
         </section>
 
-        {/* 定期予約オプション（複数日モード時） */}
-        {multiDateMode && (
-          <section className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100/50 animate-fade-in-up">
-            <h3 className="font-bold text-indigo-800 mb-3 flex items-center gap-2 text-sm">
-              <FiRepeat className="w-4 h-4" />
-              定期予約（任意）
-            </h3>
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setRecurring(recurringType === 'WEEKLY' ? null : 'WEEKLY', recurringCount)}
-                className={clsx(
-                  'flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all',
-                  recurringType === 'WEEKLY'
-                    ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
-                    : 'border-gray-200 bg-white text-gray-500'
-                )}
-              >
-                毎週
-              </button>
-              <button
-                onClick={() => setRecurring(recurringType === 'BIWEEKLY' ? null : 'BIWEEKLY', recurringCount)}
-                className={clsx(
-                  'flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all',
-                  recurringType === 'BIWEEKLY'
-                    ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
-                    : 'border-gray-200 bg-white text-gray-500'
-                )}
-              >
-                隔週
-              </button>
-            </div>
-            {recurringType && (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-indigo-600 mb-2">回数を選択（基準日を下から選んでください）</p>
-                  <div className="flex gap-2">
-                    {[2, 3, 4, 5, 6, 7, 8].map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => { setRecurringEndDate(null); setRecurring(recurringType, c); }}
-                        className={clsx(
-                          'w-9 h-9 rounded-lg border-2 text-xs font-bold transition-all',
-                          !recurringEndDate && recurringCount === c
-                            ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
-                            : 'border-gray-200 bg-white text-gray-500'
-                        )}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs text-indigo-600 mb-2">
-                    または期間で指定（基準日の曜日で、終了日まで{recurringType === 'BIWEEKLY' ? '隔週' : '毎週'}繰り返し）
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : ''}
-                      min={format(new Date(), 'yyyy-MM-dd')}
-                      max={format(addDays(new Date(), RESERVABLE_DAYS - 1), 'yyyy-MM-dd')}
-                      onChange={(e) => setRecurringEndDate(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null)}
-                      className={clsx(
-                        'flex-1 px-3 py-2 rounded-lg border-2 text-sm font-semibold bg-white',
-                        recurringEndDate ? 'border-indigo-500 text-indigo-700' : 'border-gray-200 text-gray-500'
-                      )}
-                    />
-                    {recurringEndDate && (
-                      <button
-                        onClick={() => setRecurringEndDate(null)}
-                        className="px-3 py-2 rounded-lg border-2 border-gray-200 bg-white text-xs font-semibold text-gray-500"
-                      >
-                        解除
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-indigo-400 mt-1">※予約は{RESERVABLE_DAYS}日先まで。年間予約は運営にご相談ください。</p>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
         {/* 日時選択セクション（まとめてスッキリ） */}
         <section className="mb-6 panel animate-fade-in-up">
           <div className="panel-header">
@@ -691,6 +683,90 @@ export const CheckinPage: React.FC = () => {
           )}
           </div>
         </section>
+
+        {/* 繰り返し設定（複数日モード時）: 基準日を選んだあとに回数・期間を決める */}
+        {multiDateMode && (
+          <section className="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100/50 animate-fade-in-up">
+            <h3 className="font-bold text-indigo-800 mb-1 flex items-center gap-2 text-sm">
+              <FiRepeat className="w-4 h-4" />
+              繰り返し設定（任意）
+            </h3>
+            <p className="text-[11px] text-indigo-400 mb-3">
+              {date
+                ? `基準日 ${format(date, 'M/d(E)', { locale: ja })} をもとに、同じ曜日・時間で繰り返し予約します`
+                : '上の「基準日を選択」で日付を選んでから設定してください'}
+            </p>
+            <div className="flex gap-2 mb-3">
+              <button
+                onClick={() => setRecurring(recurringType === 'WEEKLY' ? null : 'WEEKLY', recurringCount)}
+                className={clsx(
+                  'flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all',
+                  recurringType === 'WEEKLY'
+                    ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
+                    : 'border-gray-200 bg-white text-gray-500'
+                )}
+              >
+                毎週
+              </button>
+              <button
+                onClick={() => setRecurring(recurringType === 'BIWEEKLY' ? null : 'BIWEEKLY', recurringCount)}
+                className={clsx(
+                  'flex-1 py-2 rounded-lg border-2 text-xs font-semibold transition-all',
+                  recurringType === 'BIWEEKLY'
+                    ? 'border-indigo-500 bg-indigo-100 text-indigo-700'
+                    : 'border-gray-200 bg-white text-gray-500'
+                )}
+              >
+                隔週
+              </button>
+            </div>
+            {recurringType && (
+              <div className="space-y-4">
+                <div className={clsx('rounded-xl p-3 border-2 transition-all', !recurringEndDate ? 'border-indigo-300 bg-white/70' : 'border-transparent bg-white/40 opacity-60')}>
+                  <p className="text-xs font-bold text-indigo-600 mb-2">回数で指定（ダイヤルを回して選択）</p>
+                  <CountDial
+                    value={recurringCount}
+                    onChange={(c) => { setRecurringEndDate(null); setRecurring(recurringType, c); }}
+                  />
+                </div>
+                <div className={clsx('rounded-xl p-3 border-2 transition-all', recurringEndDate ? 'border-indigo-300 bg-white/70' : 'border-transparent bg-white/40')}>
+                  <p className="text-xs font-bold text-indigo-600 mb-2">
+                    または終了日で指定（終了日まで{recurringType === 'BIWEEKLY' ? '隔週' : '毎週'}繰り返し）
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={recurringEndDate ? format(recurringEndDate, 'yyyy-MM-dd') : ''}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      max={format(addDays(new Date(), RESERVABLE_DAYS - 1), 'yyyy-MM-dd')}
+                      onChange={(e) => setRecurringEndDate(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null)}
+                      className={clsx(
+                        'flex-1 px-3 py-2 rounded-lg border-2 text-sm font-semibold bg-white',
+                        recurringEndDate ? 'border-indigo-500 text-indigo-700' : 'border-gray-200 text-gray-500'
+                      )}
+                    />
+                    {recurringEndDate && (
+                      <button
+                        onClick={() => setRecurringEndDate(null)}
+                        className="px-3 py-2 rounded-lg border-2 border-gray-200 bg-white text-xs font-semibold text-gray-500"
+                      >
+                        解除
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[10px] text-indigo-400">
+                  ※予約は{RESERVABLE_DAYS}日先まで（それを超える分は自動で除外）。年間予約は運営にご相談ください。
+                </p>
+                {dates.length > 0 && (
+                  <p className="text-xs font-bold text-indigo-700 text-center">
+                    {dates.length}日分を予約します（{format(dates[0], 'M/d', { locale: ja })} 〜 {format(dates[dates.length - 1], 'M/d', { locale: ja })}）
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 料金内訳 */}
         {priceInfo && (
