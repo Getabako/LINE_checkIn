@@ -183,10 +183,10 @@ export const LocationPage: React.FC = () => {
               className={clsx('choice-card overflow-hidden', location === loc.id && 'selected')}
             >
               <div className="p-5 pb-4">
-                {/* ヘッダー行: サムネ + 名称 + 選択インジケーター */}
-                <div className="flex items-center gap-4">
+                {/* ヘッダー行: サムネ + 名称（1行） + 選択インジケーター */}
+                <div className="flex items-center gap-3">
                   {loc.imageUrl ? (
-                    <div className="w-16 h-16 rounded-xl overflow-hidden shadow-sm flex-shrink-0 bg-gray-100">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden shadow-sm flex-shrink-0 bg-gray-100">
                       <img
                         src={loc.imageUrl}
                         alt={loc.name}
@@ -196,26 +196,17 @@ export const LocationPage: React.FC = () => {
                     </div>
                   ) : (
                     <div className={clsx(
-                      'w-16 h-16 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
+                      'w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
                       location === loc.id
                         ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
                         : 'bg-sky-50 text-primary-400'
                     )}>
-                      <FiMapPin className="w-7 h-7" />
+                      <FiMapPin className="w-6 h-6" />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-bold text-gray-900 leading-snug">
-                      {loc.name}
-                    </h3>
-                    <p className="text-gray-500 text-xs mt-0.5">
-                      {loc.description}
-                    </p>
-                    <p className="text-xs text-primary-500 font-semibold mt-0.5 flex items-center gap-1">
-                      <FiMapPin className="w-3 h-3 flex-shrink-0" />
-                      {loc.address}
-                    </p>
-                  </div>
+                  <h3 className="flex-1 min-w-0 text-base font-bold text-gray-900 whitespace-nowrap">
+                    {loc.name}
+                  </h3>
                   {/* 選択インジケーター */}
                   <div className={clsx(
                     'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
@@ -226,7 +217,21 @@ export const LocationPage: React.FC = () => {
                     <FiCheck className="w-4 h-4" />
                   </div>
                 </div>
-                {/* 施設概要: カードの横幅いっぱいに表示 */}
+
+                {/* 住所 */}
+                <div className="flex items-center gap-2 mt-3 px-3 py-2 bg-sky-50 rounded-lg">
+                  <FiMapPin className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-primary-700">{loc.address}</span>
+                </div>
+
+                {/* 施設の説明 */}
+                {loc.description && (
+                  <p className="text-[13px] text-gray-600 mt-3 leading-relaxed whitespace-pre-wrap">
+                    {loc.description}
+                  </p>
+                )}
+
+                {/* 施設概要（補足情報） */}
                 {loc.overview && (
                   <p className="text-[13px] text-gray-600 mt-3 pt-3 border-t border-gray-100 leading-relaxed whitespace-pre-wrap">
                     {loc.overview}
