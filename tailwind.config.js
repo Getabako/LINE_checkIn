@@ -47,7 +47,8 @@ export default {
           '100%': { opacity: '1' },
         },
         fadeInUp: {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          /* 画面遷移時は上から表示（先方要望 2026-08-13） */
+          '0%': { opacity: '0', transform: 'translateY(-14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         fadeInDown: {

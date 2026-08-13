@@ -7,9 +7,11 @@ interface HeaderProps {
   subtitle?: string;
   showBack?: boolean;
   onBack?: () => void;
+  /* タイトルの代わりにロゴ画像を表示（トップページ用） */
+  logo?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ title, subtitle, showBack = false, onBack }) => {
+export const Header: React.FC<HeaderProps> = ({ title, subtitle, showBack = false, onBack, logo = false }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
@@ -19,6 +21,20 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle, showBack = fals
       navigate(-1);
     }
   };
+
+  if (logo) {
+    return (
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm animate-fade-in-down">
+        <div className="flex items-center justify-center h-16 px-4">
+          <img
+            src="/images/logo.png"
+            alt={title}
+            className="h-12 w-auto"
+          />
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-primary-100/50 animate-fade-in-down">

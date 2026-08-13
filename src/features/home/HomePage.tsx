@@ -11,6 +11,34 @@ import { PRICE_TABLE } from '../../lib/price';
 import { FacilityType, FacilityProfiles, PriceTable, facilityApi, priceApi } from '../../lib/api';
 import clsx from 'clsx';
 
+// 料金セクション: 見出し＋シンプルな行リスト（入れ子の表をやめてフラットに）
+const PriceSection: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  rows: { label: string; time: string; price: number; unit: string }[];
+}> = ({ icon, title, rows }) => (
+  <div>
+    <h4 className="text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
+      <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
+        {icon}
+      </div>
+      {title}
+    </h4>
+    <div className="rounded-xl bg-gray-50 divide-y divide-gray-200/70">
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-center px-4 py-3">
+          <span className="w-14 flex-shrink-0 text-xs font-bold text-gray-700">{r.label}</span>
+          <span className="flex-1 text-xs text-gray-500">{r.time}</span>
+          <span className="font-bold text-primary-700">
+            ¥{r.price.toLocaleString()}
+            <span className="text-xs font-normal text-gray-400">{r.unit}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 const FacilityIcon: React.FC<{ name: string; className?: string }> = ({ name, className }) => {
   switch (name) {
     case 'basketball':
@@ -47,7 +75,6 @@ export const HomePage: React.FC = () => {
   // 拠点別の営業開始時刻
   const openTime = location === 'ASP' ? '08:00' : '07:00';
   const dayRange = `${openTime}-17:00`;
-  const allDayRange = `全日 ${openTime}-21:00`;
 
   const handleFacilitySelect = (type: FacilityType) => {
     setFacilityType(type);
@@ -85,38 +112,44 @@ export const HomePage: React.FC = () => {
               onClick={() => handleFacilitySelect(facility.id)}
               className={clsx('choice-card overflow-hidden', facilityType === facility.id && 'selected')}
             >
-              <div className="flex items-start gap-4 p-5 pb-3">
-                <div className={clsx(
-                  'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
-                  facilityType === facility.id
-                    ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
-                    : 'bg-sky-50 text-primary-400'
-                )}>
-                  <FacilityIcon name={facility.iconName} className="w-7 h-7" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {facility.name}
-                  </h3>
-                  <p className="text-gray-500 text-sm mt-1">
-                    {facility.description}
-                  </p>
-                  <div className="flex items-center gap-1 mt-2 text-primary-400">
-                    <FiClock className="w-3.5 h-3.5" />
-                    <p className="text-xs">
-                      {facility.operatingHours}
-                    </p>
+              <div className="p-5 pb-4">
+                {/* ヘッダー行: アイコン + 名称 + 営業時間 + 選択インジケーター */}
+                <div className="flex items-center gap-4">
+                  <div className={clsx(
+                    'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0',
+                    facilityType === facility.id
+                      ? 'bg-gradient-to-br from-primary-500 to-primary-400 text-white shadow-button'
+                      : 'bg-sky-50 text-primary-400'
+                  )}>
+                    <FacilityIcon name={facility.iconName} className="w-7 h-7" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-900 leading-snug">
+                      {facility.name}
+                    </h3>
+                    <div className="flex items-center gap-1 mt-1 text-primary-400">
+                      <FiClock className="w-3.5 h-3.5" />
+                      <p className="text-xs">
+                        {facility.operatingHours}
+                      </p>
+                    </div>
+                  </div>
+                  {/* 選択インジケーター */}
+                  <div className={clsx(
+                    'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                    facilityType === facility.id
+                      ? 'border-primary-500 bg-primary-500 text-white'
+                      : 'border-gray-300 bg-white text-transparent'
+                  )}>
+                    <FiCheck className="w-4 h-4" />
                   </div>
                 </div>
-                {/* 選択インジケーター */}
-                <div className={clsx(
-                  'w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-1 transition-all',
-                  facilityType === facility.id
-                    ? 'border-primary-500 bg-primary-500 text-white'
-                    : 'border-gray-300 bg-white text-transparent'
-                )}>
-                  <FiCheck className="w-4 h-4" />
-                </div>
+                {/* 説明: カードの横幅いっぱいに表示 */}
+                {facility.description && (
+                  <p className="text-[13px] text-gray-600 mt-3 pt-3 border-t border-gray-100 leading-relaxed whitespace-pre-wrap">
+                    {facility.description}
+                  </p>
+                )}
               </div>
               {/* タップ可能であることを示すフッター帯 */}
               <div className={clsx(
@@ -146,104 +179,42 @@ export const HomePage: React.FC = () => {
           <div className="panel-header">
             <FaYenSign className="w-4 h-4" />
             料金表（税込）
-            <span className="ml-auto text-[10px] font-normal text-primary-100">※ご参考</span>
           </div>
 
-          <div className="panel-body space-y-6">
+          <div className="panel-body space-y-5">
             {/* 体育館料金 */}
             {locationPrices.GYM && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
-                    <FaBasketballBall className="w-3.5 h-3.5 text-primary-500" />
-                  </div>
-                  体育館
-                </h4>
-                <div className="rounded-xl overflow-hidden border border-gray-300">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-gray-700 text-white">
-                        <th className="text-left px-3 py-2.5 font-semibold">区分</th>
-                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
-                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      <tr className="bg-white">
-                        <td className="px-3 py-2.5 text-gray-700 font-medium">平日</td>
-                        <td className="px-3 py-2.5 text-gray-500">{dayRange}</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                      </tr>
-                      <tr className="bg-sky-50/60">
-                        <td className="px-3 py-2.5 text-gray-700 font-medium">平日</td>
-                        <td className="px-3 py-2.5 text-gray-500">17:00-21:00</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKDAY.EVENING.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                      </tr>
-                      <tr className="bg-white">
-                        <td className="px-3 py-2.5 text-gray-700 font-medium">土日祝</td>
-                        <td className="px-3 py-2.5 text-gray-500">終日</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.GYM.WEEKEND.DAYTIME.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <PriceSection
+                icon={<FaBasketballBall className="w-3.5 h-3.5 text-primary-500" />}
+                title="体育館"
+                rows={[
+                  { label: '平日', time: dayRange, price: locationPrices.GYM.WEEKDAY.DAYTIME, unit: '/h' },
+                  { label: '平日', time: '17:00-21:00', price: locationPrices.GYM.WEEKDAY.EVENING, unit: '/h' },
+                  { label: '土日祝', time: '終日', price: locationPrices.GYM.WEEKEND.DAYTIME, unit: '/h' },
+                ]}
+              />
             )}
 
             {/* トレーニングルーム（貸切）料金 */}
             {locationPrices.TRAINING_PRIVATE && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
-                    <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
-                  </div>
-                  トレーニングルーム（貸切）
-                </h4>
-                <div className="rounded-xl overflow-hidden border border-gray-300">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-gray-700 text-white">
-                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
-                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="bg-white">
-                        <td className="px-3 py-2.5 text-gray-500">{allDayRange}</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/h</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <PriceSection
+                icon={<FaDumbbell className="w-3.5 h-3.5 text-primary-500" />}
+                title="トレーニングルーム（貸切）"
+                rows={[
+                  { label: '全日', time: `${openTime}-21:00`, price: locationPrices.TRAINING_PRIVATE.WEEKDAY.ALLDAY, unit: '/h' },
+                ]}
+              />
             )}
 
             {/* トレーニングルーム（相席）料金 */}
             {locationPrices.TRAINING_SHARED && (
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                  <div className="w-7 h-7 bg-sky-50 rounded-lg flex items-center justify-center">
-                    <FaDumbbell className="w-3.5 h-3.5 text-primary-500" />
-                  </div>
-                  トレーニングルーム（相席）
-                </h4>
-                <div className="rounded-xl overflow-hidden border border-gray-300">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-gray-700 text-white">
-                        <th className="text-left px-3 py-2.5 font-semibold">時間帯</th>
-                        <th className="text-right px-3 py-2.5 font-semibold">料金</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="bg-white">
-                        <td className="px-3 py-2.5 text-gray-500">{allDayRange}</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-primary-700">¥{locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY.toLocaleString()}<span className="text-xs font-normal text-gray-400">/人</span></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <PriceSection
+                icon={<FaDumbbell className="w-3.5 h-3.5 text-primary-500" />}
+                title="トレーニングルーム（相席）"
+                rows={[
+                  { label: '全日', time: `${openTime}-21:00`, price: locationPrices.TRAINING_SHARED.WEEKDAY.ALLDAY, unit: '/人' },
+                ]}
+              />
             )}
           </div>
         </div>

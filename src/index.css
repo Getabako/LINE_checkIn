@@ -137,7 +137,8 @@
 .stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  /* 画面遷移時は上から表示（先方要望 2026-08-13） */
+  from { opacity: 0; transform: translateY(-14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
