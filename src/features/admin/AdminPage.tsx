@@ -1147,6 +1147,7 @@ const MembersTab: React.FC = () => {
     startDate: '',
     endDate: '',
   });
+  const [expandedType, setExpandedType] = React.useState<string | null>(null);
   const [importing, setImporting] = React.useState(false);
   const [importResult, setImportResult] = React.useState<{
     total: number; created: number; updated: number;
@@ -1267,20 +1268,34 @@ const MembersTab: React.FC = () => {
     }
   };
 
+  // ユーザーとアクティブ会員区分の対応（LINE未連携ユーザーは userId で照合）
+  const findCurrentMembership = React.useCallback(
+    (u: AdminUser) =>
+      memberships.find(
+        (m) => m.isActive && ((m.userId && m.userId === u.id) || (u.lineUserId && m.lineUserId === u.lineUserId))
+      ),
+    [memberships]
+  );
+
   // 会員情報編集: 検索
-  const handleEditSearch = async () => {
+  const handleEditSearch = async (q?: string) => {
     try {
-      const list = await adminApi.getUsers(editSearch);
+      const list = await adminApi.getUsers(q !== undefined ? q : editSearch);
       setEditUsers(list);
     } catch (e) {
       console.error(e);
-      alert('ユーザーの取得に失敗しました');
+      const msg = e instanceof Error ? e.message : '';
+      if (/token|認証|unauthorized|invalid/i.test(msg)) {
+        alert('ログインの有効期限が切れています。ミニアプリを一度閉じて開き直してください。');
+      } else {
+        alert(`ユーザーの取得に失敗しました${msg ? `（${msg}）` : ''}`);
+      }
     }
   };
 
   // 会員情報編集: モーダルを開く
   const openEditUser = (u: AdminUser) => {
-    const current = memberships.find((m) => m.lineUserId === u.lineUserId && m.isActive);
+    const current = findCurrentMembership(u);
     setEditForm({
       displayName: u.displayName || '',
       name: u.name || '',
@@ -1309,18 +1324,15 @@ const MembersTab: React.FC = () => {
         email: editForm.email,
         customerNumber: editForm.customerNumber,
       });
-      const current = memberships.find((m) => m.lineUserId === editTarget.lineUserId && m.isActive);
+      const current = findCurrentMembership(editTarget);
       if (editForm.memberTypeId && editForm.memberTypeId !== (current?.memberTypeId || '')) {
-        if (!editTarget.lineUserId) {
-          alert('基本情報は保存しました。このユーザーはLINE未連携のため、会員区分の変更はできません。');
-        } else {
-          await adminApi.assignMembership({
-            lineUserId: editTarget.lineUserId,
-            userId: editTarget.id,
-            displayName: editForm.displayName,
-            memberTypeId: editForm.memberTypeId,
-          });
-        }
+        // LINE未連携（Laboraインポート等）でも userId で区分変更できる
+        await adminApi.assignMembership({
+          lineUserId: editTarget.lineUserId || null,
+          userId: editTarget.id,
+          displayName: editForm.displayName,
+          memberTypeId: editForm.memberTypeId,
+        });
       }
       setEditTarget(null);
       setEditUsers((prev) => prev.map((u) => (u.id === editTarget.id ? { ...u, ...editForm } : u)));
@@ -1332,6 +1344,30 @@ const MembersTab: React.FC = () => {
       setEditSaving(false);
     }
   };
+
+  // 会員情報編集: 退会（ソフト削除。予約・売上履歴は保持）
+  const handleWithdrawUser = async () => {
+    if (!editTarget) return;
+    if (!confirm(`「${editTarget.displayName || editTarget.name || 'このユーザー'}」を退会させますか？\n会員区分は解除され、一覧に表示されなくなります（過去の予約・売上履歴は保持されます）。`)) return;
+    setEditSaving(true);
+    try {
+      await adminApi.deleteUser(editTarget.id);
+      setEditUsers((prev) => prev.filter((u) => u.id !== editTarget.id));
+      setEditTarget(null);
+      load();
+      alert('退会処理が完了しました');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '退会処理に失敗しました');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // タブ表示時に会員一覧を自動取得（検索前でも一覧が見えるように）
+  React.useEffect(() => {
+    handleEditSearch('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // フォームを開いた時に全ユーザーを自動取得
   React.useEffect(() => {
@@ -1456,6 +1492,53 @@ const MembersTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* 会員検索・情報の編集（最上部: 一番よく使う操作） */}
+      <section className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
+        <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-1">
+          <FiSearch className="w-4 h-4 text-primary-500" />
+          会員検索・情報の編集
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">
+          氏名・電話番号・会員番号などの登録情報の変更、会員区分の変更、退会処理ができます。
+        </p>
+        <div className="flex gap-2">
+          <input
+            placeholder="氏名・会員番号・LINE IDで検索（空欄で全件）"
+            value={editSearch}
+            onChange={(e) => setEditSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleEditSearch()}
+            className="flex-1 px-3 py-2 border rounded-lg text-sm"
+          />
+          <button onClick={() => handleEditSearch()} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
+            <FiSearch className="w-4 h-4" />
+          </button>
+        </div>
+        {editUsers.length > 0 && (
+          <div className="mt-3 max-h-72 overflow-y-auto border rounded-lg divide-y">
+            {editUsers.map((u) => {
+              const current = findCurrentMembership(u);
+              return (
+                <div key={u.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{u.displayName || u.name || '(名前なし)'}</p>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {[u.customerNumber && `会員番号:${u.customerNumber}`, u.mobile || u.phone, current?.memberTypeName]
+                        .filter(Boolean).join(' / ') || u.lineUserId || 'LINE未連携'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => openEditUser(u)}
+                    className="flex-shrink-0 px-3 py-1.5 rounded-lg border-2 border-primary-300 text-primary-700 text-xs font-semibold"
+                  >
+                    編集
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       {/* Labora CSVインポート */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -1734,74 +1817,57 @@ const MembersTab: React.FC = () => {
           </div>
         )}
 
+        {/* 会員区分ごとにグルーピング。区分をタップするとその区分の会員一覧を表示 */}
         <div className="space-y-2">
           {memberships.length === 0 ? (
             <p className="text-center text-gray-400 py-4 text-sm">会員登録がありません</p>
-          ) : memberships.map((m) => (
-            <div key={m.id} className="bg-white p-3 rounded-xl border border-gray-100 flex items-center justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <FiUser className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="font-semibold text-gray-900">{m.displayName || '(名前未取得)'}</span>
-                </div>
-                <p className="text-xs text-primary-600 font-semibold mt-0.5">{m.memberTypeName}</p>
-                <p className="text-[10px] text-gray-400">
-                  {(m.startDate || '指定なし')} 〜 {(m.endDate || '指定なし')}
-                </p>
-              </div>
-              <button onClick={() => handleRevoke(m.id)} className="p-2 text-red-400 hover:text-red-600">
-                <FiTrash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 会員情報の編集 */}
-      <section className="bg-white rounded-2xl shadow-card border border-gray-100 p-4">
-        <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-1">
-          <FiUser className="w-4 h-4 text-primary-500" />
-          会員情報の編集
-        </h3>
-        <p className="text-xs text-gray-500 mb-3">
-          氏名・電話番号・会員番号などの登録情報と会員区分を変更できます。
-        </p>
-        <div className="flex gap-2">
-          <input
-            placeholder="氏名・LINE IDで検索（空欄で全件）"
-            value={editSearch}
-            onChange={(e) => setEditSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleEditSearch()}
-            className="flex-1 px-3 py-2 border rounded-lg text-sm"
-          />
-          <button onClick={handleEditSearch} className="px-3 py-2 bg-primary-500 text-white rounded-lg text-sm flex items-center gap-1">
-            <FiSearch className="w-4 h-4" />
-          </button>
-        </div>
-        {editUsers.length > 0 && (
-          <div className="mt-3 max-h-72 overflow-y-auto border rounded-lg divide-y">
-            {editUsers.map((u) => {
-              const current = memberships.find((m) => m.lineUserId === u.lineUserId && m.isActive);
-              return (
-                <div key={u.id} className="px-3 py-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{u.displayName || u.name || '(名前なし)'}</p>
-                    <p className="text-[10px] text-gray-400 truncate">
-                      {[u.customerNumber && `会員番号:${u.customerNumber}`, u.mobile || u.phone, current?.memberTypeName]
-                        .filter(Boolean).join(' / ') || u.lineUserId || 'LINE未連携'}
-                    </p>
+          ) : (
+            Object.entries(
+              memberships.reduce<Record<string, UserMembership[]>>((acc, m) => {
+                const key = m.memberTypeName || '（区分不明）';
+                (acc[key] = acc[key] || []).push(m);
+                return acc;
+              }, {})
+            ).map(([typeName, list]) => (
+              <div key={typeName} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <button
+                  onClick={() => setExpandedType(expandedType === typeName ? null : typeName)}
+                  className={clsx(
+                    'w-full flex items-center justify-between px-3 py-2.5 text-left',
+                    expandedType === typeName ? 'bg-primary-50' : 'bg-white'
+                  )}
+                >
+                  <span className="font-semibold text-gray-900 text-sm">{typeName}</span>
+                  <span className="text-xs text-primary-600 font-semibold">
+                    {list.length}名 {expandedType === typeName ? '▲' : '▼'}
+                  </span>
+                </button>
+                {expandedType === typeName && (
+                  <div className="divide-y border-t border-gray-100">
+                    {[...list]
+                      .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'ja'))
+                      .map((m) => (
+                        <div key={m.id} className="px-3 py-2 flex items-center justify-between">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <FiUser className="w-3.5 h-3.5 text-gray-400" />
+                              <span className="font-semibold text-gray-900 text-sm">{m.displayName || '(名前未取得)'}</span>
+                            </div>
+                            <p className="text-[10px] text-gray-400">
+                              {(m.startDate || '指定なし')} 〜 {(m.endDate || '指定なし')}
+                            </p>
+                          </div>
+                          <button onClick={() => handleRevoke(m.id)} className="p-2 text-red-400 hover:text-red-600">
+                            <FiTrash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
                   </div>
-                  <button
-                    onClick={() => openEditUser(u)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-lg border-2 border-primary-300 text-primary-700 text-xs font-semibold"
-                  >
-                    編集
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </section>
 
       {/* 会員情報編集モーダル */}
@@ -1841,7 +1907,7 @@ const MembersTab: React.FC = () => {
                   ))}
                 </select>
                 {!editTarget.lineUserId && (
-                  <p className="text-[10px] text-amber-600 mt-1">※ LINE未連携ユーザーのため会員区分の変更はできません</p>
+                  <p className="text-[10px] text-gray-400 mt-1">※ LINE未連携（Laboraインポート）ユーザーです。区分変更は可能ですが、本人がミニアプリを開くまでLINE通知は届きません</p>
                 )}
               </div>
             </div>
@@ -1861,6 +1927,16 @@ const MembersTab: React.FC = () => {
                 {editSaving ? '保存中...' : '保存'}
               </button>
             </div>
+            <button
+              onClick={handleWithdrawUser}
+              disabled={editSaving}
+              className="w-full mt-3 py-2.5 rounded-xl border-2 border-red-200 text-red-600 text-sm font-semibold disabled:opacity-40"
+            >
+              このユーザーを退会させる
+            </button>
+            <p className="text-[10px] text-gray-400 mt-1 text-center">
+              退会すると会員区分が解除され一覧から消えます（予約・売上履歴は保持）
+            </p>
           </div>
         </div>
       )}

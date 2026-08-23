@@ -411,36 +411,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // ============ 予約作成（管理者） ============
+    // repeatEvery ('WEEKLY'|'BIWEEKLY') + repeatUntil (YYYY-MM-DD) を指定すると
+    // 年度一括予約（同曜日・同時刻・同一PIN・同一groupId）として複数件を一括登録する。
+    // 既存予約と重なる日はスキップし、結果サマリーを返す。
     if (action === 'createCheckin' && req.method === 'POST') {
-      const { location, facilityType, date, startTime, duration, totalPrice, userId, displayName, skipRemoteLock, isInvoicePayment } = req.body;
+      const { location, facilityType, date, startTime, duration, totalPrice, userId, displayName, skipRemoteLock, isInvoicePayment, repeatEvery, repeatUntil } = req.body;
       if (!location || !facilityType || !date || !startTime || !duration) {
         return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // 対象日リストを作成（繰り返しなしなら1件）
+      const MAX_OCCURRENCES = 60; // 週1×1年でも53回なので安全上限
+      const targetDates: string[] = [date];
+      if (repeatEvery && repeatUntil) {
+        const stepDays = repeatEvery === 'BIWEEKLY' ? 14 : 7;
+        const until = new Date(`${repeatUntil}T00:00:00+09:00`);
+        const cursor = new Date(`${date}T00:00:00+09:00`);
+        while (targetDates.length < MAX_OCCURRENCES) {
+          cursor.setDate(cursor.getDate() + stepDays);
+          if (cursor > until) break;
+          const y = cursor.getFullYear();
+          const m = String(cursor.getMonth() + 1).padStart(2, '0');
+          const d = String(cursor.getDate()).padStart(2, '0');
+          targetDates.push(`${y}-${m}-${d}`);
+        }
       }
 
       // 重複チェック（TRAINING_SHARED は定員 10 まで OK）
       const SHARED_CAPACITY = 10;
       const newStart = parseInt(String(startTime).split(':')[0], 10);
       const newEnd = newStart + Number(duration);
-      const existingSnapshot = await db.collection(COLLECTIONS.CHECKINS)
-        .where('date', '==', date)
-        .get();
-      const overlapping = existingSnapshot.docs.filter((doc) => {
-        const ex = doc.data();
-        if (ex.location !== location) return false;
-        if (ex.facilityType !== facilityType) return false;
-        if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
-        const exStart = parseInt(String(ex.startTime).split(':')[0], 10);
-        const exEnd = exStart + (ex.duration || 0);
-        return newStart < exEnd && exStart < newEnd;
-      });
-      if (facilityType === 'TRAINING_SHARED') {
-        if (overlapping.length >= SHARED_CAPACITY) {
-          return res.status(409).json({ error: `${date} ${startTime}〜は定員に達しています` });
-        }
-      } else {
-        if (overlapping.length > 0) {
-          return res.status(409).json({ error: `${date} ${startTime}〜は既に予約されています` });
-        }
+      const checkOverlap = async (targetDate: string): Promise<boolean> => {
+        const snap = await db.collection(COLLECTIONS.CHECKINS)
+          .where('date', '==', targetDate)
+          .get();
+        const overlapping = snap.docs.filter((doc) => {
+          const ex = doc.data();
+          if (ex.location !== location) return false;
+          if (ex.facilityType !== facilityType) return false;
+          if (ex.status !== 'PENDING' && ex.status !== 'PAID') return false;
+          const exStart = parseInt(String(ex.startTime).split(':')[0], 10);
+          const exEnd = exStart + (ex.duration || 0);
+          return newStart < exEnd && exStart < newEnd;
+        });
+        if (facilityType === 'TRAINING_SHARED') return overlapping.length >= SHARED_CAPACITY;
+        return overlapping.length > 0;
+      };
+
+      // 単発予約は従来どおり重複でエラーに
+      if (targetDates.length === 1 && await checkOverlap(date)) {
+        return res.status(409).json({
+          error: facilityType === 'TRAINING_SHARED'
+            ? `${date} ${startTime}〜は定員に達しています`
+            : `${date} ${startTime}〜は既に予約されています`,
+        });
       }
 
       // ユーザー解決（未指定なら管理者自身の userId を使う）
@@ -482,41 +506,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const now = new Date().toISOString();
-      const checkinData = {
-        userId: targetUserId,
-        location,
-        facilityType,
-        date,
-        startTime,
-        duration: Number(duration),
-        totalPrice: Number(totalPrice) || 0,
-        originalPrice: Number(totalPrice) || 0,
-        memberDiscount: 0,
-        memberTypeName: null,
-        couponCode: null,
-        couponId: null,
-        couponDiscount: 0,
-        pinCode,
-        status: 'PAID',
-        paymentId: null,
-        isInvoicePayment: isInvoicePayment || false,
-        paymentMethod: isInvoicePayment ? 'INVOICE' : null,
-        skipRemoteLock: skipRemoteLock || false,
-        groupId: null,
-        recurringType: null,
-        createdByAdmin: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const ref = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
-      // 利用者へ予約完了（利用開始案内）をLINE通知
+      const isRepeat = targetDates.length > 1;
+      const groupId = isRepeat ? `adm-rec-${Date.now()}` : null;
+      const created: Array<{ id: string; date: string }> = [];
+      const skippedDates: string[] = [];
+      let firstCheckinId: string | null = null;
+
+      for (const targetDate of targetDates) {
+        // 繰り返しの2件目以降は重なった日をスキップして続行
+        if (isRepeat && await checkOverlap(targetDate)) {
+          skippedDates.push(targetDate);
+          continue;
+        }
+        const checkinData = {
+          userId: targetUserId,
+          location,
+          facilityType,
+          date: targetDate,
+          startTime,
+          duration: Number(duration),
+          totalPrice: Number(totalPrice) || 0,
+          originalPrice: Number(totalPrice) || 0,
+          memberDiscount: 0,
+          memberTypeName: null,
+          couponCode: null,
+          couponId: null,
+          couponDiscount: 0,
+          pinCode, // 繰り返し登録では全日程で同一PIN（年間固定PIN）
+          status: 'PAID',
+          paymentId: null,
+          isInvoicePayment: isInvoicePayment || false,
+          paymentMethod: isInvoicePayment ? 'INVOICE' : null,
+          skipRemoteLock: skipRemoteLock || false,
+          groupId,
+          recurringType: isRepeat ? (repeatEvery === 'BIWEEKLY' ? 'BIWEEKLY' : 'WEEKLY') : null,
+          createdByAdmin: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const ref = await db.collection(COLLECTIONS.CHECKINS).add(checkinData);
+        created.push({ id: ref.id, date: targetDate });
+        if (!firstCheckinId) firstCheckinId = ref.id;
+      }
+
+      if (created.length === 0) {
+        return res.status(409).json({ error: 'すべての日程が既存予約と重なっていたため登録できませんでした' });
+      }
+
+      // 利用者へ予約完了（利用開始案内）をLINE通知（繰り返しでも通知は初回分の1通のみ）
       try {
         const { notifyBookingComplete } = await import('../server-lib/notify.js');
-        await notifyBookingComplete(ref.id);
+        if (firstCheckinId) await notifyBookingComplete(firstCheckinId);
       } catch (e) {
         console.error('notify error (admin createCheckin):', e);
       }
-      return res.status(201).json({ id: ref.id, ...checkinData });
+
+      return res.status(201).json({
+        id: firstCheckinId,
+        createdCount: created.length,
+        skippedDates,
+        groupId,
+        pinCode,
+        dates: created.map((c) => c.date),
+      });
     }
 
     // ============ 予約削除（管理者） ============
@@ -753,17 +805,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ============ ユーザー検索（会員付与用） ============
     if (action === 'users' && req.method === 'GET') {
       const search = ((req.query.search as string) || '').trim();
-      const snapshot = await db.collection(COLLECTIONS.USERS).limit(500).get();
-      let users = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; lineUserId: string; displayName: string }));
+      const snapshot = await db.collection(COLLECTIONS.USERS).limit(1000).get();
+      let users = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; lineUserId: string; displayName: string; name?: string; kana?: string; customerNumber?: string; deletedAt?: string }))
+        .filter((u) => !u.deletedAt); // 退会済みは一覧に出さない
       if (search) {
         const q = search.toLowerCase();
         users = users.filter((u) =>
           (u.displayName || '').toLowerCase().includes(q) ||
+          (u.name || '').toLowerCase().includes(q) ||
+          (u.kana || '').toLowerCase().includes(q) ||
+          (u.customerNumber || '').toLowerCase().includes(q) ||
           (u.lineUserId || '').toLowerCase().includes(q)
         );
       }
-      users = users.slice(0, 100);
+      users = users.slice(0, 200);
       return res.status(200).json(users);
+    }
+
+    // ============ ユーザー退会（管理者・ソフト削除） ============
+    // 過去の予約・売上履歴を壊さないため、ユーザー本体は deletedAt を付けて一覧から除外し、
+    // アクティブな会員区分をすべて解除する。
+    if (action === 'deleteUser' && req.method === 'DELETE') {
+      const userId = req.query.userId as string;
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const ref = db.collection(COLLECTIONS.USERS).doc(userId);
+      const doc = await ref.get();
+      if (!doc.exists) return res.status(404).json({ error: 'User not found' });
+      const u = doc.data() as { lineUserId?: string };
+      const nowIso = new Date().toISOString();
+
+      // アクティブ会員区分を解除（userId 紐付け / lineUserId 紐付けの両方）
+      const batch = db.batch();
+      const byUser = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+        .where('userId', '==', userId).where('isActive', '==', true).get();
+      byUser.docs.forEach((d) => batch.update(d.ref, { isActive: false, updatedAt: nowIso }));
+      if (u.lineUserId) {
+        const byLine = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+          .where('lineUserId', '==', u.lineUserId).where('isActive', '==', true).get();
+        byLine.docs.forEach((d) => {
+          if (!byUser.docs.some((x) => x.id === d.id)) {
+            batch.update(d.ref, { isActive: false, updatedAt: nowIso });
+          }
+        });
+      }
+      batch.update(ref, { deletedAt: nowIso, updatedAt: nowIso });
+      await batch.commit();
+      return res.status(200).json({ message: 'Withdrawn', deletedAt: nowIso });
     }
 
     // ユーザー情報の編集（氏名・電話・会員番号など）
@@ -809,20 +897,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'assignMembership' && req.method === 'POST') {
       const { lineUserId, userId, displayName, memberTypeId, startDate, endDate } = req.body;
-      if (!lineUserId || !memberTypeId) return res.status(400).json({ error: 'Missing lineUserId or memberTypeId' });
+      // LINE未連携（Laboraインポート等）のユーザーは userId のみで付与できる
+      if ((!lineUserId && !userId) || !memberTypeId) {
+        return res.status(400).json({ error: 'Missing lineUserId/userId or memberTypeId' });
+      }
 
       // 既存のアクティブ会員を非アクティブ化（1ユーザー1会員）
-      const existing = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
-        .where('lineUserId', '==', lineUserId)
-        .where('isActive', '==', true)
-        .get();
       const batch = db.batch();
-      existing.docs.forEach((d) => batch.update(d.ref, { isActive: false, updatedAt: new Date().toISOString() }));
+      const nowIso = new Date().toISOString();
+      const seen = new Set<string>();
+      if (lineUserId) {
+        const byLine = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+          .where('lineUserId', '==', lineUserId).where('isActive', '==', true).get();
+        byLine.docs.forEach((d) => { seen.add(d.id); batch.update(d.ref, { isActive: false, updatedAt: nowIso }); });
+      }
+      if (userId) {
+        const byUser = await db.collection(COLLECTIONS.USER_MEMBERSHIPS)
+          .where('userId', '==', userId).where('isActive', '==', true).get();
+        byUser.docs.forEach((d) => { if (!seen.has(d.id)) batch.update(d.ref, { isActive: false, updatedAt: nowIso }); });
+      }
       await batch.commit();
 
       const now = new Date().toISOString();
       const data = {
-        lineUserId,
+        lineUserId: lineUserId || null,
         userId: userId || null,
         displayName: displayName || null,
         memberTypeId,

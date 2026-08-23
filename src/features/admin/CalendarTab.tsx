@@ -94,6 +94,30 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
   const [selectedUser, setSelectedUser] = React.useState<{ id: string; displayName: string } | null>(null);
   const [isInvoice, setIsInvoice] = React.useState(false);
 
+  // 繰り返し登録（年度一括予約用）: 開始日から毎週/隔週で終了日まで登録
+  const [repeatMode, setRepeatMode] = React.useState<'NONE' | 'WEEKLY' | 'BIWEEKLY'>('NONE');
+  const fiscalYearEnd = React.useMemo(() => {
+    const d = new Date(`${defaultDate}T00:00:00`);
+    const year = d.getMonth() >= 3 ? d.getFullYear() + 1 : d.getFullYear();
+    return `${year}-03-31`;
+  }, [defaultDate]);
+  const [repeatUntil, setRepeatUntil] = React.useState(fiscalYearEnd);
+
+  // 繰り返し回数のプレビュー
+  const repeatCount = React.useMemo(() => {
+    if (repeatMode === 'NONE') return 1;
+    const step = repeatMode === 'BIWEEKLY' ? 14 : 7;
+    const until = new Date(`${repeatUntil}T00:00:00`);
+    const cursor = new Date(`${date}T00:00:00`);
+    let count = 1;
+    while (count < 60) {
+      cursor.setDate(cursor.getDate() + step);
+      if (cursor > until) break;
+      count++;
+    }
+    return count;
+  }, [repeatMode, repeatUntil, date]);
+
   // ユーザー検索（300msデバウンス）。選択済みのときは検索しない
   React.useEffect(() => {
     if (selectedUser) return;
@@ -140,7 +164,7 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
     setIsSubmitting(true);
     setError(null);
     try {
-      await adminApi.createCheckin({
+      const result = await adminApi.createCheckin({
         location,
         facilityType,
         date,
@@ -151,7 +175,14 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
         displayName: selectedUser?.displayName,
         isInvoicePayment: isInvoice,
         skipRemoteLock: true,
+        ...(repeatMode !== 'NONE' ? { repeatEvery: repeatMode, repeatUntil } : {}),
       });
+      if (repeatMode !== 'NONE' && result.createdCount !== undefined) {
+        const skipped = result.skippedDates?.length
+          ? `\n重複のためスキップ: ${result.skippedDates.join(', ')}`
+          : '';
+        alert(`${result.createdCount}件の予約を登録しました（PIN: ${result.pinCode} で全日程共通）${skipped}`);
+      }
       onCreated();
       onClose();
     } catch (e) {
@@ -300,6 +331,46 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
             )}
           </div>
 
+          {/* 繰り返し登録（年度一括予約） */}
+          <div>
+            <label className="text-xs font-semibold text-gray-600 block mb-1">
+              繰り返し登録（年度一括予約）
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {([['NONE', 'なし'], ['WEEKLY', '毎週'], ['BIWEEKLY', '隔週']] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  onClick={() => setRepeatMode(mode)}
+                  className={clsx(
+                    'py-2 rounded-lg text-sm font-semibold border-2',
+                    repeatMode === mode
+                      ? 'bg-primary-50 border-primary-500 text-primary-700'
+                      : 'bg-white border-gray-200 text-gray-600',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {repeatMode !== 'NONE' && (
+              <div className="mt-2 space-y-1">
+                <label className="text-xs text-gray-500 block">終了日（この日まで同曜日・同時刻で登録）</label>
+                <input
+                  type="date"
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 text-sm focus:border-primary-300 focus:outline-none"
+                />
+                <p className="text-[11px] text-primary-700 font-semibold">
+                  合計 {repeatCount} 回の予約を一括登録します（PINコードは全日程共通・上限60回）
+                </p>
+                <p className="text-[10px] text-gray-400">
+                  既に予約が入っている日は自動でスキップされます。年度一括は4/1〜翌3/31、年度途中は開始日〜3/31で登録してください。
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* 請求書払い（後日請求・定期利用者向け） */}
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
@@ -314,9 +385,14 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
           {/* 料金 */}
           <div className="p-3 bg-gradient-to-r from-sky-50 to-primary-50 rounded-lg border border-primary-100">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">料金</span>
+              <span className="text-sm text-gray-600">{repeatMode !== 'NONE' ? '料金（1回あたり）' : '料金'}</span>
               <span className="text-xl font-bold text-primary-700">¥{totalPrice.toLocaleString()}</span>
             </div>
+            {repeatMode !== 'NONE' && (
+              <p className="text-[11px] text-gray-500 text-right mt-0.5">
+                {repeatCount}回合計 ¥{(totalPrice * repeatCount).toLocaleString()}
+              </p>
+            )}
           </div>
 
           {error && (

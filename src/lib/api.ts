@@ -488,7 +488,9 @@ export const adminApi = {
     displayName?: string;
     skipRemoteLock?: boolean;
     isInvoicePayment?: boolean;
-  }) => api.post<Checkin>('/admin?action=createCheckin', data),
+    repeatEvery?: 'WEEKLY' | 'BIWEEKLY';
+    repeatUntil?: string;
+  }) => api.post<Checkin & { createdCount?: number; skippedDates?: string[]; pinCode?: string }>('/admin?action=createCheckin', data),
 
   // 予約削除（管理者）
   deleteCheckin: (checkinId: string) =>
@@ -549,8 +551,11 @@ export const adminApi = {
   // ユーザー情報の編集
   updateUser: (data: { userId: string; displayName?: string; name?: string; kana?: string; phone?: string; mobile?: string; email?: string; customerNumber?: string }) =>
     api.put<AdminUser>('/admin?action=updateUser', data),
+  // ユーザー退会（ソフト削除: 会員区分を解除し一覧から除外。予約・売上履歴は保持）
+  deleteUser: (userId: string) =>
+    api.delete<{ message: string }>(`/admin?action=deleteUser&userId=${userId}`),
   getMemberships: () => api.get<UserMembership[]>('/admin?action=memberships'),
-  assignMembership: (data: { lineUserId: string; userId: string; displayName?: string; memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
+  assignMembership: (data: { lineUserId?: string | null; userId?: string | null; displayName?: string; memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
     api.post<UserMembership>('/admin?action=assignMembership', data),
   revokeMembership: (membershipId: string) =>
     api.delete<void>(`/admin?action=revokeMembership&membershipId=${membershipId}`),
