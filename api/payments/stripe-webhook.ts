@@ -69,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // PIN発行
       let pinCode: string;
+      let remoteLockError: string | null = null;
 
       if (isRemoteLockConfigured()) {
         try {
@@ -92,6 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (error) {
           console.error('RemoteLock API error in webhook:', error);
           pinCode = generatePinCode();
+          remoteLockError = error instanceof Error ? error.message : String(error);
         }
       } else {
         pinCode = generatePinCode();
@@ -102,7 +104,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pinCode,
         paymentId: session.id,
         updatedAt: new Date().toISOString(),
+        ...(remoteLockError ? { remoteLockFailed: true, remoteLockError } : {}),
       });
+      if (remoteLockError) {
+        const { notifyAdminRemoteLockFailure } = await import('../../server-lib/notify.js');
+        await notifyAdminRemoteLockFailure({
+          checkinId,
+          location: checkin.location,
+          facilityType: checkin.facilityType,
+          date: checkin.date,
+          startTime: checkin.startTime,
+          duration: checkin.duration,
+          pinCode,
+          error: remoteLockError,
+          source: 'stripe-webhook',
+        });
+      }
 
       // クーポン使用回数を更新
       if (checkin.couponId) {

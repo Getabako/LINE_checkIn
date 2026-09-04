@@ -67,6 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (cData.status === 'PAID') continue;
 
       let pinCode: string;
+      let remoteLockError: string | null = null;
 
       if (!cData.skipRemoteLock && isRemoteLockConfigured()) {
         try {
@@ -91,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch (error) {
           console.error('RemoteLock API error, falling back to random PIN:', error);
           pinCode = groupPinCode || generatePinCode();
+          remoteLockError = error instanceof Error ? error.message : String(error);
         }
       } else {
         pinCode = groupPinCode || generatePinCode();
@@ -106,7 +108,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pinCode,
         paymentId: sessionId,
         updatedAt: new Date().toISOString(),
+        ...(remoteLockError ? { remoteLockFailed: true, remoteLockError } : {}),
       });
+      if (remoteLockError) {
+        const { notifyAdminRemoteLockFailure } = await import('../../server-lib/notify.js');
+        await notifyAdminRemoteLockFailure({
+          checkinId: cId,
+          location: cData.location,
+          facilityType: cData.facilityType,
+          date: cData.date,
+          startTime: cData.startTime,
+          duration: cData.duration,
+          pinCode,
+          error: remoteLockError,
+          source: 'stripe-callback',
+        });
+      }
     }
 
     // クーポン使用回数を更新（1回のみ）

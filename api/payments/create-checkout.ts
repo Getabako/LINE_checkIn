@@ -344,6 +344,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const cId = checkinIds[i];
         const d = allDates[i];
         let pinCode: string;
+        let remoteLockError: string | null = null;
 
         if (!skipRemoteLock && isRemoteLockConfigured()) {
           try {
@@ -367,6 +368,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } catch (error) {
             console.error('RemoteLock API error, falling back to random PIN:', error);
             pinCode = groupPinCode || Math.floor(1000 + Math.random() * 9000).toString();
+            remoteLockError = error instanceof Error ? error.message : String(error);
           }
         } else {
           pinCode = groupPinCode || Math.floor(1000 + Math.random() * 9000).toString();
@@ -381,7 +383,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: 'PAID',
           pinCode,
           updatedAt: new Date().toISOString(),
+          ...(remoteLockError ? { remoteLockFailed: true, remoteLockError } : {}),
         });
+        if (remoteLockError) {
+          const { notifyAdminRemoteLockFailure } = await import('../../server-lib/notify.js');
+          await notifyAdminRemoteLockFailure({
+            checkinId: cId,
+            location,
+            facilityType,
+            date: d,
+            startTime,
+            duration,
+            pinCode,
+            error: remoteLockError,
+            source: 'skip-payment',
+          });
+        }
       }
 
       // クーポン使用回数を更新（SKIP_PAYMENT時）

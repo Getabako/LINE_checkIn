@@ -187,3 +187,38 @@ export async function notifyEventComplete(
     console.error('notifyEventComplete error:', e);
   }
 }
+
+// RemoteLock 登録失敗の管理者通知（ADMIN_LINE_USER_IDS 宛）。
+// 予約フローは止めない（失敗時は代替PINで成立するため、管理者が手動登録できるよう即時に知らせる）。
+export async function notifyAdminRemoteLockFailure(params: {
+  checkinId?: string;
+  location?: string;
+  facilityType?: string;
+  date?: string;
+  startTime?: string;
+  duration?: number;
+  pinCode?: string;
+  error?: unknown;
+  source?: string;
+}): Promise<void> {
+  try {
+    const ids = (process.env.ADMIN_LINE_USER_IDS || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (!isLineConfigured() || ids.length === 0) return;
+    const errMsg = params.error instanceof Error ? params.error.message : String(params.error ?? '');
+    const text =
+      '【要対応】スマートロックへのPIN登録に失敗しました。\n' +
+      '予約は成立していますが、この解錠コードでは扉が開きません。RemoteLockで手動登録してください。\n\n' +
+      `施設：${LOCATION_NAMES[params.location || ''] || params.location || '-'} ${FACILITY_NAMES[params.facilityType || ''] || params.facilityType || ''}\n` +
+      `日時：${params.date || '-'} ${formatTime(params.startTime, params.duration) || ''}\n` +
+      `解錠コード（代替）：${params.pinCode || '-'}\n` +
+      `予約ID：${params.checkinId || '-'}\n` +
+      `経路：${params.source || '-'}\n` +
+      `エラー：${errMsg.slice(0, 200)}`;
+    await Promise.all(ids.map((id) => sendTextMessage(id, text).catch((e) => console.error('admin notify failed:', e))));
+  } catch (e) {
+    console.error('notifyAdminRemoteLockFailure error:', e);
+  }
+}

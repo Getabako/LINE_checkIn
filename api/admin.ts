@@ -480,6 +480,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // PIN コード生成（RemoteLock は管理者予約ではスキップ推奨）
       let pinCode: string = Math.floor(1000 + Math.random() * 9000).toString();
+      let remoteLockError: string | null = null;
       if (!skipRemoteLock) {
         try {
           const { createBooking, isRemoteLockConfigured } = await import('../server-lib/remotelock.js');
@@ -502,6 +503,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         } catch (e) {
           console.error('RemoteLock error (admin createCheckin):', e);
+          remoteLockError = e instanceof Error ? e.message : String(e);
+          const { notifyAdminRemoteLockFailure } = await import('../server-lib/notify.js');
+          await notifyAdminRemoteLockFailure({
+            location,
+            facilityType,
+            date,
+            startTime,
+            duration: Number(duration),
+            pinCode,
+            error: remoteLockError,
+            source: 'admin-createCheckin',
+          });
         }
       }
 
@@ -533,6 +546,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           couponId: null,
           couponDiscount: 0,
           pinCode, // 繰り返し登録では全日程で同一PIN（年間固定PIN）
+          ...(remoteLockError ? { remoteLockFailed: true, remoteLockError } : {}),
           status: 'PAID',
           paymentId: null,
           isInvoicePayment: isInvoicePayment || false,

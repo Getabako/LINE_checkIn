@@ -6,7 +6,7 @@ import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculatePrice, calculateEndTime, LOCATION_TIME_SLOTS, getAvailableDurations } from '../../lib/price';
 import clsx from 'clsx';
 
-type CheckinItem = Checkin & { displayName?: string; isInvoicePayment?: boolean };
+type CheckinItem = Checkin & { displayName?: string; isInvoicePayment?: boolean; remoteLockFailed?: boolean };
 
 const DAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土'];
 const DAY_TO_NUM: Record<string, number> = {
@@ -685,6 +685,7 @@ export const CalendarTab: React.FC = () => {
                         <div className="text-xs text-gray-600 mt-0.5">
                           {c.displayName || ''} ({c.duration}h) · {c.isInvoicePayment ? '請求書払い' : c.status === 'PENDING' ? '未決済' : '決済済'}
                           {c.pinCode && <span className="ml-2 font-mono">PIN: {c.pinCode}</span>}
+                          {c.remoteLockFailed && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-700">鍵登録失敗・要手動</span>}
                         </div>
                       </div>
                       <button
