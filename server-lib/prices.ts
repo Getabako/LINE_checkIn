@@ -1,7 +1,7 @@
 // 料金マスタ（サーバー側の課金計算の唯一の参照元）
 // 既定値はコードに固定。管理画面で上書きした分は Firestore settings/pricePlans に保存し、
 // loadPriceTable() で既定値にディープマージして返す。
-import { getDb } from './firebase.js';
+import { getDb } from './db.js';
 
 export type PriceTable = Record<string, Record<string, Record<string, Record<string, number>>>>;
 

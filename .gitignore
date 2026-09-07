@@ -43,3 +43,9 @@ Thumbs.db
 
 # Keys memo
 KEYS_MEMO.md
+
+# Vercel env dump
+.env.vercel
+
+# Smoke test build
+dist-smoke

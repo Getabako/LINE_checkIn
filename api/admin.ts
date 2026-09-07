@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb, COLLECTIONS } from '../server-lib/firebase.js';
+import { getDb, COLLECTIONS, type Query as DbQuery } from '../server-lib/db.js';
 import { verifyLiffToken } from '../server-lib/auth.js';
 
 // 管理者LINE UserIDリスト
@@ -340,7 +340,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const groupBy = req.query.groupBy as string;
 
       // 複合インデックス回避のため date 範囲のみでクエリし status はメモリでフィルタ
-      let query = db.collection(COLLECTIONS.CHECKINS) as FirebaseFirestore.Query;
+      let query = db.collection(COLLECTIONS.CHECKINS) as DbQuery;
       const effectiveFrom = from || (year ? `${year}-01-01` : '');
       const effectiveTo = to || (year ? `${year}-12-31` : '');
       if (effectiveFrom) query = query.where('date', '>=', effectiveFrom);
@@ -599,7 +599,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const to = req.query.to as string;
 
       // 複合インデックス回避のため date 範囲のみでクエリし、status はメモリ側でフィルタ
-      let query = db.collection(COLLECTIONS.CHECKINS) as FirebaseFirestore.Query;
+      let query = db.collection(COLLECTIONS.CHECKINS) as DbQuery;
       if (from) query = query.where('date', '>=', from);
       if (to) query = query.where('date', '<=', to);
 

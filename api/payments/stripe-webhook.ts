@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { getDb, COLLECTIONS, FieldValue } from '../../server-lib/db.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 
 function generatePinCode(): string {
@@ -125,8 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (checkin.couponId) {
         try {
           const couponRef = db.collection('coupons').doc(checkin.couponId);
-          const { FieldValue } = await import('firebase-admin/firestore');
-          await couponRef.update({ usedCount: FieldValue.increment(1) });
+                    await couponRef.update({ usedCount: FieldValue.increment(1) });
 
           await db.collection('couponRedemptions').add({
             couponId: checkin.couponId,

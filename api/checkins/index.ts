@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { getDb, COLLECTIONS, FieldValue } from '../../server-lib/db.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createLogger } from '../../server-lib/logger.js';
 
@@ -267,8 +267,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
 
         // カウントアップ
-        const { FieldValue } = await import('firebase-admin/firestore');
-        await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+                await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
 
         return res.status(201).json({ id: regRef.id, ...regData });
       }
@@ -310,8 +309,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const regRef = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS).add(regData);
 
         // カウントアップ
-        const { FieldValue } = await import('firebase-admin/firestore');
-        await schoolDoc.ref.update({ currentCount: FieldValue.increment(1) });
+                await schoolDoc.ref.update({ currentCount: FieldValue.increment(1) });
 
         return res.status(201).json({ id: regRef.id, ...regData });
       }

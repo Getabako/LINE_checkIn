@@ -4,6 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm ci",
+  "regions": ["sin1"],
   "functions": {
     "api/**/*.ts": {
       "includeFiles": "server-lib/fonts/**"

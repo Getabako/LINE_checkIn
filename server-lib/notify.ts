@@ -1,7 +1,7 @@
 // 予約・キャンセル完了時のLINEプッシュ通知ユーティリティ
 // 通知文は Firestore settings/notificationTemplates で管理者が編集可能。
 // LINE未設定時や失敗時は決済フローを止めないよう、例外は内部で握りつぶす。
-import { getDb, COLLECTIONS } from './firebase.js';
+import { getDb, COLLECTIONS } from './db.js';
 import { isLineConfigured, sendTextMessage } from './line.js';
 
 const SETTINGS_COLLECTION = 'settings';

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import crypto from 'crypto';
-import { getDb, COLLECTIONS } from '../../server-lib/firebase.js';
+import { getDb, COLLECTIONS, FieldValue } from '../../server-lib/db.js';
 import { verifyLiffToken } from '../../server-lib/auth.js';
 import { createBooking, isRemoteLockConfigured } from '../../server-lib/remotelock.js';
 import { createLogger } from '../../server-lib/logger.js';
@@ -404,8 +404,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // クーポン使用回数を更新（SKIP_PAYMENT時）
       if (couponId) {
         try {
-          const { FieldValue } = await import('firebase-admin/firestore');
-          await db.collection('coupons').doc(couponId).update({ usedCount: FieldValue.increment(1) });
+                    await db.collection('coupons').doc(couponId).update({ usedCount: FieldValue.increment(1) });
           await db.collection('couponRedemptions').add({
             couponId,
             userId,
