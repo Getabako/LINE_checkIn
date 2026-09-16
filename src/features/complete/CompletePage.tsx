@@ -425,7 +425,7 @@ export const CompletePage: React.FC = () => {
         <div className="mt-5 p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200/50 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
           <div className="flex items-start gap-2.5 text-sm text-amber-700">
             <FiAlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
-            <span>暗証番号は予約時間内のみ有効です。時間外はご利用いただけません。</span>
+            <span>暗証番号は予約開始の10分前から予約終了時刻まで有効です。時間外はご利用いただけません。</span>
           </div>
         </div>
       </main>

@@ -7,8 +7,36 @@
 //   ASP体育館          (GYM)           シリアル: AC000W017830299
 //   ASPトレーニングルーム (TRAINING)     シリアル: AC000W017830548
 //   みんなの体育館八橋   (YABASE)        シリアル: AC000W017827205
+//
+// 複数ドアの扱い（2026-09-16 修正）:
+//   同じ時間帯に同じPINで2件目の booking を作ると RemoteLock 側で
+//   「PIN has already been taken」となり、201 のまま別PINに差し替えられる
+//   （= 玄関は開くのに体育館が開かない事故の原因）。
+//   そのため 1台目だけ booking を作り、レスポンスの access_person に対して
+//   POST /access_persons/{id}/accesses で 2台目以降のドアを追加する。
+//   これで全ドアが同一PINになる。
+//
+// 開始前マージン:
+//   booking の start_margin_sec は API から変更できない（読み取り専用）ため、
+//   starts_at 自体を REMOTELOCK_START_MARGIN_MIN 分（既定10分）前倒しして登録する。
 
 const REMOTELOCK_API_BASE = 'https://api.remotelock-pf.jp';
+
+// 予約開始の何分前からPINを有効にするか（ユーザー入れ替えをスムーズにするため）
+const START_MARGIN_MIN = (() => {
+  const v = Number(process.env.REMOTELOCK_START_MARGIN_MIN ?? '10');
+  return Number.isFinite(v) && v >= 0 ? v : 10;
+})();
+
+// "yyyy-MM-ddTHH:mm:ss"（JSTローカル・オフセットなし）を分単位でずらす
+function shiftLocalDateTime(local: string, deltaMinutes: number): string {
+  const m = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/);
+  if (!m || deltaMinutes === 0) return local;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+  d.setUTCMinutes(d.getUTCMinutes() + deltaMinutes);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
 
 const API_HEADERS = {
   'Content-Type': 'application/json',
@@ -105,68 +133,86 @@ export async function createBooking(params: {
   }
 
   // RemoteLock APIは yyyy-MM-dd'T'HH:mm:ss（タイムゾーンオフセットなし・JSTローカル時刻）のみ受け付ける
-  const startsAt = params.startsAt.replace(/(\+|-)\d{2}:\d{2}$|Z$/, '');
-  const endsAt = params.endsAt.replace(/(\+|-)\d{2}:\d{2}$|Z$/, '');
+  const stripTz = (v: string) => v.replace(/(\+|-)\d{2}:\d{2}$|Z$/, '');
+  // 開始はマージン分前倒し（入れ替えをスムーズにする）。終了は予約通り
+  const startsAt = shiftLocalDateTime(stripTz(params.startsAt), -START_MARGIN_MIN);
+  const endsAt = stripTz(params.endsAt);
 
-  let pinCode = '';
-  let universalAccessKeyUrl = '';
-  const bookingIds: string[] = [];
+  const authHeaders = {
+    ...API_HEADERS,
+    Authorization: `Bearer ${accessToken}`,
+  };
 
-  for (let i = 0; i < deviceIds.length; i++) {
-    const deviceId = deviceIds[i];
-    const bookingId = deviceIds.length > 1
-      ? `${params.checkinId}-${i + 1}`
-      : params.checkinId;
+  // 1台目: booking を作成（PINと access_person が発行される）
+  const body: Record<string, unknown> = {
+    type: 'booking',
+    id: params.checkinId,
+    attributes: {
+      name: params.name,
+      device_id: deviceIds[0],
+      starts_at: startsAt,
+      ends_at: endsAt,
+      validation: false,
+      ...(params.pin ? { pin: params.pin } : {}),
+    },
+  };
 
-    // グループ予約でPIN指定がある場合は全デバイスに適用、それ以外は2台目以降に適用
-    const shouldSetPin = params.pin || (i > 0 && pinCode);
-    const pinToUse = params.pin || pinCode;
+  const response = await fetch(`${REMOTELOCK_API_BASE}/bookings`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify(body),
+  });
 
-    const body: Record<string, unknown> = {
-      type: 'booking',
-      id: bookingId,
-      attributes: {
-        name: params.name,
-        device_id: deviceId,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        validation: false,
-        ...(shouldSetPin && pinToUse ? { pin: pinToUse } : {}),
-      },
-    };
-
-    const response = await fetch(`${REMOTELOCK_API_BASE}/bookings`, {
-      method: 'POST',
-      headers: {
-        ...API_HEADERS,
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      // 2台目以降の失敗はログのみ（1台目のPINは有効）
-      if (i > 0) {
-        console.error(`RemoteLock booking failed for device ${deviceId}: ${response.status} ${errorText}`);
-        continue;
-      }
-      throw new Error(`RemoteLock booking failed: ${response.status} ${errorText}`);
-    }
-
-    const result = await response.json();
-    const attrs = result.data.attributes;
-    bookingIds.push(result.data.id);
-
-    // 1台目のレスポンスからPINとURLを取得
-    if (i === 0) {
-      pinCode = attrs.pin || '';
-      universalAccessKeyUrl = attrs.universal_access_key_url || '';
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`RemoteLock booking failed: ${response.status} ${errorText}`);
   }
+
+  const result = await response.json();
+  const attrs = result.data.attributes;
+  const pinCode: string = attrs.pin || '';
+  const universalAccessKeyUrl: string = attrs.universal_access_key_url || '';
+  const accessPersonId: string = attrs.access_person_id || '';
+  const bookingIds: string[] = [result.data.id];
 
   if (!pinCode) {
     throw new Error('RemoteLock: PIN was not generated');
+  }
+
+  // 指定PINが使用済みで差し替えられた場合は警告（呼び出し側は返却PINを正として扱う）
+  if (params.pin && pinCode !== params.pin) {
+    console.warn(
+      `RemoteLock: requested PIN ${params.pin} was replaced with ${pinCode} for ${params.checkinId}`,
+      JSON.stringify(result.meta ?? null),
+    );
+  }
+
+  // 2台目以降: 同じ access_person にドアのアクセス権を追加（同一PINで開く）
+  const failedDevices: string[] = [];
+  for (const deviceId of deviceIds.slice(1)) {
+    if (!accessPersonId) {
+      failedDevices.push(deviceId);
+      continue;
+    }
+    const accessRes = await fetch(`${REMOTELOCK_API_BASE}/access_persons/${accessPersonId}/accesses`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        attributes: { accessible_id: deviceId, accessible_type: 'lock' },
+      }),
+    });
+    if (!accessRes.ok) {
+      const errorText = await accessRes.text();
+      console.error(`RemoteLock access add failed for device ${deviceId}: ${accessRes.status} ${errorText}`);
+      failedDevices.push(deviceId);
+    }
+  }
+
+  // 施設側のドアが開かないと利用できないので、失敗は呼び出し側に伝えて管理者通知に乗せる
+  if (failedDevices.length > 0) {
+    throw new Error(
+      `RemoteLock: PIN ${pinCode} was issued for the entrance but adding access to device(s) ${failedDevices.join(', ')} failed`,
+    );
   }
 
   return { pinCode, universalAccessKeyUrl, bookingIds };
@@ -176,9 +222,11 @@ export async function createBooking(params: {
 export async function cancelBooking(checkinId: string, deviceCount: number): Promise<void> {
   const accessToken = await getAccessToken();
 
-  const ids = deviceCount > 1
-    ? Array.from({ length: deviceCount }, (_, i) => `${checkinId}-${i + 1}`)
-    : [checkinId];
+  // 現行は booking 1件（id = checkinId）。旧方式（`${checkinId}-N`）で作られた予約も念のため対象にする
+  const ids = [checkinId];
+  if (deviceCount > 1) {
+    for (let i = 0; i < deviceCount; i++) ids.push(`${checkinId}-${i + 1}`);
+  }
 
   for (const bookingId of ids) {
     try {

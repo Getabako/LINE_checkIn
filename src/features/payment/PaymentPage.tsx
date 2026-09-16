@@ -317,7 +317,7 @@ export const PaymentPage: React.FC = () => {
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0"></span>
-              暗証番号は当日の利用時間のみ有効です
+              暗証番号は当日の利用開始10分前から終了時刻まで有効です
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0"></span>
