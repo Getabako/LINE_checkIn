@@ -6,6 +6,7 @@ import { ja } from 'date-fns/locale';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
+import { useUserStore } from '../../stores/userStore';
 import { mergeLocations, getLocationName } from '../../lib/locations';
 import { LocationId, Event, School, Announcement, MemberType, UserMembership, FacilityProfiles, eventApi, schoolApi, announcementApi, membershipApi, facilityApi } from '../../lib/api';
 import clsx from 'clsx';
@@ -44,6 +45,7 @@ const announcementStyle = (priority: Announcement['priority']) => {
 export const LocationPage: React.FC = () => {
   const navigate = useNavigate();
   const { location, setLocation, reset } = useCheckinStore();
+  const isAdmin = useUserStore((s) => s.isAdmin);
   const [events, setEvents] = React.useState<Event[]>([]);
   const [schools, setSchools] = React.useState<School[]>([]);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
@@ -378,13 +380,18 @@ export const LocationPage: React.FC = () => {
               <p className="text-[10px] text-primary-400">予約の確認・キャンセル</p>
             </div>
           </button>
-          <button
-            onClick={() => navigate('/admin')}
-            className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 text-left flex items-center gap-3 hover:bg-gray-100 transition-colors"
-          >
-            <FiSettings className="w-5 h-5 text-gray-400" />
-            <span className="text-sm text-gray-500">管理画面</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/admin')}
+              className="w-full p-3 bg-gray-800 rounded-xl border border-gray-900 text-left flex items-center gap-3 hover:bg-gray-700 transition-colors"
+            >
+              <FiSettings className="w-5 h-5 text-amber-300" />
+              <div>
+                <span className="text-sm font-semibold text-white">管理者モードへ</span>
+                <p className="text-[10px] text-gray-300">予約状況・売上・会員・料金の管理</p>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* 法務リンク */}

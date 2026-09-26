@@ -26,3 +26,17 @@ export async function verifyLiffToken(authHeader: string | undefined): Promise<L
     return null;
   }
 }
+
+/** 管理者の LINE userId 一覧（環境変数 ADMIN_LINE_USER_IDS、カンマ区切り） */
+export function getAdminUserIds(): string[] {
+  return (process.env.ADMIN_LINE_USER_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+/** 管理者判定。ADMIN_LINE_USER_IDS が未設定のときは誰も管理者にしない（安全側） */
+export function isAdminUserId(lineUserId: string | undefined | null): boolean {
+  if (!lineUserId) return false;
+  return getAdminUserIds().includes(lineUserId);
+}

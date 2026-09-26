@@ -3,6 +3,7 @@
 // LINE未設定時や失敗時は決済フローを止めないよう、例外は内部で握りつぶす。
 import { getDb, COLLECTIONS } from './db.js';
 import { isLineConfigured, sendTextMessage } from './line.js';
+import { getAdminUserIds } from './auth.js';
 
 const SETTINGS_COLLECTION = 'settings';
 const TEMPLATES_DOC = 'notificationTemplates';
@@ -202,10 +203,7 @@ export async function notifyAdminRemoteLockFailure(params: {
   source?: string;
 }): Promise<void> {
   try {
-    const ids = (process.env.ADMIN_LINE_USER_IDS || '')
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const ids = getAdminUserIds();
     if (!isLineConfigured() || ids.length === 0) return;
     const errMsg = params.error instanceof Error ? params.error.message : String(params.error ?? '');
     const text =

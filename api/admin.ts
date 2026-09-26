@@ -1,19 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, COLLECTIONS, type Query as DbQuery } from '../server-lib/db.js';
-import { verifyLiffToken } from '../server-lib/auth.js';
-
-// 管理者LINE UserIDリスト
-function getAdminUserIds(): string[] {
-  const ids = process.env.ADMIN_LINE_USER_IDS || '';
-  return ids.split(',').map((id) => id.trim()).filter(Boolean);
-}
+import { verifyLiffToken, isAdminUserId } from '../server-lib/auth.js';
 
 async function verifyAdmin(req: VercelRequest): Promise<{ userId: string; lineUserId: string } | null> {
   const profile = await verifyLiffToken(req.headers.authorization);
   if (!profile) return null;
 
-  const adminIds = getAdminUserIds();
-  if (adminIds.length > 0 && !adminIds.includes(profile.userId)) {
+  // ADMIN_LINE_USER_IDS 未設定時は全員拒否（以前は全員許可だった）
+  if (!isAdminUserId(profile.userId)) {
     return null;
   }
 

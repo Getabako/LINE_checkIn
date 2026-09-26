@@ -69,6 +69,8 @@ export interface User {
   lineUserId: string;
   displayName: string;
   pictureUrl?: string;
+  /** 管理者（ADMIN_LINE_USER_IDS に含まれる）かどうか */
+  isAdmin?: boolean;
 }
 
 // 管理画面で扱うユーザー（Laboraインポート項目を含む）

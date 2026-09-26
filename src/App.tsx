@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeLiff } from './lib/liff';
 import { userApi } from './lib/api';
+import { useUserStore } from './stores/userStore';
 import { createLogger } from './lib/logger';
 import { Loading } from './components/common/Loading';
 import { LocationPage } from './features/location/LocationPage';
@@ -46,8 +47,14 @@ const App: React.FC = () => {
         // ユーザーをFirestoreに自動登録（失敗してもアプリ起動は継続）
         userApi
           .getMe()
-          .then(() => log.op('user.autoRegister.ok'))
-          .catch((e) => log.warn('user.autoRegister.fail', { message: String(e) }));
+          .then((me) => {
+            useUserStore.getState().setUser(me);
+            log.op('user.autoRegister.ok', { isAdmin: !!me.isAdmin });
+          })
+          .catch((e) => {
+            useUserStore.getState().setUser(null);
+            log.warn('user.autoRegister.fail', { message: String(e) });
+          });
         setIsLiffReady(true);
       } catch (err) {
         log.error('liff.init.fail', { message: String(err) });

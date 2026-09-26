@@ -2,7 +2,9 @@ import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
+import { useUserStore } from '../../stores/userStore';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
 import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser } from '../../lib/api';
@@ -2154,10 +2156,45 @@ const CouponsTab: React.FC = () => {
 // ============ メインの管理画面 ============
 export const AdminPage: React.FC = () => {
   const [activeTab, setActiveTab] = React.useState<Tab>('calendar');
+  const navigate = useNavigate();
+  const { loaded, isAdmin } = useUserStore();
+
+  // 管理者以外は利用者画面へ戻す（API 側も ADMIN_LINE_USER_IDS で 403 を返すが、画面でも隠す）
+  React.useEffect(() => {
+    if (loaded && !isAdmin) navigate('/', { replace: true });
+  }, [loaded, isAdmin, navigate]);
+
+  if (!loaded) {
+    return <Loading fullScreen text="確認中..." />;
+  }
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 text-center">
+        <div>
+          <p className="text-gray-700 font-semibold">この画面は管理者専用です</p>
+          <p className="text-sm text-gray-500 mt-2">利用者画面に戻ります</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-      <Header title="管理画面" showBack />
+      <Header title="管理画面" showBack onBack={() => navigate('/')} />
+
+      {/* モード表示バー: 管理者モード中であることを明示し、利用者画面へワンタップで戻れる */}
+      <div className="sticky top-14 z-40 bg-gray-900 text-white px-4 py-2 flex items-center justify-between">
+        <span className="text-xs font-semibold tracking-wide">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-300 mr-2 align-middle" />
+          管理者モード
+        </span>
+        <button
+          onClick={() => navigate('/')}
+          className="text-xs font-semibold bg-white/10 hover:bg-white/20 rounded-lg px-3 py-1.5 transition-colors"
+        >
+          利用者画面へ
+        </button>
+      </div>
 
       <main className="p-4 pb-8">
         {/* タブ切り替え */}
