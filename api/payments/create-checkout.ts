@@ -459,8 +459,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      // Stripe Dashboard で有効化された決済方法（カード・PayPay 等）を自動表示
-      automatic_payment_methods: { enabled: true },
+      // payment_method_types を省略すると Stripe Dashboard で有効化された決済方法
+      // （カード・PayPay 等）が自動表示される（automatic_payment_methods は Checkout では無効なパラメータ）
       line_items: [
         {
           price_data: {
