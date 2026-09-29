@@ -254,3 +254,128 @@ export function isRemoteLockConfigured(): boolean {
      process.env.REMOTELOCK_DEVICE_ID_YABASE)
   );
 }
+
+// ============================================================
+// スタッフ入館（業者・清掃のシルバー人材など、予約と無関係に決まった曜日・時間帯だけ開くPIN）
+//
+// 仕組み:
+//   1. POST /schedules (access_schedule) で曜日別の時間帯（例: 月水金 09:00〜11:00）を作る
+//   2. POST /access_persons (access_guest) で有効期間付きのゲストを作り PIN を自動発行
+//   3. POST /access_persons/{id}/accesses で対象ドアをスケジュール付きで紐づける
+// 取り消しは PUT /access_persons/{id}/deactivate（履歴が残る）＋スケジュール削除。
+// ============================================================
+
+export type StaffDoor = 'ENTRANCE' | 'GYM' | 'TRAINING' | 'YABASE';
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export const STAFF_DOOR_DEVICE_ENV: Record<StaffDoor, string> = {
+  ENTRANCE: 'REMOTELOCK_DEVICE_ID_ENTRANCE',
+  GYM: 'REMOTELOCK_DEVICE_ID_GYM',
+  TRAINING: 'REMOTELOCK_DEVICE_ID_TRAINING',
+  YABASE: 'REMOTELOCK_DEVICE_ID_YABASE',
+};
+
+function staffDoorDeviceId(door: StaffDoor): string | undefined {
+  return process.env[STAFF_DOOR_DEVICE_ENV[door]];
+}
+
+async function rlFetch(path: string, init: RequestInit): Promise<Response> {
+  const accessToken = await getAccessToken();
+  return fetch(`${REMOTELOCK_API_BASE}${path}`, {
+    ...init,
+    headers: { ...API_HEADERS, Authorization: `Bearer ${accessToken}`, ...(init.headers || {}) },
+  });
+}
+
+export interface StaffAccessResult {
+  pinCode: string;
+  accessPersonId: string;
+  scheduleId: string;
+}
+
+export async function createStaffAccess(params: {
+  name: string;
+  doors: StaffDoor[];
+  startDate: string; // yyyy-MM-dd（JST）
+  endDate: string;   // yyyy-MM-dd（JST・この日の終わりまで有効）
+  days: Weekday[];
+  startTime: string; // HH:mm
+  endTime: string;   // HH:mm
+}): Promise<StaffAccessResult> {
+  const deviceIds = params.doors.map((d) => staffDoorDeviceId(d)).filter((v): v is string => !!v);
+  if (deviceIds.length === 0) throw new Error('対象ドアのデバイスIDが設定されていません');
+  if (params.days.length === 0) throw new Error('曜日を1つ以上選んでください');
+
+  // 1. 曜日別スケジュール
+  const scheduleAttrs: Record<string, unknown> = { name: `staff ${params.name} ${params.startDate}` };
+  for (const d of ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as Weekday[]) {
+    scheduleAttrs[d] = params.days.includes(d)
+      ? [{ start_time: params.startTime, end_time: params.endTime }]
+      : [];
+  }
+  const schedRes = await rlFetch('/schedules', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'access_schedule', attributes: scheduleAttrs }),
+  });
+  if (!schedRes.ok) throw new Error(`RemoteLock schedule failed: ${schedRes.status} ${await schedRes.text()}`);
+  const scheduleId: string = (await schedRes.json()).data.id;
+
+  // 2. 期間付きゲスト（PIN自動発行）。日時はタイムゾーンなしのJSTローカル
+  const guestRes = await rlFetch('/access_persons', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'access_guest',
+      attributes: {
+        name: params.name,
+        generate_pin: true,
+        starts_at: `${params.startDate}T00:00:00`,
+        ends_at: `${params.endDate}T23:59:59`,
+      },
+    }),
+  });
+  if (!guestRes.ok) {
+    await rlFetch(`/schedules/${scheduleId}`, { method: 'DELETE' }).catch(() => undefined);
+    throw new Error(`RemoteLock access_guest failed: ${guestRes.status} ${await guestRes.text()}`);
+  }
+  const guest = await guestRes.json();
+  const accessPersonId: string = guest.data.id;
+  const pinCode: string = guest.data.attributes?.pin || '';
+  if (!pinCode) throw new Error('RemoteLock: PIN was not generated for staff access');
+
+  // 3. ドアをスケジュール付きで紐づけ
+  const failed: string[] = [];
+  for (const deviceId of deviceIds) {
+    const res = await rlFetch(`/access_persons/${accessPersonId}/accesses`, {
+      method: 'POST',
+      body: JSON.stringify({
+        attributes: { accessible_id: deviceId, accessible_type: 'lock', access_schedule_id: scheduleId },
+      }),
+    });
+    if (!res.ok) {
+      console.error(`RemoteLock staff access add failed for ${deviceId}: ${res.status} ${await res.text()}`);
+      failed.push(deviceId);
+    }
+  }
+  if (failed.length > 0) {
+    await deactivateStaffAccess(accessPersonId, scheduleId);
+    throw new Error(`RemoteLock: ドアの紐づけに失敗しました (${failed.join(', ')})`);
+  }
+
+  return { pinCode, accessPersonId, scheduleId };
+}
+
+export async function deactivateStaffAccess(accessPersonId: string, scheduleId?: string | null): Promise<void> {
+  try {
+    const res = await rlFetch(`/access_persons/${accessPersonId}/deactivate`, { method: 'PUT' });
+    if (!res.ok) console.error(`RemoteLock staff deactivate failed: ${res.status} ${await res.text()}`);
+  } catch (e) {
+    console.error('RemoteLock staff deactivate error:', e);
+  }
+  if (scheduleId) {
+    try {
+      await rlFetch(`/schedules/${scheduleId}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error('RemoteLock schedule delete error:', e);
+    }
+  }
+}

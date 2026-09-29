@@ -439,6 +439,40 @@ export interface NotificationTemplates {
   enabled: boolean;
 }
 
+export type StaffDoor = 'ENTRANCE' | 'GYM' | 'TRAINING' | 'YABASE';
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+export type StaffAccessKind = 'VENDOR' | 'CLEANING' | 'OTHER';
+
+export interface StaffAccess {
+  id: string;
+  name: string;
+  kind: StaffAccessKind;
+  location: LocationId;
+  doors: StaffDoor[];
+  startDate: string;
+  endDate: string;
+  days: Weekday[];
+  startTime: string;
+  endTime: string;
+  pinCode: string;
+  status: 'ACTIVE' | 'DELETED';
+  note?: string | null;
+  createdAt: string;
+}
+
+export interface CreateStaffAccessRequest {
+  name: string;
+  kind: StaffAccessKind;
+  location: LocationId;
+  doors: StaffDoor[];
+  startDate: string;
+  endDate: string;
+  days: Weekday[];
+  startTime: string;
+  endTime: string;
+  note?: string;
+}
+
 export const adminApi = {
   // イベント管理
   getEvents: () => api.get<Event[]>('/admin?action=events'),
@@ -497,6 +531,13 @@ export const adminApi = {
   // 予約削除（管理者）
   deleteCheckin: (checkinId: string) =>
     api.delete<void>(`/admin?action=deleteCheckin&checkinId=${checkinId}`),
+
+  // スタッフ入館（業者・清掃など、曜日・時間帯限定PIN）
+  getStaffAccesses: () => api.get<StaffAccess[]>('/admin?action=staffAccesses'),
+  createStaffAccess: (data: CreateStaffAccessRequest) =>
+    api.post<StaffAccess>('/admin?action=createStaffAccess', data),
+  deleteStaffAccess: (staffAccessId: string) =>
+    api.delete<void>(`/admin?action=deleteStaffAccess&staffAccessId=${staffAccessId}`),
 
   // お知らせ管理
   getAnnouncements: () => api.get<Announcement[]>('/admin?action=announcements'),

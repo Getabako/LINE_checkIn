@@ -257,3 +257,25 @@ CREATE TABLE IF NOT EXISTS settings (
   id   text PRIMARY KEY,
   data jsonb NOT NULL DEFAULT '{}'::jsonb
 );
+
+-- スタッフ入館（業者・清掃など、予約と無関係に曜日・時間帯限定で開くPIN）
+CREATE TABLE IF NOT EXISTS staff_accesses (
+  id               text PRIMARY KEY,
+  name             text,
+  kind             text,
+  location         text,
+  start_date       text,
+  end_date         text,
+  start_time       text,
+  end_time         text,
+  pin_code         text,
+  access_person_id text,
+  schedule_id      text,
+  status           text,
+  note             text,
+  created_by       text,
+  created_at       timestamptz,
+  updated_at       timestamptz,
+  extra            jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS staff_accesses_status_idx ON staff_accesses (status);

@@ -1,13 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign, FiKey } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { useUserStore } from '../../stores/userStore';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
@@ -33,7 +33,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing' | 'staff';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -1106,6 +1106,282 @@ const AnnouncementsTab: React.FC = () => {
                 <FiTrash2 className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+
+// ============ スタッフ入館タブ（業者・清掃のシルバー人材など、曜日・時間帯限定PIN） ============
+const STAFF_KIND_LABEL: Record<StaffAccessKind, string> = {
+  VENDOR: '業者',
+  CLEANING: '清掃',
+  OTHER: 'その他',
+};
+const STAFF_DOOR_LABEL: Record<StaffDoor, string> = {
+  ENTRANCE: 'ASP 玄関',
+  GYM: 'ASP 体育館',
+  TRAINING: 'ASP トレーニングルーム',
+  YABASE: 'やばせ',
+};
+const DOORS_BY_LOCATION: Record<LocationId, StaffDoor[]> = {
+  ASP: ['ENTRANCE', 'GYM', 'TRAINING'],
+  YABASE: ['YABASE'],
+};
+const WEEKDAYS: Array<{ key: Weekday; label: string }> = [
+  { key: 'mon', label: '月' }, { key: 'tue', label: '火' }, { key: 'wed', label: '水' },
+  { key: 'thu', label: '木' }, { key: 'fri', label: '金' }, { key: 'sat', label: '土' }, { key: 'sun', label: '日' },
+];
+
+const StaffAccessTab: React.FC = () => {
+  const [items, setItems] = React.useState<StaffAccess[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [showForm, setShowForm] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [issued, setIssued] = React.useState<StaffAccess | null>(null);
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const emptyForm = {
+    name: '',
+    kind: 'CLEANING' as StaffAccessKind,
+    location: 'ASP' as LocationId,
+    doors: ['ENTRANCE', 'GYM', 'TRAINING'] as StaffDoor[],
+    startDate: today,
+    endDate: format(new Date(new Date().getFullYear(), 11, 31), 'yyyy-MM-dd'),
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'] as Weekday[],
+    startTime: '09:00',
+    endTime: '12:00',
+    note: '',
+  };
+  const [form, setForm] = React.useState(emptyForm);
+
+  const load = () => {
+    adminApi.getStaffAccesses()
+      .then(setItems)
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  };
+  React.useEffect(load, []);
+
+  const toggle = <T,>(list: T[], v: T): T[] => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+
+  const changeLocation = (location: LocationId) => {
+    setForm({ ...form, location, doors: DOORS_BY_LOCATION[location] });
+  };
+
+  const handleCreate = async () => {
+    setError(null);
+    setIsSaving(true);
+    try {
+      const created = await adminApi.createStaffAccess({
+        name: form.name.trim(),
+        kind: form.kind,
+        location: form.location,
+        doors: form.doors,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        days: form.days,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        note: form.note.trim() || undefined,
+      });
+      setIssued(created);
+      setShowForm(false);
+      setForm(emptyForm);
+      load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (a: StaffAccess) => {
+    if (!confirm(`「${a.name}」のカギを無効にしますか？（すぐに開かなくなります）`)) return;
+    try {
+      await adminApi.deleteStaffAccess(a.id);
+      load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const dayLabel = (days: Weekday[]) => WEEKDAYS.filter((w) => days.includes(w.key)).map((w) => w.label).join('');
+  const isExpired = (a: StaffAccess) => a.endDate < today;
+  const canSubmit = form.name.trim() && form.doors.length > 0 && form.days.length > 0
+    && form.startDate && form.endDate && form.startDate <= form.endDate && form.startTime < form.endTime;
+
+  if (isLoading) return <Loading text="読み込み中..." />;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-600 leading-relaxed">
+        予約と関係なく、決めた曜日・時間帯だけ開く暗証番号を発行します。自販機の業者や清掃のシルバー人材の方に渡してください。
+      </p>
+
+      <Button onClick={() => { setShowForm(!showForm); setError(null); }}>
+        <FiPlus className="w-4 h-4" /> {showForm ? '閉じる' : 'カギを発行する'}
+      </Button>
+
+      {issued && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-2">
+          <p className="text-sm font-semibold text-emerald-800">カギを発行しました</p>
+          <p className="text-3xl font-bold tracking-widest text-emerald-900">{issued.pinCode}</p>
+          <p className="text-sm text-emerald-800">
+            {issued.name} / {dayLabel(issued.days)}曜 {issued.startTime}〜{issued.endTime} / {issued.startDate}〜{issued.endDate}
+          </p>
+          <p className="text-xs text-emerald-700">この番号を相手に伝えてください。一覧からいつでも確認できます。</p>
+          <button onClick={() => setIssued(null)} className="text-xs text-emerald-700 underline">閉じる</button>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="bg-white p-5 rounded-2xl shadow-card border border-gray-100 space-y-3">
+          <input
+            placeholder="名前（例: 清掃シルバー 佐藤さん / 自販機業者）" value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.kind}
+              onChange={(e) => setForm({ ...form, kind: e.target.value as StaffAccessKind })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              {(Object.keys(STAFF_KIND_LABEL) as StaffAccessKind[]).map((k) => (
+                <option key={k} value={k}>{STAFF_KIND_LABEL[k]}</option>
+              ))}
+            </select>
+            <select
+              value={form.location}
+              onChange={(e) => changeLocation(e.target.value as LocationId)}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              <option value="ASP">ASP</option>
+              <option value="YABASE">やばせ</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500">開けるドア</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {DOORS_BY_LOCATION[form.location].map((d) => (
+                <button
+                  key={d} type="button"
+                  onClick={() => setForm({ ...form, doors: toggle(form.doors, d) })}
+                  className={clsx(
+                    'px-3 py-1.5 rounded-lg text-sm border font-semibold',
+                    form.doors.includes(d) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300'
+                  )}
+                >
+                  {STAFF_DOOR_LABEL[d]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500">曜日</label>
+            <div className="grid grid-cols-7 gap-1 mt-1">
+              {WEEKDAYS.map((w) => (
+                <button
+                  key={w.key} type="button"
+                  onClick={() => setForm({ ...form, days: toggle(form.days, w.key) })}
+                  className={clsx(
+                    'py-2 rounded-lg text-sm border font-semibold',
+                    form.days.includes(w.key) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300'
+                  )}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500">入れる時間（から）</label>
+              <input type="time" value={form.startTime} step={900}
+                onChange={(e) => setForm({ ...form, startTime: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">入れる時間（まで）</label>
+              <input type="time" value={form.endTime} step={900}
+                onChange={(e) => setForm({ ...form, endTime: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500">有効期間（開始日）</label>
+              <input type="date" value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">有効期間（終了日）</label>
+              <input type="date" value={form.endDate}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+          </div>
+          <input
+            placeholder="メモ（任意）" value={form.note}
+            onChange={(e) => setForm({ ...form, note: e.target.value })}
+            className="w-full px-3 py-2 border rounded-lg text-sm"
+          />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <Button fullWidth onClick={handleCreate} disabled={!canSubmit || isSaving}>
+            {isSaving ? 'カギを発行中...' : '発行する'}
+          </Button>
+        </div>
+      )}
+
+      {items.length === 0 && !showForm && (
+        <p className="text-center text-gray-400 py-8">発行済みのカギはありません</p>
+      )}
+
+      {items.map((a) => (
+        <div
+          key={a.id}
+          className={clsx(
+            'bg-white p-4 rounded-2xl shadow-card border',
+            isExpired(a) ? 'border-gray-200 opacity-60' : 'border-gray-100'
+          )}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border bg-gray-50 text-gray-700 border-gray-200">
+                  {STAFF_KIND_LABEL[a.kind] || a.kind}
+                </span>
+                <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-600">
+                  {a.location === 'ASP' ? 'ASP' : 'やばせ'}
+                </span>
+                {isExpired(a) && (
+                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500">期限切れ</span>
+                )}
+              </div>
+              <h3 className="font-bold text-gray-900">{a.name}</h3>
+              <p className="text-xl font-bold tracking-widest text-gray-800 mt-1">{a.pinCode}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {dayLabel(a.days)}曜 {a.startTime}〜{a.endTime}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {a.startDate} 〜 {a.endDate} / {a.doors.map((d) => STAFF_DOOR_LABEL[d]).join('・')}
+              </p>
+              {a.note && <p className="text-xs text-gray-500 mt-1">{a.note}</p>}
+            </div>
+            <button
+              onClick={() => handleDelete(a)}
+              className="p-2 text-red-400 hover:text-red-600"
+              title="カギを無効にする"
+            >
+              <FiTrash2 className="w-4 h-4" />
+            </button>
           </div>
         </div>
       ))}
@@ -2210,6 +2486,7 @@ export const AdminPage: React.FC = () => {
             { key: 'notifications', icon: FiBell, label: '通知設定' },
             { key: 'facilities', icon: FiMapPin, label: '施設' },
             { key: 'pricing', icon: FiDollarSign, label: '料金' },
+            { key: 'staff', icon: FiKey, label: 'スタッフ入館' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -2237,6 +2514,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'notifications' && <NotificationSettingsTab />}
         {activeTab === 'facilities' && <FacilityProfilesTab />}
         {activeTab === 'pricing' && <PricingTab />}
+        {activeTab === 'staff' && <StaffAccessTab />}
       </main>
     </div>
   );

@@ -1152,6 +1152,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ message: 'Deleted' });
     }
 
+    // ============ スタッフ入館（業者・清掃のシルバー人材など：曜日・時間帯限定PIN） ============
+    if (action === 'staffAccesses' && req.method === 'GET') {
+      const snapshot = await db.collection(COLLECTIONS.STAFF_ACCESSES).get();
+      const items = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string; status?: string }))
+        .filter((a) => a.status !== 'DELETED')
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return res.status(200).json(items);
+    }
+
+    if (action === 'createStaffAccess' && req.method === 'POST') {
+      const { name, kind, location, doors, startDate, endDate, days, startTime, endTime, note } = req.body || {};
+      const VALID_DOORS = ['ENTRANCE', 'GYM', 'TRAINING', 'YABASE'];
+      const VALID_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      const isYmd = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+      const isHm = (v: unknown) => typeof v === 'string' && /^\d{2}:\d{2}$/.test(v);
+      if (!name || !location || !isYmd(startDate) || !isYmd(endDate) || !isHm(startTime) || !isHm(endTime)) {
+        return res.status(400).json({ error: '名前・拠点・期間・時間帯を入力してください' });
+      }
+      if (endDate < startDate) return res.status(400).json({ error: '終了日は開始日以降にしてください' });
+      if (endTime <= startTime) return res.status(400).json({ error: '終了時刻は開始時刻より後にしてください' });
+      const doorList: string[] = Array.isArray(doors) ? doors.filter((d: string) => VALID_DOORS.includes(d)) : [];
+      const dayList: string[] = Array.isArray(days) ? days.filter((d: string) => VALID_DAYS.includes(d)) : [];
+      if (doorList.length === 0) return res.status(400).json({ error: 'ドアを1つ以上選んでください' });
+      if (dayList.length === 0) return res.status(400).json({ error: '曜日を1つ以上選んでください' });
+
+      const { createStaffAccess, isRemoteLockConfigured } = await import('../server-lib/remotelock.js');
+      if (!isRemoteLockConfigured()) return res.status(501).json({ error: 'RemoteLock が設定されていません' });
+      let lock;
+      try {
+        lock = await createStaffAccess({
+          name: String(name),
+          doors: doorList as import('../server-lib/remotelock.js').StaffDoor[],
+          startDate, endDate,
+          days: dayList as import('../server-lib/remotelock.js').Weekday[],
+          startTime, endTime,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('RemoteLock error (createStaffAccess):', e);
+        return res.status(502).json({ error: `カギの発行に失敗しました: ${msg}` });
+      }
+
+      const now = new Date().toISOString();
+      const data = {
+        name: String(name),
+        kind: kind || 'OTHER',
+        location,
+        doors: doorList,
+        startDate, endDate,
+        days: dayList,
+        startTime, endTime,
+        pinCode: lock.pinCode,
+        accessPersonId: lock.accessPersonId,
+        scheduleId: lock.scheduleId,
+        status: 'ACTIVE',
+        note: note || null,
+        createdBy: admin.lineUserId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const ref = await db.collection(COLLECTIONS.STAFF_ACCESSES).add(data);
+      return res.status(201).json({ id: ref.id, ...data });
+    }
+
+    if (action === 'deleteStaffAccess' && req.method === 'DELETE') {
+      const staffAccessId = req.query.staffAccessId as string;
+      if (!staffAccessId) return res.status(400).json({ error: 'Missing staffAccessId' });
+      const doc = await db.collection(COLLECTIONS.STAFF_ACCESSES).doc(staffAccessId).get();
+      if (!doc.exists) return res.status(404).json({ error: 'Not found' });
+      const data = doc.data() as { accessPersonId?: string; scheduleId?: string };
+      if (data.accessPersonId) {
+        const { deactivateStaffAccess } = await import('../server-lib/remotelock.js');
+        await deactivateStaffAccess(data.accessPersonId, data.scheduleId);
+      }
+      await db.collection(COLLECTIONS.STAFF_ACCESSES).doc(staffAccessId).update({
+        status: 'DELETED', updatedAt: new Date().toISOString(),
+      });
+      return res.status(200).json({ message: 'Deleted' });
+    }
+
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (error) {
     console.error('Admin API error:', error);
