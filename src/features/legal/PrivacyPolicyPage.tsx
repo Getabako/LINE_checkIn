@@ -4,7 +4,7 @@ import { Header } from '../../components/common/Header';
 export const PrivacyPolicyPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-      <Header title="プライバシーポリシー" showBack />
+      <Header title="プライバシーポリシー" showBack={window.history.length > 1} />
 
       <main className="p-4 pb-12">
         <div className="bg-white rounded-2xl shadow-card border border-gray-100/50 p-5 space-y-5 text-sm text-gray-700 leading-relaxed">

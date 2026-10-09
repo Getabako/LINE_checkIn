@@ -33,6 +33,12 @@ const queryClient = new QueryClient({
 
 const log = createLogger('App');
 
+// LINE認証なしで閲覧できる公開ページ（特商法表記・プライバシーポリシー）
+// PayPay/Stripe等の審査担当者が外部ブラウザから直接確認できるようにする
+const PUBLIC_PATHS = ['/commerce-law', '/privacy'];
+const isPublicPath = (pathname: string) =>
+  PUBLIC_PATHS.some((p) => pathname === p || pathname === `${p}/`);
+
 const App: React.FC = () => {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +46,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       log.op('app.boot');
+      if (isPublicPath(window.location.pathname)) {
+        log.op('app.publicPage', { path: window.location.pathname });
+        setIsLiffReady(true);
+        return;
+      }
       try {
         log.debug('liff.init start');
         await initializeLiff();

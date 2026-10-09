@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>画面遷移図 みんなの体育館</title>
+<style>
+@page { size: A4 landscape; margin: 10mm; }
+html { font-size: 12px; }
+body { margin:0; font-family: "Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; color:#222; letter-spacing:0.03em; line-height:1.7; }
+.page { width: 277mm; height: 190mm; page-break-after: always; display:flex; flex-direction:column; box-sizing:border-box; }
+.page:last-child { page-break-after: auto; }
+h1 { text-align:center; font-size: 22px; margin: 0 0 4px; letter-spacing:0.1em; }
+.rule { border-bottom: 2px solid #c0392b; margin-bottom: 8px; }
+.meta { display:flex; justify-content:space-between; font-size: 11px; color:#444; margin-bottom:6px; }
+.instr { border:1.5px solid #333; text-align:center; font-weight:bold; padding:4px; font-size:13px; margin-bottom:8px; }
+.cols { display:grid; grid-template-columns: repeat(6, 1fr); gap: 8px; flex:1; min-height:0; }
+.col { display:flex; flex-direction:column; min-height:0; }
+.label { border:1.5px solid #333; text-align:center; font-size: 11.5px; font-weight:bold; padding:3px 2px; line-height:1.4; height: 34px; display:flex; align-items:center; justify-content:center; }
+.shot { flex:1; min-height:0; margin-top:6px; border:1px solid #999; background:#eee; display:flex; align-items:flex-start; justify-content:center; overflow:hidden; }
+.shot img { width:100%; height:100%; object-fit:contain; object-position: top center; background:#fff; display:block; }
+.note { font-size: 10.5px; color:#333; margin-top:4px; line-height:1.5; }
+.arrow { text-align:center; color:#c0392b; font-weight:bold; font-size:11px; margin-top:4px; }
+.box { border:1px solid #999; padding:8px 12px; margin-top:8px; font-size:11.5px; }
+.box h2 { font-size:13px; margin:0 0 4px; }
+.box ul { margin:0; padding-left:18px; }
+.two { display:grid; grid-template-columns: 1fr 1.6fr; gap:14px; flex:1; min-height:0; }
+.two .shot { height: 100%; }
+table { border-collapse: collapse; width:100%; font-size:11.5px; }
+td, th { border:1px solid #999; padding:4px 8px; text-align:left; vertical-align:top; }
+th { background:#f3f3f3; width: 34%; }
+</style></head><body>
+
+<section class="page">
+  <h1>画面遷移図</h1>
+  <div class="rule"></div>
+  <div class="meta"><span>加盟店名: 株式会社Local Power（サービス名: みんなの体育館 ／ 無人体育館・トレーニングルーム予約システム）</span><span>作成日: 2026年10月9日</span></div>
+  <div class="instr">請求発生から支払の具体的な流れ（LINEミニアプリ内で予約〜決済〜入館用暗証番号の発行まで完結）</div>
+  <div class="cols">
+    <div class="col"><div class="label">1. サイトトップ<br>（加盟店名・ロゴあり）</div><div class="shot"><img src="01_top.png"></div><div class="note">LINEログイン後に表示。拠点（ASP／やばせ）を選択。</div></div>
+    <div class="col"><div class="label">2. 施設・料金の確認</div><div class="shot"><img src="02_facility.png"></div><div class="note">利用施設を選択。税込料金表を表示。</div></div>
+    <div class="col"><div class="label">3. 日時選択<br>（＝商品をカートに入れる）</div><div class="shot"><img src="03_checkin.png"></div><div class="note">空き枠をタップし、利用時間を選択。金額を即時表示。</div></div>
+    <div class="col"><div class="label">4. ご利用内容確認・<br>支払方法の案内</div><div class="shot"><img src="04b_payment_methods.png"></div><div class="note">予約内容と金額を確認し「お支払いへ進む」。</div></div>
+    <div class="col"><div class="label">5. 支払方法選択・決済<br>（Stripe Checkout）</div><div class="shot"><img src="05_stripe.png"></div><div class="note">Stripeのホスト型決済画面へ遷移。PayPay有効化後はここにPayPayが表示される。</div></div>
+    <div class="col"><div class="label">6. 購入（予約）完了</div><div class="shot"><img src="06_complete.png"></div><div class="note">決済完了後に入館用の4桁暗証番号を発行し、LINEにも通知。</div></div>
+  </div>
+</section>
+
+<section class="page">
+  <h1>補足資料</h1>
+  <div class="rule"></div>
+  <div class="two">
+    <div class="col">
+      <div class="label">特定商取引法に基づく表記ページ</div>
+      <div class="shot"><img src="07_commerce_law.png"></div>
+      <div class="note">URL: https://gym-checkin.vercel.app/commerce-law（LINE認証不要・外部ブラウザから閲覧可）</div>
+    </div>
+    <div class="col">
+      <div class="box">
+        <h2>サービス概要</h2>
+        <table>
+          <tr><th>サービス名</th><td>みんなの体育館（みんなの体育館 ASP／みんなの体育館 やばせ）</td></tr>
+          <tr><th>運営事業者</th><td>株式会社Local Power（秋田県秋田市八橋大畑2-3-1 White Cube 1F）</td></tr>
+          <tr><th>取扱商材</th><td>体育館・トレーニングルームの時間貸し利用料（1時間単位、税込）</td></tr>
+          <tr><th>提供形態</th><td>LINEミニアプリ（LIFF）。利用者はLINEアカウントでログインして予約・決済を行う</td></tr>
+          <tr><th>決済方法</th><td>Stripe Checkout による事前決済（クレジットカード、PayPay ※有効化後）</td></tr>
+          <tr><th>決済タイミング</th><td>予約確定時に全額を即時決済。決済完了と同時に入館用暗証番号を発行</td></tr>
+          <tr><th>商品の引渡し</th><td>予約日時に現地の電子ロックへ暗証番号を入力して入館（暗証番号は開始10分前〜終了時刻まで有効）</td></tr>
+          <tr><th>キャンセル</th><td>利用日前日まで無料（アプリ内から全額返金）。当日は100%</td></tr>
+          <tr><th>領収書</th><td>予約完了画面・マイ予約からPDF発行、メール送信に対応</td></tr>
+        </table>
+      </div>
+      <div class="box">
+        <h2>決済画面へ外部からアクセスできない理由</h2>
+        <ul>
+          <li>本サービスはLINEミニアプリとして提供しており、予約・決済画面はLINEログイン（LIFF認証）を行った利用者本人のみが利用できます。</li>
+          <li>決済そのものはStripeがホストするCheckout画面（checkout.stripe.com）で行われ、カード情報等は当社サーバーを経由しません。</li>
+          <li>特定商取引法に基づく表記ページとプライバシーポリシーは認証なしで公開しています。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+</body></html>

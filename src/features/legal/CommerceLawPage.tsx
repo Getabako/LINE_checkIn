@@ -11,7 +11,7 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
 export const CommerceLawPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-      <Header title="特定商取引法に基づく表記" showBack />
+      <Header title="特定商取引法に基づく表記" showBack={window.history.length > 1} />
 
       <main className="p-4 pb-12">
         <div className="bg-white rounded-2xl shadow-card border border-gray-100/50 p-5">
