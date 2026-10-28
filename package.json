@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@holiday-jp/holiday_jp": "^2.5.1",
-    "@line/liff": "^2.24.0",
+    "@line/liff": "2.31.2",
     "@pdf-lib/fontkit": "^1.1.1",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.7.9",
