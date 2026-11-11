@@ -355,30 +355,13 @@ export const PaymentPage: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-primary-50 to-sky-50 rounded-xl border border-primary-200 transition-all duration-300">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-400 rounded-xl flex items-center justify-center shadow-sm">
-                    <FiCreditCard className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900 text-sm">クレジットカード</p>
-                  </div>
-                  <FiCheckCircle className="w-5 h-5 text-primary-500" />
-                </div>
-                <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border border-red-200 transition-all duration-300">
-                  <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-400 rounded-xl flex items-center justify-center shadow-sm">
-                    <span className="text-white font-bold text-xs">Pay</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900 text-sm">PayPay</p>
-                  </div>
-                  <FiCheckCircle className="w-5 h-5 text-red-500" />
-                </div>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-3 text-center">
-                決済画面でお支払い方法を選択できます
+              <p className="text-gray-700 leading-relaxed" style={{ fontSize: '15px' }}>
+                次の画面で、以下のお支払い方法が選択できます。
               </p>
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400 justify-center">
+              <p className="text-gray-900 font-bold mt-2 leading-relaxed" style={{ fontSize: '15px' }}>
+                クレジットカード、Apple Pay、PayPay
+              </p>
+              <div className="flex items-center gap-1.5 mt-4 text-xs text-gray-400">
                 <FiShield className="w-3.5 h-3.5" />
                 <span>安全な暗号化通信で保護されています</span>
               </div>

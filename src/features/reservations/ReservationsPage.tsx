@@ -105,13 +105,16 @@ export const ReservationsPage: React.FC = () => {
   }, [fetchCheckins]);
 
   const handleCancel = async (id: string) => {
-    if (!confirm('この予約をキャンセルしますか？')) return;
+    if (!confirm('この予約をキャンセルしますか？\nお支払い済みの料金は自動で返金されます。')) return;
 
     setCancellingId(id);
     setError(null);
     try {
-      await checkinApi.cancel(id);
+      const result = await checkinApi.cancel(id);
       await fetchCheckins();
+      if (result?.refunded) {
+        alert(`キャンセルしました。¥${(result.refundAmount ?? 0).toLocaleString()} を返金しました。\n（カード会社・PayPayへの反映まで数日かかる場合があります）`);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'キャンセルに失敗しました';
       setError(msg);

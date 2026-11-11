@@ -129,9 +129,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      if (checkinData.status === 'CANCELLED') {
+        return res.status(400).json({ error: 'この予約は既にキャンセル済みです' });
+      }
+
+      // Stripe 自動返金（失敗したらキャンセル自体を止め、再試行できるようにする）
+      const { refundCheckin } = await import('../../server-lib/refund.js');
+      let refund: Awaited<ReturnType<typeof refundCheckin>>;
+      try {
+        refund = await refundCheckin(id, checkinData);
+      } catch (e) {
+        console.error('Refund error:', e);
+        return res.status(500).json({
+          error: '返金処理に失敗したため、キャンセルできませんでした。時間をおいて再度お試しいただくか、施設までお問い合わせください',
+        });
+      }
+
+      // 発行済みの暗証番号（RemoteLock）を無効化
+      if (!checkinData.skipRemoteLock) {
+        try {
+          const { cancelBooking, isRemoteLockConfigured } = await import('../../server-lib/remotelock.js');
+          if (isRemoteLockConfigured()) await cancelBooking(id, 0);
+        } catch (e) {
+          console.error('RemoteLock cancel error:', e);
+        }
+      }
+
       await checkinDoc.ref.update({
         status: 'CANCELLED',
         updatedAt: new Date().toISOString(),
+        cancelledAt: new Date().toISOString(),
+        ...(refund.refunded
+          ? { refundId: refund.refundId, refundAmount: refund.amount, refundedAt: new Date().toISOString() }
+          : {}),
       });
 
       // キャンセル完了をLINEで通知
@@ -142,7 +172,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.error('notify error (cancel):', e);
       }
 
-      return res.status(200).json({ message: 'Cancelled successfully' });
+      return res.status(200).json({
+        message: 'Cancelled successfully',
+        refunded: refund.refunded,
+        refundAmount: refund.amount ?? 0,
+      });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
