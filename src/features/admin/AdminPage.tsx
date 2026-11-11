@@ -1,13 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign, FiKey } from 'react-icons/fi';
+import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign, FiKey, FiShield, FiCopy } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { useUserStore } from '../../stores/userStore';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
+import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, AdminMember, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
@@ -33,7 +33,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing' | 'staff';
+type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing' | 'staff' | 'admins';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -598,6 +598,8 @@ const SalesTab: React.FC = () => {
             </div>
           </div>
 
+          <SalesExportUrlCard />
+
           {/* 棒グラフ */}
           <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-3">
             {entries.length === 0 ? (
@@ -621,6 +623,253 @@ const SalesTab: React.FC = () => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+
+// ============ RPA向け 売上CSVの専用URL ============
+const SalesExportUrlCard: React.FC = () => {
+  const [url, setUrl] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  const load = async () => {
+    setBusy(true);
+    try {
+      setUrl((await adminApi.getSalesExportUrl()).url);
+      setOpen(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'URLの取得に失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const regenerate = async () => {
+    if (!confirm('URLを作り直しますか？\n今のURLは使えなくなります（RPAの設定も新しいURLに変更が必要です）')) return;
+    setBusy(true);
+    try {
+      setUrl((await adminApi.regenerateSalesExportUrl()).url);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="panel">
+      <div className="panel-header">
+        <FiDownload className="w-4 h-4" />
+        RPA用 売上CSVのURL
+      </div>
+      <div className="panel-body space-y-3">
+        <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
+          このURLを開くだけで、前日分の売上（決済・返金）CSVがダウンロードされます。LINEログインは不要です。
+          末尾に <code className="bg-gray-100 px-1 rounded">&amp;date=2026-12-01</code> を付けると日付を指定できます。
+        </p>
+        {!open ? (
+          <button
+            onClick={load}
+            disabled={busy}
+            className="w-full py-2.5 rounded-lg bg-gray-800 text-white text-sm font-semibold disabled:opacity-40"
+          >
+            {busy ? '取得中...' : 'URLを表示'}
+          </button>
+        ) : (
+          <>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 break-all text-xs text-gray-700">{url}</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={copy}
+                className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-primary-500 text-white text-sm font-semibold"
+              >
+                <FiCopy className="w-4 h-4" />
+                {copied ? 'コピーしました' : 'コピー'}
+              </button>
+              <button
+                onClick={regenerate}
+                disabled={busy}
+                className="py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold disabled:opacity-40"
+              >
+                URLを作り直す
+              </button>
+            </div>
+            <p className="text-xs text-red-500 leading-relaxed">
+              このURLを知っている人は誰でも売上を見られます。社外の人には共有しないでください。漏れた場合は「URLを作り直す」を押してください。
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============ 管理者タブ ============
+const AdminUsersTab: React.FC = () => {
+  const [admins, setAdmins] = React.useState<AdminMember[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [search, setSearch] = React.useState('');
+  const [results, setResults] = React.useState<AdminUser[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const [busyId, setBusyId] = React.useState('');
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      setAdmins(await adminApi.getAdminUsers());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const doSearch = async () => {
+    if (!search.trim()) return;
+    setSearching(true);
+    try {
+      setResults(await adminApi.getUsers(search.trim()));
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const add = async (u: AdminUser) => {
+    if (!confirm(`${u.name || u.displayName} さんを管理者にしますか？\n管理画面のすべての操作（予約・売上・会員の閲覧と編集）ができるようになります。`)) return;
+    setBusyId(u.lineUserId);
+    try {
+      await adminApi.addAdminUser(u.lineUserId);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '追加に失敗しました');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const remove = async (a: AdminMember) => {
+    if (!confirm(`${a.name || a.displayName || 'この方'} を管理者から外しますか？`)) return;
+    setBusyId(a.lineUserId);
+    try {
+      await adminApi.removeAdminUser(a.lineUserId);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '削除に失敗しました');
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const adminIds = new Set(admins.map((a) => a.lineUserId));
+
+  return (
+    <div className="space-y-6">
+      <div className="panel">
+        <div className="panel-header">
+          <FiShield className="w-4 h-4" />
+          管理者一覧
+        </div>
+        <div className="panel-body">
+          {loading ? (
+            <Loading />
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {admins.map((a) => (
+                <li key={a.lineUserId} className="flex items-center gap-3 py-3">
+                  {a.pictureUrl ? (
+                    <img src={a.pictureUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                      <FiUser className="w-5 h-5 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 truncate" style={{ fontSize: '15px' }}>
+                      {a.name || a.displayName || '（未登録のユーザー）'}
+                      {a.isSelf && <span className="ml-2 text-xs text-primary-600">あなた</span>}
+                    </p>
+                    {a.name && a.displayName && <p className="text-xs text-gray-500 truncate">LINE名: {a.displayName}</p>}
+                  </div>
+                  {a.fixed ? (
+                    <span className="text-[11px] text-gray-400 text-right leading-tight">システム設定<br />（削除不可）</span>
+                  ) : a.isSelf ? null : (
+                    <button
+                      onClick={() => remove(a)}
+                      disabled={busyId === a.lineUserId}
+                      className="flex items-center gap-1 text-sm text-red-500 border border-red-200 rounded-lg px-3 py-1.5 disabled:opacity-40"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                      外す
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <FiPlus className="w-4 h-4" />
+          管理者を追加
+        </div>
+        <div className="panel-body space-y-3">
+          <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
+            追加したい方に、先に一度このミニアプリを開いてもらってから、名前で検索してください。
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+              placeholder="名前・LINE名で検索"
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5"
+              style={{ fontSize: '16px' }}
+            />
+            <button
+              onClick={doSearch}
+              disabled={searching}
+              className="flex items-center gap-1 px-4 rounded-lg bg-gray-800 text-white text-sm font-semibold disabled:opacity-40"
+            >
+              <FiSearch className="w-4 h-4" />
+              検索
+            </button>
+          </div>
+          {results.length > 0 && (
+            <ul className="divide-y divide-gray-100 border border-gray-100 rounded-lg">
+              {results
+                .filter((u) => !!u.lineUserId)
+                .map((u) => (
+                  <li key={u.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate" style={{ fontSize: '15px' }}>{u.name || u.displayName}</p>
+                      {u.name && <p className="text-xs text-gray-500 truncate">LINE名: {u.displayName}</p>}
+                    </div>
+                    {adminIds.has(u.lineUserId) ? (
+                      <span className="text-xs text-gray-400">管理者</span>
+                    ) : (
+                      <button
+                        onClick={() => add(u)}
+                        disabled={busyId === u.lineUserId}
+                        className="text-sm text-white bg-primary-500 rounded-lg px-3 py-1.5 disabled:opacity-40"
+                      >
+                        管理者にする
+                      </button>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -2487,6 +2736,7 @@ export const AdminPage: React.FC = () => {
             { key: 'facilities', icon: FiMapPin, label: '施設' },
             { key: 'pricing', icon: FiDollarSign, label: '料金' },
             { key: 'staff', icon: FiKey, label: 'スタッフ入館' },
+            { key: 'admins', icon: FiShield, label: '管理者' },
           ] as const).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -2515,6 +2765,7 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'facilities' && <FacilityProfilesTab />}
         {activeTab === 'pricing' && <PricingTab />}
         {activeTab === 'staff' && <StaffAccessTab />}
+        {activeTab === 'admins' && <AdminUsersTab />}
       </main>
     </div>
   );

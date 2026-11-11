@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, COLLECTIONS } from '../../server-lib/db.js';
-import { verifyLiffToken, isAdminUserId } from '../../server-lib/auth.js';
+import { verifyLiffToken, isAdmin } from '../../server-lib/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 管理者フラグ（画面の管理者モード切替に使用。権限チェック自体は各 API 側で行う）
-    return res.status(200).json({ ...userData, isAdmin: isAdminUserId(profile.userId) });
+    return res.status(200).json({ ...userData, isAdmin: await isAdmin(profile.userId) });
   } catch (error) {
     console.error('API Error:', error);
     return res.status(500).json({ error: 'Internal server error' });

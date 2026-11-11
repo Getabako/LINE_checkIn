@@ -1,13 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getDb, COLLECTIONS, type Query as DbQuery } from '../server-lib/db.js';
-import { verifyLiffToken, isAdminUserId } from '../server-lib/auth.js';
+import { verifyLiffToken, isAdmin } from '../server-lib/auth.js';
 
 async function verifyAdmin(req: VercelRequest): Promise<{ userId: string; lineUserId: string } | null> {
   const profile = await verifyLiffToken(req.headers.authorization);
   if (!profile) return null;
 
   // ADMIN_LINE_USER_IDS 未設定時は全員拒否（以前は全員許可だった）
-  if (!isAdminUserId(profile.userId)) {
+  if (!(await isAdmin(profile.userId))) {
     return null;
   }
 
@@ -34,6 +34,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const db = getDb();
+
+    // ============ RPA向け 日次売上CSV（LINEログイン不要・専用トークンURL） ============
+    if (action === 'salesCsv' && req.method === 'GET') {
+      const { verifySalesExportToken, buildDailySalesCsv, yesterdayJst } = await import('../server-lib/salesExport.js');
+      if (!(await verifySalesExportToken(req.query.token as string | undefined))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const dateParam = (req.query.date as string) || '';
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : yesterdayJst();
+      const csv = await buildDailySalesCsv(date);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="sales_${date}.csv"`);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).send(csv);
+    }
 
     // ============ お知らせ公開取得（認証不要） ============
     if (action === 'announcementsPublic' && req.method === 'GET') {
@@ -156,6 +171,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const admin = await verifyAdmin(req);
     if (!admin) {
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    // ============ 管理者の管理（管理画面で追加・削除） ============
+    if (action === 'adminUsers' && req.method === 'GET') {
+      const { getAdminUserIds, getDashboardAdminUserIds } = await import('../server-lib/auth.js');
+      const fixed = getAdminUserIds();
+      const dashboard = await getDashboardAdminUserIds();
+      const all = Array.from(new Set([...fixed, ...dashboard]));
+      const snap = all.length
+        ? await db.collection(COLLECTIONS.USERS).where('lineUserId', 'in', all).get()
+        : { docs: [] as Array<{ id: string; data: () => Record<string, unknown> }> };
+      const byLine = new Map<string, Record<string, unknown>>();
+      for (const d of snap.docs) {
+        const u = d.data();
+        byLine.set(u.lineUserId as string, { id: d.id, ...u });
+      }
+      const items = all.map((lineUserId) => {
+        const u = byLine.get(lineUserId);
+        return {
+          lineUserId,
+          displayName: (u?.displayName as string) || '',
+          name: (u?.name as string) || '',
+          pictureUrl: (u?.pictureUrl as string) || '',
+          fixed: fixed.includes(lineUserId),
+          isSelf: lineUserId === admin.lineUserId,
+        };
+      });
+      return res.status(200).json(items);
+    }
+    if (action === 'addAdminUser' && req.method === 'POST') {
+      const { lineUserId } = req.body || {};
+      if (!lineUserId || typeof lineUserId !== 'string') return res.status(400).json({ error: 'Missing lineUserId' });
+      const u = await db.collection(COLLECTIONS.USERS).where('lineUserId', '==', lineUserId).limit(1).get();
+      if (u.empty) return res.status(404).json({ error: 'このユーザーはまだアプリを利用していません' });
+      const { getDashboardAdminUserIds, saveDashboardAdminUserIds } = await import('../server-lib/auth.js');
+      const saved = await saveDashboardAdminUserIds([...(await getDashboardAdminUserIds()), lineUserId]);
+      return res.status(200).json({ lineUserIds: saved });
+    }
+    if (action === 'removeAdminUser' && req.method === 'DELETE') {
+      const lineUserId = req.query.lineUserId as string;
+      if (!lineUserId) return res.status(400).json({ error: 'Missing lineUserId' });
+      const { getAdminUserIds, getDashboardAdminUserIds, saveDashboardAdminUserIds } = await import('../server-lib/auth.js');
+      if (getAdminUserIds().includes(lineUserId)) {
+        return res.status(400).json({ error: 'この管理者はシステム設定で登録されているため、画面からは削除できません' });
+      }
+      if (lineUserId === admin.lineUserId) {
+        return res.status(400).json({ error: '自分自身は削除できません。他の管理者に依頼してください' });
+      }
+      const saved = await saveDashboardAdminUserIds((await getDashboardAdminUserIds()).filter((id) => id !== lineUserId));
+      return res.status(200).json({ lineUserIds: saved });
+    }
+
+    // ============ RPA向け売上CSV URL（管理者が確認・再発行） ============
+    if (action === 'salesExportUrl' && (req.method === 'GET' || req.method === 'POST')) {
+      const { getSalesExportToken, regenerateSalesExportToken } = await import('../server-lib/salesExport.js');
+      const token = req.method === 'POST' ? await regenerateSalesExportToken() : await getSalesExportToken();
+      const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+      const base = process.env.NEXT_PUBLIC_BASE_URL || `${proto}://${req.headers.host}`;
+      return res.status(200).json({ url: `${base}/api/admin?action=salesCsv&token=${token}` });
     }
 
     // ============ 会員種別申請（管理者） ============

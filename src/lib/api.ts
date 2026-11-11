@@ -74,6 +74,15 @@ export interface User {
 }
 
 // 管理画面で扱うユーザー（Laboraインポート項目を含む）
+export interface AdminMember {
+  lineUserId: string;
+  displayName: string;
+  name: string;
+  pictureUrl: string;
+  fixed: boolean; // システム設定（環境変数）で登録＝画面から削除不可
+  isSelf: boolean;
+}
+
 export interface AdminUser {
   id: string;
   lineUserId: string;
@@ -585,6 +594,15 @@ export const adminApi = {
   // 自分（管理者）を会員に付与
   assignSelfMembership: (data: { memberTypeId: string; startDate?: string | null; endDate?: string | null }) =>
     api.post<UserMembership>('/admin?action=assignSelfMembership', data),
+
+  // 管理者の管理
+  getAdminUsers: () => api.get<AdminMember[]>('/admin?action=adminUsers'),
+  addAdminUser: (lineUserId: string) => api.post<{ lineUserIds: string[] }>('/admin?action=addAdminUser', { lineUserId }),
+  removeAdminUser: (lineUserId: string) =>
+    api.delete<{ lineUserIds: string[] }>(`/admin?action=removeAdminUser&lineUserId=${encodeURIComponent(lineUserId)}`),
+  // RPA向け 日次売上CSVの専用URL（POSTで再発行）
+  getSalesExportUrl: () => api.get<{ url: string }>('/admin?action=salesExportUrl'),
+  regenerateSalesExportUrl: () => api.post<{ url: string }>('/admin?action=salesExportUrl', {}),
 
   // ユーザー会員区分の付与
   getUsers: (search?: string) => {
