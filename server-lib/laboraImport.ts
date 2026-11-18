@@ -100,6 +100,11 @@ interface MemberTypeDoc {
   trainingDiscountType?: string;
   trainingDiscountValue?: number;
   monthlyCoversTraining?: boolean;
+  // 施設別の設定が無い会員区分は、共通の割引設定を使う（決済側と同じ後方互換）
+  discountType?: string;
+  discountValue?: number;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 /** 料金表＋会員区分の割引から、アプリで予約した場合と同じ金額を出す */
@@ -126,10 +131,15 @@ function computePrice(
   let discount = 0;
   if (memberType) {
     const isGym = facilityType === 'GYM';
+    const facilityTypeSetting = isGym ? memberType.gymDiscountType : memberType.trainingDiscountType;
     const type = !isGym && memberType.monthlyCoversTraining
       ? 'FREE'
-      : (isGym ? memberType.gymDiscountType : memberType.trainingDiscountType);
-    const value = Number(isGym ? memberType.gymDiscountValue : memberType.trainingDiscountValue) || 0;
+      : (facilityTypeSetting || memberType.discountType || 'NONE');
+    const value = Number(
+      facilityTypeSetting
+        ? (isGym ? memberType.gymDiscountValue : memberType.trainingDiscountValue)
+        : memberType.discountValue,
+    ) || 0;
     if (type === 'FREE') discount = original;
     else if (type === 'PERCENTAGE') discount = Math.floor(original * (value / 100));
     else if (type === 'FIXED_PER_HOUR') discount = Math.min(original, Math.abs(value) * duration);
@@ -180,10 +190,17 @@ export async function importLaboraReservations(params: {
     .map((d): CheckinDoc => ({ id: d.id, ...d.data() }))
     .filter((u) => !u.deletedAt);
   const typeByCode = new Map<string, MemberTypeDoc>();
-  typesSnap.docs.forEach((d) => {
-    const t = { id: d.id, ...d.data() } as MemberTypeDoc;
-    if (t.code) typeByCode.set(t.code, t);
-  });
+  // 同じコードの会員区分が複数あるときは、名前にコードを含むもの（例:「S-01（定期）」）を優先し、
+  // 次に並び順の早いものを使う（どれが選ばれるかを毎回同じにする）
+  const types = typesSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as MemberTypeDoc))
+    .filter((t) => t.code && t.isActive !== false)
+    .sort((a, b) => {
+      const na = (a.name || '').includes(a.code!) ? 0 : 1;
+      const nb = (b.name || '').includes(b.code!) ? 0 : 1;
+      return na - nb || (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.id.localeCompare(b.id);
+    });
+  for (const t of types) if (!typeByCode.has(t.code!)) typeByCode.set(t.code!, t);
   const hasMembership = new Set<string>();
   memSnap.docs.forEach((d) => {
     const m = d.data();
