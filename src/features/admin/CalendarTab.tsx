@@ -186,8 +186,7 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
         const skipped = result.skippedDates?.length
           ? `\n重複のためスキップ: ${result.skippedDates.join(', ')}`
           : '';
-        const pin = result.pinCode ? `（解錠コード: ${result.pinCode} で全日程共通）` : '';
-        alert(`${result.createdCount}件の予約を登録しました${pin}${skipped}`);
+        alert(`${result.createdCount}件の予約を登録しました。\n解錠コードは日ごとに異なります（カレンダーの各予約、または利用者のマイ予約で確認できます）。${skipped}`);
       }
       if (lockFailed > 0) {
         alert(`予約は登録しましたが、${lockFailed}件でスマートロックへの鍵の登録に失敗しました。\n会員タブの「LaBOLA予約の取り込み」にある「鍵の登録をやり直す」から再実行できます。`);

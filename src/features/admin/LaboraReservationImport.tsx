@@ -222,7 +222,7 @@ export const LaboraReservationImport: React.FC = () => {
       <div className="panel-body space-y-4">
         <p className="text-gray-600">
           LaBOLA の「予約一覧（詳細）」CSV から、指定した日以降の予約をまとめて登録します。
-          決済は発生せず、団体ごとに全日程共通の解錠コードを発行します。
+          決済は発生せず、予約ごとに解錠コードを発行します（同じ日の連続した枠は1つのコード）。
           同じCSVを取り込み直しても二重登録にはなりません。
         </p>
 
@@ -302,7 +302,6 @@ export const LaboraReservationImport: React.FC = () => {
             </p>
             <p className="text-gray-800">
               鍵の登録 {result.lockRegistered}件
-              {result.pinChanged > 0 && ` / うち ${result.pinChanged}件は団体共通とは別の解錠コードになりました`}
             </p>
             {(result.lockFailed > 0 || result.lockRemaining > 0) && (
               <p className="text-red-600 font-semibold">
@@ -348,9 +347,11 @@ export const LaboraReservationImport: React.FC = () => {
                       </p>
                       <p className="text-gray-800">
                         解錠コード:{' '}
-                        {s.pins.length > 0
-                          ? <span className="font-mono font-bold tracking-widest text-primary-700">{s.pins.join(' / ')}</span>
-                          : <span className="text-amber-700">未登録</span>}
+                        {s.pins.length === 0
+                          ? <span className="text-amber-700">未登録</span>
+                          : s.pins.length <= 2
+                            ? <span className="font-mono font-bold tracking-widest text-primary-700">{s.pins.join(' / ')}</span>
+                            : <span>予約ごとに発行済み（{s.pins.length}種類）</span>}
                         {s.pending + s.failed > 0 && <span className="text-red-600">（鍵の未登録 {s.pending + s.failed}件）</span>}
                       </p>
                     </div>

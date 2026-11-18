@@ -6,12 +6,12 @@
 //   lockState='PENDING' を付け、registerPendingLocks() を時間の許す範囲で繰り返し呼ぶ。
 //
 // 暗証番号の決め方:
-//   - 同じ pinGroup（= 同じ団体の定期予約）は全日程で同じ暗証番号にする
-//     （最初の 1 件で RemoteLock が発行した番号を、以降の予約で指定する）
+//   - 暗証番号は鍵（RemoteLock の booking）ごとに RemoteLock が発行したものを使う。
+//     2026-11-18 に本番で確認: RemoteLock は日付や時間帯が違っても、すでに使われている番号の指定を
+//     受け付けず「PIN has already been taken」で別の番号に差し替える。つまり booking 方式では
+//     「同じ団体は全日程同じ番号」にできない（番号の指定はしない）
 //   - 同じ団体が同じ日に連続・同時で使う枠（例: 体育館 17-19 と 19-21、体育館とトレーニングルーム同時）は
-//     1 つの鍵にまとめる。RemoteLock は同じ時間帯に同じ暗証番号の鍵を 2 つ作れず、
-//     勝手に別の番号へ差し替えるため（10 分前から有効にしているので連続枠でも重なる）
-//   - それでも RemoteLock が別の番号を返した場合は、その予約に返された番号を正として保存する
+//     1 つの鍵にまとめ、その日は 1 つの番号で通して使えるようにする
 import { getDb, COLLECTIONS } from './db.js';
 import { createBooking, cancelBooking, isRemoteLockConfigured } from './remotelock.js';
 
@@ -168,7 +168,6 @@ export async function registerPendingLocks(opts: {
           location: first.location,
           facilityType: first.facilityType,
           facilityTypes,
-          pin: groupPin,
         });
         pinCode = booking.pinCode;
       } catch (e) {
@@ -183,7 +182,7 @@ export async function registerPendingLocks(opts: {
       handled.add(c.id);
       const wasPending = c.lockState === 'PENDING';
       if (error) {
-        const fallbackPin = c.pinCode || groupPin || '';
+        const fallbackPin = ''; // 扉が開かない番号を見せない
         const patch = {
           lockState: 'FAILED',
           lockSeq: (Number(c.lockSeq) || 0) + 1,
@@ -207,7 +206,6 @@ export async function registerPendingLocks(opts: {
         await col.doc(c.id).update(patch);
         Object.assign(c, patch);
         result.registered++;
-        if (groupPin && pinCode !== groupPin) result.pinChanged++;
       }
       if (wasPending) processedPending++;
     }

@@ -570,7 +570,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 暗証番号: 鍵（RemoteLock）は予約を作ったあとにまとめて発行する（server-lib/lockQueue.ts）。
-      // 繰り返し登録は全日程に同じ番号の鍵を発行する。skipRemoteLock 指定時は従来どおり番号だけ割り当てる。
+      // 繰り返し登録は全日程に鍵を発行する（番号は日ごとに別。RemoteLock が同じ番号の使い回しを受け付けないため）。
+      // skipRemoteLock 指定時は従来どおり番号だけ割り当てる。
       const useLock = !skipRemoteLock;
       const fallbackPin: string = Math.floor(1000 + Math.random() * 9000).toString();
       let lockLabel = displayName || '';
@@ -606,7 +607,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           couponCode: null,
           couponId: null,
           couponDiscount: 0,
-          pinCode: useLock ? '' : fallbackPin, // 繰り返し登録では全日程で同一PIN（年間固定PIN）
+          pinCode: useLock ? '' : fallbackPin, // 鍵を発行しない場合のみ、全日程で同じ番号を割り当てる
           ...(useLock
             ? { lockState: 'PENDING', pinGroup: groupId, lockLabel }
             : {}),
