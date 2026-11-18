@@ -95,6 +95,61 @@ export interface AdminUser {
   customerNumber?: string;
   customerType?: string;
   isImported?: boolean;
+  lineDisplayName?: string;
+  createdAt?: string;
+}
+
+// LaBOLA 予約CSVの1行（取り込み用に必要な列だけ）
+export interface LaboraReservationRow {
+  reservationNo: string;
+  content: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  paymentMethod: string;
+  amount: string;
+  customerType: string;
+  customerNumber: string;
+  name: string;
+  kana: string;
+  teamName: string;
+  email: string;
+  phone: string;
+  mobile: string;
+}
+
+export interface LaboraImportResult {
+  created: number;
+  unchanged: number;
+  changed: number;
+  cancelled: number;
+  outOfRange: number;
+  ignored: number;
+  usersCreated: number;
+  conflicts: string[];
+  errors: string[];
+}
+
+export interface LockQueueResult {
+  registered: number;
+  failed: number;
+  pinChanged: number;
+  remaining: number;
+  configured: boolean;
+}
+
+export interface LaboraTeamSummary {
+  userId: string;
+  displayName: string;
+  location: LocationId;
+  linked: boolean;
+  count: number;
+  firstDate: string;
+  lastDate: string;
+  pins: string[];
+  pending: number;
+  failed: number;
 }
 
 export interface PricePlan {
@@ -536,7 +591,70 @@ export const adminApi = {
     isInvoicePayment?: boolean;
     repeatEvery?: 'WEEKLY' | 'BIWEEKLY';
     repeatUntil?: string;
-  }) => api.post<Checkin & { createdCount?: number; skippedDates?: string[]; pinCode?: string }>('/admin?action=createCheckin', data),
+  }) => api.post<Checkin & { createdCount?: number; skippedDates?: string[]; pinCode?: string; pendingLocks?: number; lockFailed?: number }>('/admin?action=createCheckin', data),
+
+  // 鍵（スマートロック）の登録待ちを進める。remaining が 0 になるまで繰り返し呼ぶ
+  registerPendingLocks: (retryFailed = false) =>
+    api.post<LockQueueResult>('/admin?action=registerPendingLocks', { retryFailed }),
+  // 登録待ちが無くなるまで進める（進み具合を onProgress で通知）
+  drainPendingLocks: async (onProgress?: (r: LockQueueResult & { totalRegistered: number }) => void, retryFailed = false) => {
+    const total = { registered: 0, failed: 0, pinChanged: 0, remaining: 0, configured: true };
+    for (let i = 0; i < 200; i++) {
+      const r = await api.post<LockQueueResult>('/admin?action=registerPendingLocks', { retryFailed: retryFailed && i === 0 });
+      total.registered += r.registered;
+      total.failed += r.failed;
+      total.pinChanged += r.pinChanged;
+      total.remaining = r.remaining;
+      total.configured = r.configured;
+      onProgress?.({ ...r, totalRegistered: total.registered });
+      if (r.remaining === 0) break;
+      // 1回で1件も進まなければ打ち切る（同じ失敗を繰り返さない）
+      if (r.registered === 0 && r.failed === 0) break;
+    }
+    return total;
+  },
+
+  // LaBOLA 予約CSVの取り込み（チャンク処理）
+  importReservations: async (
+    location: LocationId,
+    fromDate: string,
+    rows: LaboraReservationRow[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<LaboraImportResult> => {
+    const CHUNK = 60;
+    const total: LaboraImportResult = {
+      created: 0, unchanged: 0, changed: 0, cancelled: 0, outOfRange: 0, ignored: 0, usersCreated: 0, conflicts: [], errors: [],
+    };
+    for (let offset = 0; offset < rows.length; offset += CHUNK) {
+      const r = await api.post<LaboraImportResult>(
+        `/admin?action=importReservations&offset=${offset}&limit=${CHUNK}`,
+        { location, fromDate, rows },
+      );
+      total.created += r.created;
+      total.unchanged += r.unchanged;
+      total.changed += r.changed;
+      total.cancelled += r.cancelled;
+      total.outOfRange += r.outOfRange;
+      total.ignored += r.ignored;
+      total.usersCreated += r.usersCreated;
+      total.conflicts.push(...r.conflicts);
+      total.errors.push(...r.errors);
+      onProgress?.(Math.min(offset + CHUNK, rows.length), rows.length);
+    }
+    return total;
+  },
+  getLaboraImportSummary: () => api.get<LaboraTeamSummary[]>('/admin?action=laboraImportSummary'),
+
+  // LINE未連携の団体を、本人の LINE アカウントに紐づける / 外す
+  getLineUsers: (search?: string) => {
+    const qs = new URLSearchParams({ action: 'users', lineOnly: '1' });
+    if (search) qs.set('search', search);
+    return api.get<AdminUser[]>(`/admin?${qs.toString()}`);
+  },
+  linkLineAccount: (userId: string, lineUserDocId: string) =>
+    api.post<{ userId: string; notified: boolean }>('/admin?action=linkLineAccount', { userId, lineUserDocId }),
+  unlinkLineAccount: (userId: string) =>
+    api.post<{ message: string }>('/admin?action=unlinkLineAccount', { userId }),
 
   // 予約削除（管理者）
   deleteCheckin: (checkinId: string) =>

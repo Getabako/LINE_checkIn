@@ -148,8 +148,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // 発行済みの暗証番号（RemoteLock）を無効化
       if (!checkinData.skipRemoteLock) {
         try {
-          const { cancelBooking, isRemoteLockConfigured } = await import('../../server-lib/remotelock.js');
-          if (isRemoteLockConfigured()) await cancelBooking(id, 0);
+          // 連続枠をまとめた鍵は、ほかの有効な予約が使っている間は残す
+          const { releaseLockFor } = await import('../../server-lib/lockQueue.js');
+          await releaseLockFor({ id, ...checkinData, status: 'CANCELLED' });
         } catch (e) {
           console.error('RemoteLock cancel error:', e);
         }

@@ -35,8 +35,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       // 既存ユーザーのプロフィール更新
       const doc = snapshot.docs[0];
+      // 団体として取り込んで LINE と紐づけた会員は、表示名（団体名）を LINE の名前で上書きしない
+      const keepName = !!doc.data().keepDisplayName;
       const updateData = {
-        displayName: profile.displayName,
+        ...(keepName ? { lineDisplayName: profile.displayName } : { displayName: profile.displayName }),
         pictureUrl: profile.pictureUrl || null,
         updatedAt: new Date().toISOString(),
       };

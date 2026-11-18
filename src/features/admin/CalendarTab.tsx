@@ -174,14 +174,23 @@ const CreateCheckinModal: React.FC<CreateCheckinModalProps> = ({ defaultDate, on
         userId: selectedUser?.id,
         displayName: selectedUser?.displayName,
         isInvoicePayment: isInvoice,
-        skipRemoteLock: true,
         ...(repeatMode !== 'NONE' ? { repeatEvery: repeatMode, repeatUntil } : {}),
       });
+      // 日程が多いと鍵（スマートロック）の登録が1回で終わらないので、残りを続けて登録する
+      let lockFailed = result.lockFailed || 0;
+      if (result.pendingLocks) {
+        const rest = await adminApi.drainPendingLocks();
+        lockFailed += rest.failed + rest.remaining;
+      }
       if (repeatMode !== 'NONE' && result.createdCount !== undefined) {
         const skipped = result.skippedDates?.length
           ? `\n重複のためスキップ: ${result.skippedDates.join(', ')}`
           : '';
-        alert(`${result.createdCount}件の予約を登録しました（PIN: ${result.pinCode} で全日程共通）${skipped}`);
+        const pin = result.pinCode ? `（解錠コード: ${result.pinCode} で全日程共通）` : '';
+        alert(`${result.createdCount}件の予約を登録しました${pin}${skipped}`);
+      }
+      if (lockFailed > 0) {
+        alert(`予約は登録しましたが、${lockFailed}件でスマートロックへの鍵の登録に失敗しました。\n会員タブの「LaBOLA予約の取り込み」にある「鍵の登録をやり直す」から再実行できます。`);
       }
       onCreated();
       onClose();

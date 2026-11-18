@@ -62,15 +62,19 @@ function csvEscape(v: string | number): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/** 期間指定の上限（日数）。RPA の設定ミスで全期間を引かないように */
+export const SALES_CSV_MAX_DAYS = 366;
+
 /**
- * 指定日（日本時間）に発生した 決済（＋）と 返金（－）の明細CSV。
+ * 指定期間（日本時間・両端の日を含む）に発生した 決済（＋）と 返金（－）の明細CSV。
+ * 1日分なら from と to に同じ日を渡す。
  * 請求書払い（定期）や無料予約はオンライン決済がないので含めない。
  */
-export async function buildDailySalesCsv(date: string): Promise<string> {
+export async function buildSalesCsv(from: string, to: string): Promise<string> {
   const db = getDb();
-  // 日本時間 date の 0:00〜24:00 を UTC に
-  const start = new Date(`${date}T00:00:00+09:00`).toISOString();
-  const end = new Date(new Date(`${date}T00:00:00+09:00`).getTime() + 24 * 60 * 60 * 1000).toISOString();
+  // 日本時間 from の 0:00 〜 to の 24:00 を UTC に
+  const start = new Date(`${from}T00:00:00+09:00`).toISOString();
+  const end = new Date(new Date(`${to}T00:00:00+09:00`).getTime() + 24 * 60 * 60 * 1000).toISOString();
 
   // 決済: 申込日時が対象日のもの（即時決済のため申込日＝決済日）
   const createdSnap = await db

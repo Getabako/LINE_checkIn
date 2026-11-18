@@ -12,6 +12,7 @@ import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
 import { CalendarTab } from './CalendarTab';
+import { LaboraReservationImport, LinkLineAccountModal } from './LaboraReservationImport';
 import clsx from 'clsx';
 
 // CSVダウンロードヘルパー
@@ -672,6 +673,7 @@ const SalesExportUrlCard: React.FC = () => {
         <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
           このURLを開くだけで、前日分の売上（決済・返金）CSVがダウンロードされます。LINEログインは不要です。
           末尾に <code className="bg-gray-100 px-1 rounded">&amp;date=2026-12-01</code> を付けると日付を指定できます。
+          期間でまとめて取るときは <code className="bg-gray-100 px-1 rounded">&amp;from=2026-12-01&amp;to=2026-12-31</code> を付けます（両端の日を含む・最長366日）。
         </p>
         {!open ? (
           <button
@@ -1648,6 +1650,7 @@ const MembersTab: React.FC = () => {
   const [editSearch, setEditSearch] = React.useState('');
   const [editUsers, setEditUsers] = React.useState<AdminUser[]>([]);
   const [editTarget, setEditTarget] = React.useState<AdminUser | null>(null);
+  const [linkFor, setLinkFor] = React.useState<AdminUser | null>(null);
   const [editForm, setEditForm] = React.useState({ displayName: '', name: '', kana: '', phone: '', mobile: '', email: '', customerNumber: '', memberTypeId: '' });
   const [editSaving, setEditSaving] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -1837,6 +1840,21 @@ const MembersTab: React.FC = () => {
   };
 
   // 会員情報編集: 保存（基本情報 + 会員区分が変わっていれば付け替え）
+  const handleUnlinkLine = async () => {
+    if (!editTarget) return;
+    if (!confirm(`「${editTarget.displayName || 'この会員'}」の LINE 連携を外しますか？\n予約と会員区分はこの会員に残り、いま連携している LINE には表示されなくなります。`)) return;
+    setEditSaving(true);
+    try {
+      await adminApi.unlinkLineAccount(editTarget.id);
+      setEditUsers((prev) => prev.map((u) => (u.id === editTarget.id ? { ...u, lineUserId: '' } : u)));
+      setEditTarget(null);
+    } catch (e) {
+      alert('連携を外せませんでした: ' + (e as Error).message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleSaveEditUser = async () => {
     if (!editTarget) return;
     setEditSaving(true);
@@ -2129,6 +2147,9 @@ const MembersTab: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* LaBOLA 予約CSVの取り込み（定期利用の移行）と LINE 紐づけ */}
+      <LaboraReservationImport />
 
       {/* 会員種別マスタ */}
       <section>
@@ -2434,9 +2455,27 @@ const MembersTab: React.FC = () => {
                   ))}
                 </select>
                 {!editTarget.lineUserId && (
-                  <p className="text-[10px] text-gray-400 mt-1">※ LINE未連携（Laboraインポート）ユーザーです。区分変更は可能ですが、本人がミニアプリを開くまでLINE通知は届きません</p>
+                  <p className="text-[10px] text-gray-400 mt-1">※ LINE未連携（Laboraインポート）ユーザーです。区分変更は可能ですが、LINEと紐づけるまでLINE通知は届きません</p>
                 )}
               </div>
+              {/* 取り込んだ会員と、本人の LINE アカウントの紐づけ */}
+              {!editTarget.lineUserId ? (
+                <button
+                  onClick={() => { setLinkFor(editTarget); setEditTarget(null); }}
+                  disabled={editSaving}
+                  className="w-full py-2.5 rounded-xl border-2 border-primary-300 text-primary-700 text-sm font-semibold disabled:opacity-40"
+                >
+                  LINEアカウントと紐づける
+                </button>
+              ) : editTarget.isImported ? (
+                <button
+                  onClick={handleUnlinkLine}
+                  disabled={editSaving}
+                  className="w-full py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 text-sm font-semibold disabled:opacity-40"
+                >
+                  LINE連携を外す（紐づけ間違いの修正用）
+                </button>
+              ) : null}
             </div>
             <div className="flex gap-2 mt-5">
               <button
@@ -2466,6 +2505,14 @@ const MembersTab: React.FC = () => {
             </p>
           </div>
         </div>
+      )}
+      {linkFor && (
+        <LinkLineAccountModal
+          userId={linkFor.id}
+          teamName={linkFor.displayName || linkFor.name || '(名前なし)'}
+          onClose={() => setLinkFor(null)}
+          onLinked={() => { setLinkFor(null); handleEditSearch(); }}
+        />
       )}
     </div>
   );

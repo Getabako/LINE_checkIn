@@ -37,15 +37,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ============ RPA向け 日次売上CSV（LINEログイン不要・専用トークンURL） ============
     if (action === 'salesCsv' && req.method === 'GET') {
-      const { verifySalesExportToken, buildDailySalesCsv, yesterdayJst } = await import('../server-lib/salesExport.js');
+      const { verifySalesExportToken, buildSalesCsv, yesterdayJst, SALES_CSV_MAX_DAYS } = await import('../server-lib/salesExport.js');
       if (!(await verifySalesExportToken(req.query.token as string | undefined))) {
         return res.status(403).json({ error: 'Forbidden' });
       }
-      const dateParam = (req.query.date as string) || '';
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : yesterdayJst();
-      const csv = await buildDailySalesCsv(date);
+      // 日付の指定: &date=（1日）または &from=&to=（期間・両端を含む）。どちらも無ければ前日分。
+      // 実在しない日付（2026-02-31 など）や逆転した期間は、黙って別の日を返さずエラーにする
+      const isDate = (v: string) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+      const q = (k: string) => ((req.query[k] as string) || '').trim();
+      const given = ['date', 'from', 'to'].filter((k) => q(k));
+      const bad = given.find((k) => !isDate(q(k)));
+      if (bad) {
+        return res.status(400).json({ error: `${bad} は 2026-12-01 の形式で指定してください` });
+      }
+      let from: string;
+      let to: string;
+      if (q('from') || q('to')) {
+        from = q('from') || q('to');
+        to = q('to') || (q('from') ? yesterdayJst() : from);
+        if (!q('to') && to < from) to = from;
+      } else {
+        from = to = q('date') || yesterdayJst();
+      }
+      if (to < from) return res.status(400).json({ error: 'from は to 以前の日付にしてください' });
+      const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000 + 1;
+      if (days > SALES_CSV_MAX_DAYS) {
+        return res.status(400).json({ error: `期間は ${SALES_CSV_MAX_DAYS} 日以内で指定してください` });
+      }
+      const csv = await buildSalesCsv(from, to);
+      const fileName = from === to ? `sales_${from}.csv` : `sales_${from}_${to}.csv`;
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="sales_${date}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).send(csv);
     }
@@ -546,44 +569,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!userSnap.empty) targetUserId = userSnap.docs[0].id;
       }
 
-      // PIN コード生成（RemoteLock は管理者予約ではスキップ推奨）
-      let pinCode: string = Math.floor(1000 + Math.random() * 9000).toString();
-      let remoteLockError: string | null = null;
-      if (!skipRemoteLock) {
-        try {
-          const { createBooking, isRemoteLockConfigured } = await import('../server-lib/remotelock.js');
-          if (isRemoteLockConfigured()) {
-            const startHour = newStart;
-            const endHour = startHour + Number(duration);
-            const startsAt = `${date}T${String(startHour).padStart(2, '0')}:00:00+09:00`;
-            const endsAt = `${date}T${String(endHour).padStart(2, '0')}:00:00+09:00`;
-            const now2 = new Date().toISOString();
-            // 仮ID付きで先に作成してから update する戦略だと煩雑なので、ID なしで name を付ける
-            const result = await createBooking({
-              checkinId: `admin-${now2}`,
-              name: `AdminCheckin ${date} ${startTime}`,
-              startsAt,
-              endsAt,
-              location,
-              facilityType,
-            });
-            pinCode = result.pinCode;
-          }
-        } catch (e) {
-          console.error('RemoteLock error (admin createCheckin):', e);
-          remoteLockError = e instanceof Error ? e.message : String(e);
-          const { notifyAdminRemoteLockFailure } = await import('../server-lib/notify.js');
-          await notifyAdminRemoteLockFailure({
-            location,
-            facilityType,
-            date,
-            startTime,
-            duration: Number(duration),
-            pinCode,
-            error: remoteLockError,
-            source: 'admin-createCheckin',
-          });
-        }
+      // 暗証番号: 鍵（RemoteLock）は予約を作ったあとにまとめて発行する（server-lib/lockQueue.ts）。
+      // 繰り返し登録は全日程に同じ番号の鍵を発行する。skipRemoteLock 指定時は従来どおり番号だけ割り当てる。
+      const useLock = !skipRemoteLock;
+      const fallbackPin: string = Math.floor(1000 + Math.random() * 9000).toString();
+      let lockLabel = displayName || '';
+      if (!lockLabel) {
+        const uDoc = await db.collection(COLLECTIONS.USERS).doc(targetUserId).get();
+        lockLabel = (uDoc.exists && (uDoc.data()?.displayName as string)) || 'Admin';
       }
 
       const now = new Date().toISOString();
@@ -613,8 +606,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           couponCode: null,
           couponId: null,
           couponDiscount: 0,
-          pinCode, // 繰り返し登録では全日程で同一PIN（年間固定PIN）
-          ...(remoteLockError ? { remoteLockFailed: true, remoteLockError } : {}),
+          pinCode: useLock ? '' : fallbackPin, // 繰り返し登録では全日程で同一PIN（年間固定PIN）
+          ...(useLock
+            ? { lockState: 'PENDING', pinGroup: groupId, lockLabel }
+            : {}),
           status: 'PAID',
           paymentId: null,
           isInvoicePayment: isInvoicePayment || false,
@@ -635,12 +630,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(409).json({ error: 'すべての日程が既存予約と重なっていたため登録できませんでした' });
       }
 
+      // 鍵を発行（時間内に終わらなかった分は pendingLocks として返し、画面側が続きを呼ぶ）
+      let pinCode = fallbackPin;
+      let pendingLocks = 0;
+      let lockFailed = 0;
+      if (useLock) {
+        const { registerPendingLocks } = await import('../server-lib/lockQueue.js');
+        const { notifyAdminRemoteLockFailure } = await import('../server-lib/notify.js');
+        let notifiedFailure = false;
+        const lock = await registerPendingLocks({
+          budgetMs: 20000,
+          priorityIds: created.map((c) => c.id),
+          onFailure: async (c, pin, error) => {
+            if (notifiedFailure) return; // 繰り返し登録で同じ通知を何十通も送らない
+            notifiedFailure = true;
+            await notifyAdminRemoteLockFailure({
+              checkinId: c.id,
+              location: c.location,
+              facilityType: c.facilityType,
+              date: c.date,
+              startTime: c.startTime,
+              duration: Number(c.duration),
+              pinCode: pin,
+              error,
+              source: 'admin-createCheckin',
+            });
+          },
+        });
+        pendingLocks = lock.remaining;
+        lockFailed = lock.failed;
+        const firstDoc = firstCheckinId ? await db.collection(COLLECTIONS.CHECKINS).doc(firstCheckinId).get() : null;
+        pinCode = (firstDoc?.exists && (firstDoc.data()?.pinCode as string)) || '';
+      }
+
       // 利用者へ予約完了（利用開始案内）をLINE通知（繰り返しでも通知は初回分の1通のみ）
-      try {
-        const { notifyBookingComplete } = await import('../server-lib/notify.js');
-        if (firstCheckinId) await notifyBookingComplete(firstCheckinId);
-      } catch (e) {
-        console.error('notify error (admin createCheckin):', e);
+      // 鍵の発行に失敗して暗証番号が無いときは、開かない番号を案内しないよう送らない
+      if (pinCode) {
+        try {
+          const { notifyBookingComplete } = await import('../server-lib/notify.js');
+          if (firstCheckinId) await notifyBookingComplete(firstCheckinId);
+        } catch (e) {
+          console.error('notify error (admin createCheckin):', e);
+        }
       }
 
       return res.status(201).json({
@@ -649,14 +680,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         skippedDates,
         groupId,
         pinCode,
+        pendingLocks,
+        lockFailed,
         dates: created.map((c) => c.date),
       });
+    }
+
+    // ============ 鍵の登録待ちを進める（一括登録・繰り返し登録の続き） ============
+    if (action === 'registerPendingLocks' && req.method === 'POST') {
+      const { registerPendingLocks } = await import('../server-lib/lockQueue.js');
+      const lock = await registerPendingLocks({ budgetMs: 20000, retryFailed: !!req.body?.retryFailed });
+      return res.status(200).json(lock);
+    }
+
+    // ============ LaBOLA 予約CSVの取り込み ============
+    if (action === 'importReservations' && req.method === 'POST') {
+      const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+      const location = String(req.body?.location || '');
+      const fromDate = String(req.body?.fromDate || '');
+      if (!rows) return res.status(400).json({ error: 'Missing rows' });
+      const { importLaboraReservations } = await import('../server-lib/laboraImport.js');
+      try {
+        const out = await importLaboraReservations({
+          location,
+          fromDate,
+          rows,
+          offset: Number(req.query.offset) || 0,
+          limit: Number(req.query.limit) || rows.length,
+        });
+        return res.status(200).json(out);
+      } catch (e) {
+        return res.status(400).json({ error: (e as Error).message });
+      }
+    }
+
+    // 取り込んだ予約の団体別まとめ（暗証番号・LINE連携の有無）
+    if (action === 'laboraImportSummary' && req.method === 'GET') {
+      const { summarizeLaboraImport } = await import('../server-lib/laboraImport.js');
+      return res.status(200).json(await summarizeLaboraImport());
+    }
+
+    // ============ LINE未連携の団体と LINE アカウントの紐づけ ============
+    if (action === 'linkLineAccount' && req.method === 'POST') {
+      const { userId, lineUserDocId } = req.body || {};
+      if (!userId || !lineUserDocId) return res.status(400).json({ error: 'Missing userId or lineUserDocId' });
+      const { linkLineAccount } = await import('../server-lib/laboraImport.js');
+      try {
+        return res.status(200).json(await linkLineAccount(String(userId), String(lineUserDocId)));
+      } catch (e) {
+        return res.status(400).json({ error: (e as Error).message });
+      }
+    }
+    if (action === 'unlinkLineAccount' && req.method === 'POST') {
+      const { userId } = req.body || {};
+      if (!userId) return res.status(400).json({ error: 'Missing userId' });
+      const { unlinkLineAccount } = await import('../server-lib/laboraImport.js');
+      try {
+        await unlinkLineAccount(String(userId));
+        return res.status(200).json({ message: 'Unlinked' });
+      } catch (e) {
+        return res.status(400).json({ error: (e as Error).message });
+      }
     }
 
     // ============ 予約削除（管理者） ============
     if (action === 'deleteCheckin' && req.method === 'DELETE') {
       const checkinId = req.query.checkinId as string;
       if (!checkinId) return res.status(400).json({ error: 'Missing checkinId' });
+      // 発行済みの暗証番号を無効化してから消す（消したあとも扉が開く状態を残さない）
+      const target = await db.collection(COLLECTIONS.CHECKINS).doc(checkinId).get();
+      if (target.exists) {
+        try {
+          const { releaseLockFor } = await import('../server-lib/lockQueue.js');
+          await releaseLockFor({ id: checkinId, ...target.data()!, status: 'CANCELLED' });
+        } catch (e) {
+          console.error('RemoteLock release error (admin deleteCheckin):', e);
+        }
+      }
       await db.collection(COLLECTIONS.CHECKINS).doc(checkinId).delete();
       return res.status(200).json({ message: 'Deleted' });
     }
@@ -891,12 +991,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let users = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; lineUserId: string; displayName: string; name?: string; kana?: string; customerNumber?: string; deletedAt?: string }))
         .filter((u) => !u.deletedAt); // 退会済みは一覧に出さない
+      if (req.query.lineOnly === '1') {
+        users = users
+          .filter((u) => !!u.lineUserId)
+          .sort((a, b) => String((b as { createdAt?: string }).createdAt || '').localeCompare(String((a as { createdAt?: string }).createdAt || '')));
+      }
       if (search) {
         const q = search.toLowerCase();
         users = users.filter((u) =>
           (u.displayName || '').toLowerCase().includes(q) ||
           (u.name || '').toLowerCase().includes(q) ||
           (u.kana || '').toLowerCase().includes(q) ||
+          ((u as { lineDisplayName?: string }).lineDisplayName || '').toLowerCase().includes(q) ||
           (u.customerNumber || '').toLowerCase().includes(q) ||
           (u.lineUserId || '').toLowerCase().includes(q)
         );

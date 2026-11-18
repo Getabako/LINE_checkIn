@@ -110,6 +110,15 @@ function getDeviceIds(location: string, facilityType: string): string[] {
   return deviceIds;
 }
 
+// 複数施設をまとめて1つの鍵にする場合の、ドアの和集合（重複なし・玄関が先頭）
+function getDeviceIdsForTypes(location: string, facilityTypes: string[]): string[] {
+  const out: string[] = [];
+  for (const t of facilityTypes) {
+    for (const id of getDeviceIds(location, t)) if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 interface BookingResult {
   pinCode: string;
   universalAccessKeyUrl: string;
@@ -124,9 +133,12 @@ export async function createBooking(params: {
   location: string;
   facilityType: string;
   pin?: string; // グループ予約で同一PINを指定する場合
+  facilityTypes?: string[]; // 同じ団体の連続・同時利用を1つの鍵にまとめる場合（ドアは和集合）
 }): Promise<BookingResult> {
   const accessToken = await getAccessToken();
-  const deviceIds = getDeviceIds(params.location, params.facilityType);
+  const deviceIds = params.facilityTypes && params.facilityTypes.length > 0
+    ? getDeviceIdsForTypes(params.location, params.facilityTypes)
+    : getDeviceIds(params.location, params.facilityType);
 
   if (deviceIds.length === 0) {
     throw new Error('No RemoteLock device IDs configured for this facility type');
