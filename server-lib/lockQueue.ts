@@ -54,6 +54,7 @@ export interface LockQueueResult {
   failed: number;       // 登録に失敗した予約の数
   pinChanged: number;   // 団体共通の番号が使えず、別の番号になった予約の数
   remaining: number;    // まだ登録待ちの予約の数
+  rateLimited?: boolean; // RemoteLock の回数制限に当たって中断した（少し待ってから続きを呼ぶ）
   configured: boolean;  // RemoteLock の設定があるか
 }
 
@@ -176,6 +177,16 @@ export async function registerPendingLocks(opts: {
         // 玄関だけ鍵ができて施設側のドア追加に失敗した場合など、中途半端な鍵を残さない
         if (bookingId) await cancelBooking(bookingId, 0).catch(() => undefined);
       }
+    }
+
+    // 回数制限（429）は失敗扱いにしない。登録待ちのまま残し、いったん返して呼び出し側に待ってもらう
+    if (error && /\b429\b/.test(error instanceof Error ? error.message : String(error))) {
+      for (const c of cluster) {
+        // 無効化した鍵のIDを使い回さないよう、連番だけ進めておく
+        await col.doc(c.id).update({ lockState: 'PENDING', lockSeq: (Number(c.lockSeq) || 0) + 1, updatedAt: now });
+      }
+      result.rateLimited = true;
+      break;
     }
 
     for (const c of cluster) {

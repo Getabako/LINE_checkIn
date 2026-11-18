@@ -137,6 +137,7 @@ export interface LockQueueResult {
   pinChanged: number;
   remaining: number;
   configured: boolean;
+  rateLimited?: boolean;
 }
 
 export interface LaboraTeamSummary {
@@ -608,6 +609,11 @@ export const adminApi = {
       total.configured = r.configured;
       onProgress?.({ ...r, totalRegistered: total.registered });
       if (r.remaining === 0) break;
+      // スマートロック側の回数制限に当たったら、少し待って続きから再開する
+      if (r.rateLimited) {
+        await new Promise((resolve) => setTimeout(resolve, 30000));
+        continue;
+      }
       // 1回で1件も進まなければ打ち切る（同じ失敗を繰り返さない）
       if (r.registered === 0 && r.failed === 0) break;
     }
