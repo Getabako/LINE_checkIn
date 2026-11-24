@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>04_ソースコード構成</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">04_ソースコード構成</h1>
+</header>
+<h1 id="04-ソースコード構成">04. ソースコード構成</h1>
+<h2 id="1-ディレクトリツリー">1. ディレクトリツリー</h2>
+<pre><code>gym-checkin/
+├── api/                          # Vercel Serverless Functions（12 個上限）
+│   ├── admin.ts                  # 管理者 API（action で分岐）
+│   ├── checkins/
+│   │   ├── index.ts              # 予約作成／一覧／空き状況／イベント・スクール
+│   │   └── [id].ts               # 予約詳細／キャンセル／領収書 PDF
+│   ├── coupons/validate.ts
+│   ├── member-types/index.ts
+│   ├── payments/
+│   │   ├── create-checkout.ts    # Stripe セッション作成
+│   │   ├── stripe-callback.ts    # 決済成功コールバック
+│   │   └── stripe-webhook.ts     # Stripe Webhook（署名検証）
+│   ├── prices/calculate.ts
+│   ├── reviews/index.ts
+│   └── users/
+│       ├── me.ts
+│       └── membership.ts
+│
+├── server-lib/                   # サーバー側共通ライブラリ
+│   ├── auth.ts                   # LIFF accessToken 検証
+│   ├── firebase.ts               # Firestore 初期化／COLLECTIONS
+│   ├── line.ts                   # LINE Messaging API ラッパ
+│   ├── pdf.ts                    # 領収書 PDF 生成（pdf-lib）
+│   ├── remotelock.ts             # RemoteLock OAuth / Booking
+│   └── logger.ts                 # 構造化ログ（JSON 1 行／Vercel ログ向け）
+│
+├── src/                          # フロントエンド（React）
+│   ├── App.tsx                   # ルータ・LIFF 初期化
+│   ├── main.tsx
+│   ├── components/common/        # 共通コンポーネント（Loading, DebugPanel, 等）
+│   ├── features/
+│   │   ├── location/             # 拠点選択
+│   │   ├── home/                 # 施設選択
+│   │   ├── checkin/              # 単日／複数日／定期予約
+│   │   ├── payment/              # 確認・クーポン・決済
+│   │   ├── complete/             # 完了・PIN 表示
+│   │   ├── review/               # レビュー投稿
+│   │   ├── reservations/         # 予約一覧（自分）
+│   │   ├── events/               # イベント一覧／詳細
+│   │   ├── schools/              # スクール一覧／詳細
+│   │   ├── admin/                # 管理画面（AdminPage, CalendarTab）
+│   │   └── legal/                # プライバシー／特商法
+│   ├── lib/
+│   │   ├── api.ts                # API クライアント + 型
+│   │   ├── gcal.ts               # Google Calendar deeplink
+│   │   ├── liff.ts               # LIFF SDK ラッパ
+│   │   ├── locations.ts          # 拠点メタデータ
+│   │   ├── price.ts              # フロント側の料金計算
+│   │   └── logger.ts             # ブラウザログ
+│   ├── stores/
+│   │   ├── checkinStore.ts       # 予約フォームの状態
+│   │   └── debugStore.ts         # 開発用スキップフラグ
+│   ├── styles/
+│   └── index.css
+│
+├── public/                       # 静的アセット
+├── dist/                         # ビルド生成物（git 管理外）
+├── Document/                     # 【本フォルダ】設計書・マニュアル
+├── docs/                         # 画面仕様（旧）
+├── checkin/                      # 画面キャプチャ
+├── SmartLockディバイス情報/      # RemoteLock 台帳
+├── paypay有効化/                 # PayPay 有効化 PDF
+├── みんなの体育館数値取得画像/    # 売上参考資料
+├── index.html                    # Vite エントリ
+├── vite.config.ts
+├── vercel.json                   # Vercel ビルド／CORS／SPA Rewrite
+├── tailwind.config.js
+├── postcss.config.js
+├── eslint.config.js
+├── tsconfig*.json
+├── package.json / package-lock.json
+├── README.md / 運用マニュアル.md / KEYS_MEMO.md
+└── .env / .env.vercel            # 環境変数（git 管理外）</code></pre>
+<hr />
+<h2 id="2-主要モジュール解説">2. 主要モジュール解説</h2>
+<h3 id="21-srcapptsx">2.1 <code>src/App.tsx</code></h3>
+<ul>
+<li>LIFF 初期化（<code>initializeLiff</code>）→
+<code>userApi.getMe()</code> で Firestore に自動登録</li>
+<li><code>BrowserRouter</code> の下に全ルートを定義</li>
+<li><code>DebugPanel</code>
+を常時マウント（本番でも長押しで開く開発用）</li>
+<li>起動時に <code>logger.op('app.boot')</code> を出力</li>
+</ul>
+<h3 id="22-srclibliffts">2.2 <code>src/lib/liff.ts</code></h3>
+<ul>
+<li>開発モード <code>import.meta.env.DEV &amp;&amp; !VITE_LIFF_ID</code>
+のときはモックプロファイルで継続</li>
+<li>本番で <code>VITE_LIFF_ID</code> 未設定のときはエラー</li>
+<li><code>getAccessToken()</code> が Bearer として送信される</li>
+</ul>
+<h3 id="23-srclibapits">2.3 <code>src/lib/api.ts</code></h3>
+<ul>
+<li><code>fetch</code> ベースの薄いクライアント</li>
+<li>ドメイン別に <code>userApi</code> / <code>checkinApi</code> /
+<code>priceApi</code> / <code>couponApi</code> /
+<code>memberTypeApi</code> / <code>membershipApi</code> /
+<code>reviewApi</code> / <code>eventApi</code> / <code>schoolApi</code>
+/ <code>announcementApi</code> / <code>adminApi</code> を公開</li>
+<li>型 <code>LocationId</code> / <code>FacilityType</code> /
+<code>CheckinStatus</code> / <code>Checkin</code> / <code>Coupon</code>
+/ <code>MemberType</code> / ... を共通化</li>
+</ul>
+<h3 id="24-srcstorescheckinstorets">2.4
+<code>src/stores/checkinStore.ts</code></h3>
+<ul>
+<li>Zustand の単一 store（永続化なし）</li>
+<li>単日・複数日・定期予約の状態をまとめて保持</li>
+<li><code>setMultiDateMode(false)</code> で定期予約情報もクリア</li>
+</ul>
+<h3 id="25-srcstoresdebugstorets">2.5
+<code>src/stores/debugStore.ts</code></h3>
+<ul>
+<li><code>paymentEnabled</code> / <code>remoteLockEnabled</code> の 2
+フラグを localStorage に保存</li>
+<li>Payment／RemoteLock をスキップしてテストできるトグル</li>
+</ul>
+<h3 id="26-server-libfirebasets">2.6
+<code>server-lib/firebase.ts</code></h3>
+<ul>
+<li>環境変数 <code>FIREBASE_SERVICE_ACCOUNT_KEY</code>（Base64
+JSON）を復号して <code>firebase-admin</code> を初期化</li>
+<li><code>COLLECTIONS</code> 定数で 12 コレクション名を集約</li>
+</ul>
+<h3 id="27-server-libauthts">2.7 <code>server-lib/auth.ts</code></h3>
+<ul>
+<li><code>Authorization: Bearer &lt;token&gt;</code>
+を取り出し、<code>https://api.line.me/v2/profile</code> で検証</li>
+<li>開発環境では <code>mock-access-token-for-development</code>
+を許容</li>
+</ul>
+<h3 id="28-server-libremotelockts">2.8
+<code>server-lib/remotelock.ts</code></h3>
+<ul>
+<li>OAuth2 Client Credentials → 5 分マージンで accessToken
+をキャッシュ</li>
+<li><code>getDeviceIds(location, facilityType)</code>
+で対象デバイスを決定
+<ul>
+<li>ASP: <code>ENTRANCE</code> + (<code>GYM</code> or
+<code>TRAINING</code>)</li>
+<li>YABASE: <code>YABASE</code> 1 台のみ</li>
+</ul></li>
+<li><code>createBooking({ pin })</code> でグループ予約時に PIN
+を引き継げる</li>
+<li><code>cancelBooking(checkinId, deviceCount)</code> でキャンセル</li>
+</ul>
+<h3 id="29-server-libpdfts">2.9 <code>server-lib/pdf.ts</code></h3>
+<ul>
+<li><code>pdf-lib</code> + <code>@pdf-lib/fontkit</code> で日本語 TTF
+を埋め込み領収書 PDF を生成</li>
+<li><code>/api/checkins/[id]?format=receipt</code> /
+<code>/api/admin?action=receipt</code> から呼び出す</li>
+</ul>
+<h3 id="210-ログ-srclibloggerts--server-libloggerts">2.10 ログ
+(<code>src/lib/logger.ts</code> /
+<code>server-lib/logger.ts</code>)</h3>
+<ul>
+<li>フロント:
+コンソール向け読みやすい整形（<code>[LEVEL] HH:mm:ss.SSS [scope] ...</code>）</li>
+<li>サーバー: 1 行 JSON（Vercel ログの検索に最適）</li>
+<li>両者とも <code>createLogger(scope)</code> →
+<code>{ debug, info, warn, error, op }</code></li>
+<li>操作ログは <code>op(action, payload)</code> を必ず使う</li>
+</ul>
+<h3 id="211-srccomponentscommondebugpaneltsx">2.11
+<code>src/components/common/DebugPanel.tsx</code></h3>
+<ul>
+<li><code>debugStore</code> のフラグを UI
+で切り替える開発支援パネル</li>
+<li>本番でも HTML
+内に存在するが、トリガーを長押しにしているため通常利用者には見えない</li>
+</ul>
+<hr />
+<h2 id="3-ログを差し込む方針">3. ログを差し込む方針</h2>
+<h3 id="31-フロント">3.1 フロント</h3>
+<ul>
+<li>画面の <code>useEffect</code> に
+<code>log.op('&lt;page&gt;.view')</code> を入れる（必要に応じ拡張）</li>
+<li>ボタン操作は <code>onClick</code> 内で
+<code>log.op('&lt;page&gt;.&lt;action&gt;', { ...payload })</code></li>
+<li>エラー境界・catch 句に <code>log.error</code></li>
+</ul>
+<h3 id="32-サーバー">3.2 サーバー</h3>
+<ul>
+<li>各ハンドラの冒頭で
+<code>log.debug('request.in', { method, query })</code></li>
+<li>認可失敗: <code>log.warn('unauthorized')</code></li>
+<li>成功の監査ログ:
+<code>log.op('&lt;domain&gt;.&lt;action&gt;', { lineUserId, ... })</code></li>
+<li>例外:
+<code>log.error('handler.fail', { message: String(error) })</code></li>
+</ul>
+<hr />
+<h2 id="4-ビルド実行コマンド">4. ビルド／実行コマンド</h2>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev        <span class="co"># Vite dev server (LIFF モック or 実 LIFF)</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build      <span class="co"># tsc -b &amp;&amp; vite build</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run preview    <span class="co"># ビルド物を起動</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run lint       <span class="co"># ESLint</span></span></code></pre></div>
+<p>Vercel 環境では <code>vercel.json</code> の <code>buildCommand</code>
+が実行される。</p>
+</body>
+</html>

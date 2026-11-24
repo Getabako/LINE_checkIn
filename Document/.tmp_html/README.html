@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>README</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">README</h1>
+</header>
+<h1 id="みんなの体育館-チェックインアプリ-資料集">みんなの体育館
+チェックインアプリ 資料集</h1>
+<p>本フォルダは <code>gym-checkin</code>（LINE
+ミニアプリ）のシステム資料を集約したものです。</p>
+<h2 id="構成">構成</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>ファイル</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>01</td>
+<td><a href="./01_基本設計書.md">基本設計書</a></td>
+<td>システム構成・機能一覧・非機能要件</td>
+</tr>
+<tr>
+<td>02</td>
+<td><a href="./02_詳細設計書.md">詳細設計書</a></td>
+<td>画面・API・処理ロジック詳細</td>
+</tr>
+<tr>
+<td>03</td>
+<td><a href="./03_DB設計書.md">DB設計書</a></td>
+<td>Firestore コレクション定義</td>
+</tr>
+<tr>
+<td>04</td>
+<td><a href="./04_ソースコード構成.md">ソースコード構成</a></td>
+<td>ディレクトリ構成・ログ仕様</td>
+</tr>
+<tr>
+<td>05</td>
+<td><a href="./05_開発環境構築手順.md">開発環境構築手順</a></td>
+<td>ローカル開発セットアップ</td>
+</tr>
+<tr>
+<td>06</td>
+<td><a href="./06_ビルド・デプロイ手順.md">ビルド・デプロイ手順</a></td>
+<td>Vercel デプロイ</td>
+</tr>
+<tr>
+<td>07</td>
+<td><a href="./07_動作環境構築手順.md">動作環境構築手順</a></td>
+<td>本番サーバ/外部サービス設定</td>
+</tr>
+<tr>
+<td>08</td>
+<td><a
+href="./08_DBスクリプト・マスタデータ.md">DBスクリプト・マスタデータ</a></td>
+<td>初期投入データ</td>
+</tr>
+<tr>
+<td>09</td>
+<td><a href="./09_操作マニュアル.md">操作マニュアル</a></td>
+<td>利用者向け</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="./10_運用マニュアル.md">運用マニュアル</a></td>
+<td>運営者・管理者向け</td>
+</tr>
+<tr>
+<td>11</td>
+<td><a
+href="./11_運用フロー・システムフロー.md">運用フロー・システムフロー</a></td>
+<td>業務フロー／処理シーケンス</td>
+</tr>
+</tbody>
+</table>
+<h2 id="関連資料本フォルダ外">関連資料（本フォルダ外）</h2>
+<ul>
+<li><code>README.md</code> — 開発者向けクイックスタート</li>
+<li><code>運用マニュアル.md</code> / <code>運用マニュアル.pdf</code> —
+利用者向け画像付き PDF 版</li>
+<li><code>asp.pdf</code> / <code>yabase.pdf</code> — 拠点別の現地案内
+PDF</li>
+<li><code>SmartLockディバイス情報/</code> — RemoteLock デバイス台帳</li>
+<li><code>KEYS_MEMO.md</code> — API
+キー／環境変数の運用メモ（非公開）</li>
+</ul>
+<h2 id="最終更新">最終更新</h2>
+<p>2026 年 4 月 / みんなの体育館 運営チーム</p>
+</body>
+</html>

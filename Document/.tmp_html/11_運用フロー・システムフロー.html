@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>11_運用フロー・システムフロー</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">11_運用フロー・システムフロー</h1>
+</header>
+<h1 id="11-運用フローシステムフロー">11. 運用フロー・システムフロー</h1>
+<p>フローは <strong>Mermaid</strong> 記法で記述しています。GitHub /
+対応エディタ上でそのまま図として表示されます。</p>
+<blockquote>
+<p>💡 Mermaid 8.8
+系など古いバージョンでも描画できるよう、<code>graph</code>
+記法・ダブルクォートでのラベル保護で統一しています。</p>
+</blockquote>
+<hr />
+<h2 id="1-業務フロー利用者">1. 業務フロー（利用者）</h2>
+<pre class="mermaid"><code>graph TD
+  A[&quot;LINE 公式アカウント&quot;] --&gt;|&quot;LIFF URL タップ&quot;| B[&quot;LIFF 起動&quot;]
+  B --&gt; C[&quot;拠点選択&quot;]
+  C --&gt; D[&quot;施設選択&quot;]
+  D --&gt; E{&quot;予約タイプ&quot;}
+  E --&gt;|&quot;単日&quot;| F[&quot;単日予約入力&quot;]
+  E --&gt;|&quot;複数日&quot;| G[&quot;複数日予約入力&quot;]
+  E --&gt;|&quot;定期&quot;| H[&quot;毎週 / 隔週を指定&quot;]
+  F --&gt; I[&quot;確認・クーポン入力&quot;]
+  G --&gt; I
+  H --&gt; I
+  I --&gt; J[&quot;Stripe 決済&quot;]
+  J --&gt;|&quot;成功&quot;| K[&quot;予約完了・PIN 表示&quot;]
+  J --&gt;|&quot;キャンセル&quot;| I
+  K --&gt; L[&quot;Google カレンダー登録 / 領収書 DL&quot;]
+  K --&gt; M[&quot;利用日に PIN で入館&quot;]
+  M --&gt; N[&quot;利用後レビュー投稿 (任意)&quot;]</code></pre>
+<h2 id="2-業務フロー運営管理">2. 業務フロー（運営・管理）</h2>
+<pre class="mermaid"><code>graph TD
+  S[&quot;運営スタッフ&quot;] --&gt;|&quot;毎朝&quot;| A1[&quot;管理画面 /admin&quot;]
+  A1 --&gt; B1[&quot;カレンダー確認&quot;]
+  B1 --&gt; C1{&quot;対応が必要か&quot;}
+  C1 --&gt;|&quot;予約追加&quot;| D1[&quot;+予約追加フォーム&quot;]
+  C1 --&gt;|&quot;キャンセル依頼&quot;| D2[&quot;ゴミ箱で削除&quot;]
+  C1 --&gt;|&quot;通常運用&quot;| D3[&quot;特に対応なし&quot;]
+  A1 --&gt; B2[&quot;売上・レビュー確認&quot;]
+  A1 --&gt; B3[&quot;イベント / スクール管理&quot;]
+  A1 --&gt; B4[&quot;クーポン・お知らせ編集&quot;]
+  A1 --&gt; B5[&quot;会員付与・解除&quot;]
+  A1 --&gt; B6[&quot;Firestore バックアップ状況&quot;]</code></pre>
+<hr />
+<h2 id="3-システムフロー--予約決済pin-発行stripe-モード">3.
+システムフロー — 予約〜決済〜PIN 発行（Stripe モード）</h2>
+<pre class="mermaid"><code>sequenceDiagram
+  autonumber
+  participant U as &quot;利用者 (LIFF)&quot;
+  participant F as &quot;フロント (React)&quot;
+  participant API as &quot;/api&quot;
+  participant FS as &quot;Firestore&quot;
+  participant ST as &quot;Stripe&quot;
+  participant RL as &quot;RemoteLock&quot;
+
+  U-&gt;&gt;F: 拠点・施設・日時選択
+  F-&gt;&gt;API: POST /api/prices/calculate
+  API--&gt;&gt;F: 金額
+  F-&gt;&gt;API: POST /api/coupons/validate
+  API--&gt;&gt;F: 割引額
+  U-&gt;&gt;F: カードで支払う
+  F-&gt;&gt;API: POST /api/payments/create-checkout
+  API-&gt;&gt;FS: checkins を PENDING で作成 / groupId 設定
+  API-&gt;&gt;ST: Checkout Session 作成
+  ST--&gt;&gt;API: checkoutUrl
+  API--&gt;&gt;F: checkoutUrl
+  F-&gt;&gt;ST: リダイレクト
+  U-&gt;&gt;ST: カード / PayPay 入力
+  ST--&gt;&gt;U: 決済成功
+  ST-&gt;&gt;API: POST /api/payments/stripe-webhook
+  API-&gt;&gt;FS: checkin 取得 (PENDING)
+  API-&gt;&gt;RL: POST /bookings (玄関 → 施設)
+  RL--&gt;&gt;API: pin
+  API-&gt;&gt;FS: status=PAID, pinCode 更新
+  API--&gt;&gt;ST: 200 received
+  F-&gt;&gt;API: GET /api/checkins/:id
+  API--&gt;&gt;F: pinCode
+  F--&gt;&gt;U: 完了画面で PIN 表示</code></pre>
+<hr />
+<h2 id="4-システムフロー--決済スキップ管理者予約デバッグ">4.
+システムフロー — 決済スキップ（管理者予約／デバッグ）</h2>
+<pre class="mermaid"><code>sequenceDiagram
+  autonumber
+  participant ADMIN as &quot;管理者 / 開発者&quot;
+  participant API as &quot;/api&quot;
+  participant FS as &quot;Firestore&quot;
+  participant RL as &quot;RemoteLock&quot;
+
+  ADMIN-&gt;&gt;API: POST /api/payments/create-checkout (skipPayment=true)
+  API-&gt;&gt;FS: checkins を PENDING で作成
+  API-&gt;&gt;RL: POST /bookings (各日)
+  RL--&gt;&gt;API: pin (1本目を全日で共有)
+  API-&gt;&gt;FS: status=PAID, pinCode 更新
+  API--&gt;&gt;ADMIN: mode=skip, checkinIds, groupId</code></pre>
+<hr />
+<h2 id="5-システムフロー--キャンセル">5. システムフロー —
+キャンセル</h2>
+<pre class="mermaid"><code>sequenceDiagram
+  autonumber
+  participant U as &quot;利用者&quot;
+  participant F as &quot;フロント&quot;
+  participant API as &quot;/api/checkins/:id&quot;
+  participant FS as &quot;Firestore&quot;
+  participant RL as &quot;RemoteLock&quot;
+
+  U-&gt;&gt;F: キャンセルする
+  F-&gt;&gt;API: DELETE /api/checkins/:id
+  API-&gt;&gt;FS: 対象取得・時間前チェック
+  alt 利用開始1時間以上前
+    API-&gt;&gt;RL: PUT /bookings/:id/deactivate
+    API-&gt;&gt;FS: status=CANCELLED
+    API--&gt;&gt;F: 200 OK
+  else 1時間を切っている
+    API--&gt;&gt;F: 409 キャンセル不可
+  end</code></pre>
+<hr />
+<h2 id="6-認可フロー">6. 認可フロー</h2>
+<pre class="mermaid"><code>sequenceDiagram
+  autonumber
+  participant F as &quot;フロント (LIFF)&quot;
+  participant L as &quot;LINE Profile API&quot;
+  participant API as &quot;/api&quot;
+
+  F-&gt;&gt;F: liff.getAccessToken()
+  F-&gt;&gt;API: Authorization Bearer token
+  API-&gt;&gt;L: GET /v2/profile
+  L--&gt;&gt;API: userId / displayName
+  API-&gt;&gt;API: ADMIN_LINE_USER_IDS 判定 (admin のみ)
+  API--&gt;&gt;F: 200 / 401 / 403</code></pre>
+<hr />
+<h2 id="7-データフロー会員クーポン決済">7.
+データフロー（会員・クーポン・決済）</h2>
+<pre class="mermaid"><code>graph LR
+  subgraph Masters
+    M1[&quot;memberTypes&quot;]
+    M2[&quot;coupons&quot;]
+  end
+  subgraph Live
+    U[&quot;users&quot;]
+    UM[&quot;userMemberships&quot;]
+    C[&quot;checkins&quot;]
+    CR[&quot;couponRedemptions&quot;]
+    R[&quot;reviews&quot;]
+  end
+
+  U --&gt;|&quot;1:N&quot;| UM
+  M1 --&gt;|&quot;参照&quot;| UM
+  U --&gt;|&quot;1:N&quot;| C
+  M2 --&gt;|&quot;参照&quot;| C
+  C --&gt;|&quot;1:N&quot;| CR
+  C --&gt;|&quot;1:1&quot;| R</code></pre>
+<hr />
+<h2 id="8-障害時フロー">8. 障害時フロー</h2>
+<pre class="mermaid"><code>graph TD
+  X[&quot;利用者から問い合わせ&quot;] --&gt; A{&quot;どの層か&quot;}
+  A --&gt;|&quot;LIFF で開けない&quot;| B[&quot;Vercel Status / LIFF Console&quot;]
+  A --&gt;|&quot;決済できない&quot;| C[&quot;Stripe Status / Webhook Attempts&quot;]
+  A --&gt;|&quot;PIN が出ない&quot;| D[&quot;RemoteLock 管理画面 / Vercel ログ&quot;]
+  A --&gt;|&quot;予約が表示されない&quot;| E[&quot;Firebase Console / Vercel ログ&quot;]
+  B --&gt; F[&quot;デプロイ再実行 or 再設定&quot;]
+  C --&gt; F
+  D --&gt; F
+  E --&gt; F
+  F --&gt; G[&quot;LINE 公式アカウント・お知らせ機能で告知&quot;]</code></pre>
+<hr />
+<h2 id="9-日次月次運用運用カレンダー">9.
+日次・月次運用（運用カレンダー）</h2>
+<pre class="mermaid"><code>gantt
+  dateFormat YYYY-MM-DD
+  title OperationCycle
+  section Daily
+  ReservationCheck    :a1, 2026-04-01, 1d
+  EntranceTrouble     :a2, 2026-04-01, 1d
+  section Weekly
+  BatteryCheck        :b1, 2026-04-06, 1d
+  ReviewAudit         :b2, 2026-04-06, 1d
+  section Monthly
+  SalesCsv            :c1, 2026-04-30, 1d
+  FirestoreBackup     :c2, 2026-04-30, 1d
+  CouponAudit         :c3, 2026-04-30, 1d</code></pre>
+<blockquote>
+<p>💡 旧版 Mermaid の Gantt
+は日本語タイトル/タスク名で描画に失敗する場合があるため、ここだけ英数字で記述しています。</p>
+</blockquote>
+<hr />
+<h2 id="参考-運用リズム日本語表">参考: 運用リズム（日本語表）</h2>
+<table>
+<thead>
+<tr>
+<th>周期</th>
+<th>タスク</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日次</td>
+<td>予約確認、入館トラブル対応</td>
+</tr>
+<tr>
+<td>週次</td>
+<td>RemoteLock 電池残量チェック、レビュー棚卸し</td>
+</tr>
+<tr>
+<td>月次</td>
+<td>売上 CSV 経理連携、Firestore バックアップ確認、クーポン棚卸し</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

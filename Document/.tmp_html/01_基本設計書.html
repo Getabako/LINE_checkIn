@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>01_基本設計書</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">01_基本設計書</h1>
+</header>
+<h1 id="01-基本設計書">01. 基本設計書</h1>
+<p><strong>システム名</strong>: みんなの体育館
+チェックインアプリ（<code>gym-checkin</code>） <strong>形態</strong>:
+LINE ミニアプリ（LIFF） <strong>対応拠点</strong>: みんなの体育館 ASP /
+みんなの体育館 やばせ <strong>最終更新</strong>: 2026-04</p>
+<hr />
+<h2 id="1-目的背景">1. 目的・背景</h2>
+<p>無人運営の体育館・トレーニングルームにおいて、利用者が LINE
+から予約・決済し、決済完了と同時に発行される 4 桁の PIN
+で入館できるセルフサービス型予約システムを提供する。</p>
+<h3 id="主要な課題と対応方針">主要な課題と対応方針</h3>
+<table>
+<thead>
+<tr>
+<th>課題</th>
+<th>対応方針</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>スタッフ不在での入退館管理</td>
+<td>RemoteLock スマートロックに API 経由で PIN を動的発行</td>
+</tr>
+<tr>
+<td>LINE ユーザーへの到達性</td>
+<td>LIFF（LINE ミニアプリ）として公式アカウントから起動</td>
+</tr>
+<tr>
+<td>決済</td>
+<td>Stripe Checkout を利用（クレジットカード／PayPay 等）</td>
+</tr>
+<tr>
+<td>運営の業務効率</td>
+<td>管理者用カレンダー／売上／イベント／スクール／クーポン管理を統合</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-システム全体構成">2. システム全体構成</h2>
+<pre><code>┌──────────────────────────────────────────────────────────────┐
+│                    LINE ミニアプリ (LIFF)                      │
+│  React 18 + TypeScript + Vite + Zustand + Tailwind CSS       │
+│  React Router / TanStack Query                                │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ HTTPS (Bearer: LIFF accessToken)
+                            ▼
+┌──────────────────────────────────────────────────────────────┐
+│          Vercel Serverless Functions (/api)                  │
+│  @vercel/node · Node 20.x                                    │
+│  認可: LIFF access_token → LINE /v2/profile で検証           │
+└──┬───────────────┬───────────────┬───────────────┬───────────┘
+   │               │               │               │
+   ▼               ▼               ▼               ▼
+Firestore      Stripe          RemoteLock      LINE Login API
+(Firebase)     Checkout        Booking API     Messaging API
+                               (PIN 発行)</code></pre>
+<h3 id="21-役割と責務">2.1 役割と責務</h3>
+<table>
+<thead>
+<tr>
+<th>コンポーネント</th>
+<th>役割</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LIFF フロント</td>
+<td>画面表示／ユーザー操作／LIFF 認証／LINE Profile 取得</td>
+</tr>
+<tr>
+<td><code>/api</code> (Vercel)</td>
+<td>ビジネスロジック／外部 API 連携／Firestore 操作</td>
+</tr>
+<tr>
+<td>Firestore</td>
+<td>予約・ユーザー・クーポン等の永続化</td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>決済・Webhook</td>
+</tr>
+<tr>
+<td>RemoteLock</td>
+<td>PIN 発行／施錠制御</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-ネットワークドメイン">2.2 ネットワーク・ドメイン</h3>
+<ul>
+<li>本番 URL: Vercel デプロイ URL（カスタムドメイン設定可）</li>
+<li>API: <code>https://&lt;app&gt;/api/*</code></li>
+<li>LIFF URL: <code>https://liff.line.me/&lt;LIFF_ID&gt;</code></li>
+</ul>
+<hr />
+<h2 id="3-機能一覧">3. 機能一覧</h2>
+<h3 id="31-利用者line-ユーザー向け機能">3.1 利用者（LINE
+ユーザー）向け機能</h3>
+<table>
+<thead>
+<tr>
+<th>カテゴリ</th>
+<th>機能</th>
+<th>画面ルート</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>起動</td>
+<td>LIFF 初期化・ユーザー自動登録</td>
+<td>-</td>
+</tr>
+<tr>
+<td>予約</td>
+<td>拠点選択</td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td></td>
+<td>施設選択（体育館／個室トレ／相席トレ）</td>
+<td><code>/facility</code></td>
+</tr>
+<tr>
+<td></td>
+<td>単日予約</td>
+<td><code>/checkin</code></td>
+</tr>
+<tr>
+<td></td>
+<td>複数日一括予約</td>
+<td><code>/checkin</code></td>
+</tr>
+<tr>
+<td></td>
+<td>定期予約（毎週／隔週）</td>
+<td><code>/checkin</code></td>
+</tr>
+<tr>
+<td></td>
+<td>クーポンコード適用</td>
+<td><code>/payment</code></td>
+</tr>
+<tr>
+<td></td>
+<td>会員種別割引適用</td>
+<td><code>/payment</code></td>
+</tr>
+<tr>
+<td></td>
+<td>Stripe 決済</td>
+<td>外部</td>
+</tr>
+<tr>
+<td></td>
+<td>予約完了・PIN 表示</td>
+<td><code>/complete</code></td>
+</tr>
+<tr>
+<td></td>
+<td>Google カレンダー登録</td>
+<td><code>/complete</code></td>
+</tr>
+<tr>
+<td></td>
+<td>領収書 PDF ダウンロード</td>
+<td><code>/complete</code></td>
+</tr>
+<tr>
+<td></td>
+<td>レビュー投稿</td>
+<td><code>/review</code></td>
+</tr>
+<tr>
+<td>閲覧</td>
+<td>イベント一覧／詳細</td>
+<td><code>/events</code></td>
+</tr>
+<tr>
+<td></td>
+<td>スクール一覧／詳細</td>
+<td><code>/schools</code></td>
+</tr>
+<tr>
+<td></td>
+<td>予約一覧（自分）</td>
+<td><code>/reservations</code></td>
+</tr>
+<tr>
+<td></td>
+<td>プライバシーポリシー</td>
+<td><code>/privacy</code></td>
+</tr>
+<tr>
+<td></td>
+<td>特商法表記</td>
+<td><code>/commerce-law</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-管理者向け機能admin">3.2
+管理者向け機能（<code>/admin</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>カテゴリ</th>
+<th>機能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>カレンダー</td>
+<td>月表示／予約追加／予約削除／詳細閲覧</td>
+</tr>
+<tr>
+<td>イベント</td>
+<td>作成／編集／削除／参加者一覧</td>
+</tr>
+<tr>
+<td>スクール</td>
+<td>作成／編集／削除／参加者一覧</td>
+</tr>
+<tr>
+<td>会員種別マスタ</td>
+<td>作成／編集／削除</td>
+</tr>
+<tr>
+<td>会員管理</td>
+<td>ユーザー検索／会員種別付与／解除</td>
+</tr>
+<tr>
+<td>クーポン</td>
+<td>作成／編集／削除</td>
+</tr>
+<tr>
+<td>お知らせ</td>
+<td>作成／編集／削除（拠点別・優先度別）</td>
+</tr>
+<tr>
+<td>売上</td>
+<td>日別／月別／拠点別集計</td>
+</tr>
+<tr>
+<td>領収書</td>
+<td>PDF 再発行</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-機能フラグ開発モード">3.3 機能フラグ（開発モード）</h3>
+<table>
+<thead>
+<tr>
+<th>フラグ</th>
+<th>格納先</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>paymentEnabled</code></td>
+<td>localStorage (Zustand persist)</td>
+<td>Stripe 決済スキップ</td>
+</tr>
+<tr>
+<td><code>remoteLockEnabled</code></td>
+<td>同上</td>
+<td>RemoteLock API スキップ</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-料金仕様">4. 料金仕様</h2>
+<h3 id="41-asp">4.1 ASP</h3>
+<table>
+<thead>
+<tr>
+<th>施設</th>
+<th>平日昼 (08-17)</th>
+<th>平日夜 (17-21)</th>
+<th>土日祝</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>体育館</td>
+<td>¥2,200/h</td>
+<td>¥2,750/h</td>
+<td>¥2,750/h</td>
+</tr>
+<tr>
+<td>トレーニングルーム（貸切）</td>
+<td>¥2,200/h</td>
+<td>¥2,200/h</td>
+<td>¥2,200/h</td>
+</tr>
+<tr>
+<td>トレーニングルーム（相席）</td>
+<td>¥550/人</td>
+<td>¥550/人</td>
+<td>¥550/人</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-やばせ">4.2 やばせ</h3>
+<table>
+<thead>
+<tr>
+<th>施設</th>
+<th>平日昼 (07-17)</th>
+<th>平日夜 (17-21)</th>
+<th>土日祝</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>体育館</td>
+<td>¥1,650/h</td>
+<td>¥2,200/h</td>
+<td>¥2,200/h</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-営業時間">4.3 営業時間</h3>
+<ul>
+<li><strong>ASP</strong>: 08:00 – 21:00</li>
+<li><strong>やばせ</strong>: 07:00 – 21:00</li>
+</ul>
+<h3 id="44-定員">4.4 定員</h3>
+<ul>
+<li>体育館 / 個室トレ: 同時間帯 1 組</li>
+<li>相席トレ: 同時間帯 10 名</li>
+</ul>
+<h3 id="45-割引">4.5 割引</h3>
+<table>
+<thead>
+<tr>
+<th>種類</th>
+<th>計算順序</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>会員種別割引 (<code>discountType</code> =
+<code>FREE</code>/<code>PERCENTAGE</code>/<code>FIXED_PER_HOUR</code>)</td>
+<td>1. 各日料金に対して適用</td>
+</tr>
+<tr>
+<td>クーポン (<code>discountType</code> =
+<code>PERCENTAGE</code>/<code>FIXED</code>)</td>
+<td>2. 会員割引後の合計に対して適用</td>
+</tr>
+</tbody>
+</table>
+<p>最終金額
+<code>= max(0, 通常料金合計 − 会員割引合計 − クーポン割引)</code></p>
+<h3 id="46-祝日対応">4.6 祝日対応</h3>
+<ul>
+<li>日本の祝日は <strong><code>@holiday-jp/holiday_jp</code></strong>
+ライブラリで判定</li>
+<li>祝日は土日と同様に <strong>WEEKEND 料金</strong> を適用</li>
+<li>売上 CSV の <code>時間帯区分</code> も祝日を「土日祝」に分類</li>
+</ul>
+<h3 id="47-支払い方法">4.7 支払い方法</h3>
+<table>
+<thead>
+<tr>
+<th>種別</th>
+<th>表示</th>
+<th>確定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一般利用</td>
+<td>クレジットカード／PayPay（Stripe Checkout）</td>
+<td>決済完了後に PIN 発行</td>
+</tr>
+<tr>
+<td>定期利用（<code>discountType=FREE</code>）</td>
+<td><strong>「請求書払い（後日請求）」のみ</strong></td>
+<td>予約確定と同時に PIN 発行（オンライン決済なし）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="5-非機能要件">5. 非機能要件</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>要件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>可用性</td>
+<td>Vercel / Firebase / Stripe / RemoteLock の SLA に準拠</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>Vercel Functions コールドスタート込みで 2 秒以内の応答を目標</td>
+</tr>
+<tr>
+<td>スケーラビリティ</td>
+<td>Serverless・Firestore ともに自動スケール</td>
+</tr>
+<tr>
+<td>セキュリティ</td>
+<td>LIFF accessToken を LINE プロファイル API で検証／管理者は
+<code>ADMIN_LINE_USER_IDS</code> で制御</td>
+</tr>
+<tr>
+<td>監査</td>
+<td>API/フロントとも操作ログを構造化出力（<code>logger.ts</code>）</td>
+</tr>
+<tr>
+<td>個人情報</td>
+<td>LINE の userId/displayName/pictureUrl のみを保持</td>
+</tr>
+<tr>
+<td>バックアップ</td>
+<td>Firestore の自動バックアップ（日次エクスポート推奨）</td>
+</tr>
+<tr>
+<td>多言語</td>
+<td>日本語のみ</td>
+</tr>
+<tr>
+<td>ブラウザ</td>
+<td>LINE 内 WebView（iOS/Android）を主対象</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-外部システム連携">6. 外部システム連携</h2>
+<table>
+<thead>
+<tr>
+<th>サービス</th>
+<th>プロトコル</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LINE Login (LIFF)</td>
+<td>LIFF SDK v2</td>
+<td>ユーザー認証／Profile 取得</td>
+</tr>
+<tr>
+<td>LINE Profile API</td>
+<td>REST (<code>api.line.me</code>)</td>
+<td>サーバー側で accessToken 検証</td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>Stripe Node SDK</td>
+<td>Checkout Session／Webhook</td>
+</tr>
+<tr>
+<td>RemoteLock</td>
+<td>REST (<code>api.remotelock-pf.jp</code>)</td>
+<td>OAuth2 Client Credentials → <code>/bookings</code> で PIN 発行</td>
+</tr>
+<tr>
+<td>Firebase Admin</td>
+<td>SDK</td>
+<td>Firestore 読み書き</td>
+</tr>
+<tr>
+<td>Google Calendar</td>
+<td>deeplink URL</td>
+<td>利用者側でカレンダー登録</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-運用形態">7. 運用形態</h2>
+<ul>
+<li>デプロイ: GitHub → Vercel (Production 自動デプロイ)</li>
+<li>環境: Production のみ。Preview は PR 単位で自動生成。</li>
+<li>監視: Vercel ログ・Stripe ダッシュボード・Firebase コンソール</li>
+<li>問い合わせ窓口: LINE 公式アカウント</li>
+</ul>
+<hr />
+<h2 id="8-制約事項">8. 制約事項</h2>
+<table>
+<thead>
+<tr>
+<th>制約</th>
+<th>内容</th>
+<th>対策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vercel Hobby プラン関数上限</td>
+<td>12 個まで</td>
+<td>既存エンドポイントにクエリ <code>type</code>/<code>action</code>
+を持たせて集約</td>
+</tr>
+<tr>
+<td>Firestore 複合インデックス</td>
+<td>複数条件クエリ時に必要</td>
+<td>主キー 1 つで取得→メモリ側で絞り込み＆ソート</td>
+</tr>
+<tr>
+<td>RemoteLock API 障害</td>
+<td>PIN 発行不可</td>
+<td>ランダム PIN フォールバック（別途管理が必要）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-用語集">9. 用語集</h2>
+<table>
+<thead>
+<tr>
+<th>用語</th>
+<th>意味</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LIFF</td>
+<td>LINE Front-end Framework（LINE 内 WebView 向け SDK）</td>
+</tr>
+<tr>
+<td>PIN</td>
+<td>4 桁の入館用暗証番号</td>
+</tr>
+<tr>
+<td>groupId</td>
+<td>複数日予約をまとめる UUID</td>
+</tr>
+<tr>
+<td>recurringType</td>
+<td>定期予約の種別（<code>WEEKLY</code> / <code>BIWEEKLY</code>）</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

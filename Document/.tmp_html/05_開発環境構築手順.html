@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>05_開発環境構築手順</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">05_開発環境構築手順</h1>
+</header>
+<h1 id="05-開発環境構築手順">05. 開発環境構築手順</h1>
+<h2 id="1-前提ツール">1. 前提ツール</h2>
+<table>
+<thead>
+<tr>
+<th>ツール</th>
+<th>バージョン</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node.js</td>
+<td><strong>20.x</strong>（LTS）</td>
+<td>ランタイム（<code>engines.node: "20.x"</code> で固定）</td>
+</tr>
+<tr>
+<td>npm</td>
+<td>10.x 以上</td>
+<td>パッケージ管理</td>
+</tr>
+<tr>
+<td>Git</td>
+<td>任意</td>
+<td></td>
+</tr>
+<tr>
+<td>Vercel CLI</td>
+<td>最新（<code>npm i -g vercel@latest</code>）</td>
+<td><code>vercel dev</code>, <code>vercel env pull</code> 等</td>
+</tr>
+<tr>
+<td>Firebase CLI</td>
+<td>任意</td>
+<td>Firestore 操作</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>macOS では <code>brew install node@20</code> 推奨。Windows は
+nvm-windows を使用。</p>
+</blockquote>
+<hr />
+<h2 id="2-リポジトリ取得">2. リポジトリ取得</h2>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone <span class="op">&lt;</span>repo-url<span class="op">&gt;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> LINEMiniApp/gym-checkin</span></code></pre></div>
+<h2 id="3-パッケージインストール">3. パッケージインストール</h2>
+<p><code>package-lock.json</code> をそのまま使うため <code>npm ci</code>
+を推奨。</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> ci</span></code></pre></div>
+<blockquote>
+<p>⚠️ <code>npm install</code> でも動くが lock
+が更新される。本番と同じ依存を使うなら <code>ci</code>。</p>
+</blockquote>
+<hr />
+<h2 id="4-環境変数設定env">4. 環境変数設定（.env）</h2>
+<p>ルート直下に <code>.env</code>（git 管理外）を作成する。値の取得先は
+<a href="./07_動作環境構築手順.md">07. 動作環境構築手順</a> を参照。</p>
+<pre class="env"><code># LIFF
+VITE_LIFF_ID=2008793930-iDPTCREA
+
+# Firebase (Base64 JSON)
+FIREBASE_SERVICE_ACCOUNT_KEY=&lt;base64&gt;
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+
+# RemoteLock
+REMOTELOCK_CLIENT_ID=xxx
+REMOTELOCK_CLIENT_SECRET=xxx
+REMOTELOCK_DEVICE_ID_ENTRANCE=xxx
+REMOTELOCK_DEVICE_ID_GYM=xxx
+REMOTELOCK_DEVICE_ID_TRAINING=xxx
+REMOTELOCK_DEVICE_ID_YABASE=xxx
+
+# 管理者
+ADMIN_LINE_USER_IDS=Uxxxxxxxx,Uyyyyyyyy
+
+# 開発用
+NEXT_PUBLIC_BASE_URL=http://localhost:5173
+SKIP_PAYMENT=false
+LOG_LEVEL=debug</code></pre>
+<p><code>vercel env pull .env</code> で Vercel
+プロジェクトから取得することも可能。</p>
+<hr />
+<h2 id="5-開発サーバー起動">5. 開発サーバー起動</h2>
+<h3 id="51-viteフロントのみ">5.1 Vite（フロントのみ）</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run dev</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># http://localhost:5173</span></span></code></pre></div>
+<ul>
+<li><code>VITE_LIFF_ID</code> が未設定のときは <strong>LIFF
+モック</strong>で動作（<code>U_dev_user_12345</code>）。</li>
+<li>API は <code>VITE_API_URL</code> が未設定なら <code>/api</code>
+にプロキシされる。</li>
+</ul>
+<h3 id="52-vercel-devapi-付き">5.2 Vercel Dev（/api 付き）</h3>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">vercel</span> link      <span class="co"># 初回のみ</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">vercel</span> dev       <span class="co"># フロント + /api を同時起動</span></span></code></pre></div>
+<ul>
+<li>Vercel CLI が <code>.env</code> を読み込み、Serverless Functions
+もローカルで動作させる。</li>
+<li>Stripe Webhook をローカルで受けたい場合は
+<code>stripe listen --forward-to localhost:3000/api/payments/stripe-webhook</code>。</li>
+</ul>
+<hr />
+<h2 id="6-推奨-vscode-拡張">6. 推奨 VSCode 拡張</h2>
+<ul>
+<li>ESLint</li>
+<li>Tailwind CSS IntelliSense</li>
+<li>Prisma (他プロジェクトで使用。本 PJ では未使用)</li>
+<li>TypeScript 5.x Language Features（内蔵）</li>
+</ul>
+<hr />
+<h2 id="7-デバッグ-tips">7. デバッグ Tips</h2>
+<ul>
+<li><code>DebugPanel</code>（画面下の小さなゲージ）で
+<strong>支払いスキップ</strong>・<strong>RemoteLock
+スキップ</strong>を切替可能</li>
+<li>LIFF モック時は LINE
+にアクセスせず、<code>mock-access-token-for-development</code>
+をサーバー側で許容</li>
+<li><code>LOG_LEVEL=debug</code> を設定すると、サーバーロガーの
+<code>debug</code> ログも出る</li>
+<li>ブラウザ DevTools の Console に <code>[OPERATION]</code>
+で操作ログが出る</li>
+</ul>
+<h2 id="8-ありがちな詰まりどころ">8. ありがちな詰まりどころ</h2>
+<table>
+<thead>
+<tr>
+<th>症状</th>
+<th>原因</th>
+<th>対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FIREBASE_SERVICE_ACCOUNT_KEY is not set</code></td>
+<td><code>.env</code> 未設定 or vercel dev 未使用</td>
+<td><code>.env</code> を置く／<code>vercel env pull</code></td>
+</tr>
+<tr>
+<td>LIFF 画面で白画面</td>
+<td><code>VITE_LIFF_ID</code> 未設定で本番モード</td>
+<td><code>.env</code> に <code>VITE_LIFF_ID=</code> を設定</td>
+</tr>
+<tr>
+<td><code>npm ci</code> で Prisma 系エラー</td>
+<td>他 PJ の依存が混入</td>
+<td>このフォルダ内で実行しているか確認</td>
+</tr>
+<tr>
+<td>Stripe Webhook 404</td>
+<td><code>vercel dev</code> ではなく <code>npm run dev</code>
+を使っている</td>
+<td><code>vercel dev</code> に切り替え</td>
+</tr>
+<tr>
+<td>Firestore 権限エラー</td>
+<td>サービスアカウントのロール不足</td>
+<td><code>Cloud Datastore User</code> を付与</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

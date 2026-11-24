@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>07_動作環境構築手順</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">07_動作環境構築手順</h1>
+</header>
+<h1 id="07-動作環境本番サーバ外部サービス構築手順">07.
+動作環境（本番サーバ・外部サービス）構築手順</h1>
+<p>本書は <strong>誰がやっても同じ手順で構築できる</strong>
+ことを目的に、各サービスの GUI 操作をクリック単位で記載する。</p>
+<blockquote>
+<p>💡
+各章末尾に「動作確認」が付いているので、手順完了後は必ず確認してから次に進むこと。
+💡 手順中の画像キャプションは執筆時点（2026-04）の UI に基づく。UI
+変更があった場合はボタン名で読み替え可能な形にしている。</p>
+</blockquote>
+<hr />
+<h2 id="0-全体像">0. 全体像</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>サービス</th>
+<th>所要時間</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Firebase プロジェクト作成 + Firestore 有効化 +
+サービスアカウント</td>
+<td>約 20 分</td>
+</tr>
+<tr>
+<td>2</td>
+<td>LINE Developers チャネル作成 + LIFF 登録</td>
+<td>約 20 分</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Stripe アカウント + 決済方法 + Webhook</td>
+<td>約 30 分</td>
+</tr>
+<tr>
+<td>4</td>
+<td>RemoteLock API 発行 + デバイス ID 取得</td>
+<td>約 15 分</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Vercel プロジェクト作成 + 環境変数投入 + デプロイ</td>
+<td>約 30 分</td>
+</tr>
+</tbody>
+</table>
+<p>全所要時間: <strong>約 2
+時間</strong>（アカウント事前登録済みの場合）。</p>
+<hr />
+<h2 id="1-firebase--firestore-構築">1. Firebase / Firestore 構築</h2>
+<h3 id="11-プロジェクト作成">1.1 プロジェクト作成</h3>
+<ol type="1">
+<li>ブラウザで <a
+href="https://console.firebase.google.com/"><span>https://console.firebase.google.com/</span></a>
+を開く</li>
+<li>Google アカウントでログイン</li>
+<li>画面中央の <strong>「プロジェクトを追加」</strong> をクリック</li>
+<li><strong>プロジェクト名</strong>:
+<code>gym-checkin-prod</code>（任意の名前で可）を入力 →「続行」</li>
+<li><strong>Google アナリティクス</strong>: 使用しない場合はトグル OFF
+→「続行」または「プロジェクトを作成」</li>
+<li>作成完了を待つ（1〜2 分）→「続行」</li>
+</ol>
+<h3 id="12-firestore-database-作成">1.2 Firestore Database 作成</h3>
+<ol type="1">
+<li>左サイドメニュー <strong>「構築 (Build)」 → 「Firestore
+Database」</strong> を選択</li>
+<li>画面中央の <strong>「データベースの作成」</strong>
+ボタンをクリック</li>
+<li><strong>モード選択</strong>: 「本番環境モードで開始する (Start in
+production mode)」を選択 →「次へ」</li>
+<li><strong>ロケーション</strong>: プルダウンから
+<strong><code>asia-northeast1 (東京)</code></strong> を選択
+→「有効にする」</li>
+<li>データベース作成が完了するまで待つ（30 秒程度）</li>
+</ol>
+<h3 id="13-セキュリティルールを全拒否に設定">1.3
+セキュリティルールを全拒否に設定</h3>
+<ol type="1">
+<li>Firestore Database 画面 → 上部タブ <strong>「ルール
+(Rules)」</strong></li>
+<li>エディタの内容を以下で置換:</li>
+</ol>
+<pre><code>rules_version = &#39;2&#39;;
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}</code></pre>
+<ol start="3" type="1">
+<li>画面右上 <strong>「公開 (Publish)」</strong> をクリック</li>
+<li>確認ダイアログで <strong>「公開」</strong> を押下</li>
+</ol>
+<blockquote>
+<p>📌 <strong>理由</strong>: 本アプリはサーバー（Vercel
+Functions）経由のみで Firestore
+にアクセスするため、クライアント直アクセスは全拒否する。</p>
+</blockquote>
+<h3 id="14-サービスアカウント発行">1.4 サービスアカウント発行</h3>
+<ol type="1">
+<li>画面左上の <strong>歯車アイコン</strong> →
+<strong>「プロジェクトの設定」</strong> をクリック</li>
+<li>上部タブ <strong>「サービス アカウント」</strong> を選択</li>
+<li><strong>「新しい秘密鍵の生成」</strong> ボタンをクリック</li>
+<li>確認ダイアログで <strong>「キーを生成」</strong> をクリック → JSON
+ファイルがダウンロードされる</li>
+<li>ダウンロードしたファイルを
+<strong><code>firebase-service-account.json</code></strong>
+にリネーム（任意）</li>
+<li>ターミナルで Base64 化してクリップボードにコピー:</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> firebase-service-account.json <span class="kw">|</span> <span class="fu">base64</span> <span class="kw">|</span> <span class="fu">tr</span> <span class="at">-d</span> <span class="st">&#39;\n&#39;</span> <span class="kw">|</span> <span class="ex">pbcopy</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Linux</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> firebase-service-account.json <span class="kw">|</span> <span class="fu">base64</span> <span class="at">-w0</span> <span class="kw">|</span> <span class="ex">xclip</span> <span class="at">-selection</span> clipboard</span></code></pre></div>
+<ol start="7" type="1">
+<li>この Base64 文字列は後で Vercel の
+<code>FIREBASE_SERVICE_ACCOUNT_KEY</code> に貼り付ける →
+<strong>一時的にメモ帳等へ保存</strong></li>
+</ol>
+<h3 id="15-iam-権限確認">1.5 IAM 権限確認</h3>
+<ol type="1">
+<li><a
+href="https://console.cloud.google.com/iam-admin/iam"><span>https://console.cloud.google.com/iam-admin/iam</span></a>
+を開く</li>
+<li>画面上部のプロジェクト選択で先ほど作った Firebase
+プロジェクトを選ぶ</li>
+<li>一覧の中に
+<code>firebase-adminsdk-xxxxx@&lt;project&gt;.iam.gserviceaccount.com</code>
+があることを確認</li>
+<li>ロール欄に <strong>「Cloud Datastore User (Cloud Datastore
+ユーザー)」</strong> が含まれていればOK。無ければ:
+<ul>
+<li>行の <strong>鉛筆アイコン (編集)</strong> をクリック</li>
+<li><strong>「ロールを追加」</strong> → <strong>「Cloud Datastore
+ユーザー」</strong> を選択 →「保存」</li>
+</ul></li>
+</ol>
+<h3 id="16-動作確認">1.6 動作確認</h3>
+<ul>
+<li>Firebase Console → Firestore Database →
+<strong>「データ」タブ</strong>
+で「コレクションが空です」と表示されていれば成功</li>
+</ul>
+<hr />
+<h2 id="2-line-developersliff構築">2. LINE Developers（LIFF）構築</h2>
+<h3 id="21-プロバイダー作成初回のみ">2.1
+プロバイダー作成（初回のみ）</h3>
+<ol type="1">
+<li><a
+href="https://developers.line.biz/console/"><span>https://developers.line.biz/console/</span></a>
+を開く</li>
+<li>LINE アカウントでログイン</li>
+<li>画面右上 <strong>「コンソールに入る」</strong></li>
+<li>左上 <strong>「プロバイダー」 → 「作成」</strong></li>
+<li>プロバイダー名: <code>if(塾)</code> 等を入力 →「作成」</li>
+</ol>
+<h3 id="22-line-login-チャネル作成">2.2 LINE Login チャネル作成</h3>
+<ol type="1">
+<li>作成したプロバイダーを選択</li>
+<li><strong>「新規チャネル作成」</strong></li>
+<li><strong>「LINE Login」</strong> を選択</li>
+<li>入力:
+<ul>
+<li><strong>チャネル名</strong>: <code>みんなの体育館 予約</code></li>
+<li><strong>チャネル説明</strong>: 任意</li>
+<li><strong>アプリタイプ</strong>:
+<strong>「ウェブアプリ」にチェック</strong></li>
+<li>その他必須項目（プライバシーポリシー URL 等）を入力</li>
+</ul></li>
+<li>利用規約に同意してチェック →「作成」</li>
+</ol>
+<h3 id="23-liff-アプリ追加">2.3 LIFF アプリ追加</h3>
+<ol type="1">
+<li>作成したチャネル画面を開く</li>
+<li>上部タブ <strong>「LIFF」</strong> を選択</li>
+<li><strong>「追加」</strong> ボタンをクリック</li>
+<li>入力:
+<ul>
+<li><strong>LIFF アプリ名</strong>: <code>みんなの体育館</code></li>
+<li><strong>サイズ</strong>: <strong><code>Full</code></strong></li>
+<li><strong>エンドポイント URL</strong>:
+<code>https://&lt;本番URL&gt;/</code>
+<ul>
+<li>まだ Vercel に本番 URL が無い場合は仮で
+<code>https://example.com/</code> を入れて、Vercel
+デプロイ後に更新する</li>
+</ul></li>
+<li><strong>Scope</strong>: ✅ <code>profile</code> ✅
+<code>openid</code>（必須）</li>
+<li><strong>ボットリンク機能</strong>:
+<strong><code>On (Aggressive)</code></strong> 推奨</li>
+<li><strong>Scan QR</strong>: OFF</li>
+<li><strong>モジュールモード</strong>: OFF</li>
+</ul></li>
+<li>チェック項目を確認 →「追加」</li>
+<li>作成された <strong>LIFF
+ID</strong>（<code>2008793930-iDPTCREA</code> のような文字列）を控える →
+Vercel の <code>VITE_LIFF_ID</code> に使用</li>
+</ol>
+<h3 id="24-チャネル-id--シークレット取得将来の-messaging-api-連携用">2.4
+チャネル ID / シークレット取得（将来の Messaging API 連携用）</h3>
+<ol type="1">
+<li>上部タブ <strong>「チャネル基本設定」</strong></li>
+<li><strong>チャネル ID / チャネルシークレット</strong> をメモ</li>
+</ol>
+<h3 id="25-動作確認">2.5 動作確認</h3>
+<ul>
+<li>LIFF URL: <code>https://liff.line.me/&lt;LIFF_ID&gt;</code> を LINE
+内ブラウザで開く</li>
+<li>現段階では エンドポイント URL が仮なら白画面で OK（後で Vercel
+デプロイ URL に差し替え）</li>
+</ul>
+<hr />
+<h2 id="3-stripe-構築">3. Stripe 構築</h2>
+<h3 id="31-アカウント登録">3.1 アカウント登録</h3>
+<ol type="1">
+<li><a
+href="https://dashboard.stripe.com/register"><span>https://dashboard.stripe.com/register</span></a>
+を開く</li>
+<li>メールアドレス・パスワードで登録</li>
+<li>メール認証を完了</li>
+</ol>
+<h3 id="32-本番モード有効化本稼働前">3.2
+本番モード有効化（本稼働前）</h3>
+<ol type="1">
+<li>ダッシュボード左上の <strong>「本番環境を有効化」</strong>
+リンクをクリック</li>
+<li>法人・事業情報（屋号・事業者情報・口座）を入力</li>
+<li>本人確認書類をアップロード</li>
+<li>審査通過まで 1〜3 営業日</li>
+<li>審査完了後、左上のトグルで <strong>「テスト環境」/「本番」</strong>
+切替可能</li>
+</ol>
+<blockquote>
+<p>🧪 検証フェーズでは「テスト環境」のまま進めて OK。</p>
+</blockquote>
+<h3 id="33-api-キー取得">3.3 API キー取得</h3>
+<ol type="1">
+<li>左メニュー <strong>「開発者」 → 「API キー」</strong></li>
+<li><strong>シークレットキー</strong> の「+ キーを作成」または「表示」→
+<code>sk_test_...</code>（テスト）／<code>sk_live_...</code>（本番）をコピー</li>
+<li>後で Vercel の <code>STRIPE_SECRET_KEY</code> に貼る</li>
+</ol>
+<h3 id="34-決済方法の有効化カードpaypay">3.4
+決済方法の有効化（カード／PayPay）</h3>
+<ol type="1">
+<li>左メニュー <strong>「設定」 → 「決済方法 (Payment
+methods)」</strong></li>
+<li><strong>カード</strong>: デフォルトで有効</li>
+<li><strong>PayPay</strong>（日本のみ）:
+<ul>
+<li>一覧の「PayPay」行の <strong>「有効にする」</strong> をクリック</li>
+<li>同意チェック →「送信」</li>
+<li>審査完了まで数営業日</li>
+</ul></li>
+<li>同じ画面で「Checkout で有効な決済方法」を確認</li>
+</ol>
+<blockquote>
+<p>📄 PayPay 有効化の詳細は <a
+href="../paypay有効化/"><code>../paypay有効化/</code></a>
+フォルダ参照。</p>
+</blockquote>
+<h3 id="35-webhook-登録">3.5 Webhook 登録</h3>
+<ol type="1">
+<li>左メニュー <strong>「開発者」 → 「Webhook」</strong></li>
+<li><strong>「エンドポイントを追加 (Add endpoint)」</strong>
+をクリック</li>
+<li>入力:
+<ul>
+<li><strong>エンドポイント URL</strong>:
+<code>https://&lt;Vercel本番URL&gt;/api/payments/stripe-webhook</code>
+<ul>
+<li>Vercel デプロイ完了後に設定（この時点では仮でもOK、後で編集可）</li>
+</ul></li>
+<li><strong>リッスンするイベント</strong>: 「+ Events を選択」→
+<strong><code>checkout.session.completed</code></strong>
+のみチェック</li>
+</ul></li>
+<li><strong>「エンドポイントを追加」</strong> をクリック</li>
+<li>作成されたエンドポイントの <strong>「署名シークレット (Signing
+secret)」</strong> → <strong>「表示」</strong> をクリックし
+<code>whsec_...</code> をコピー</li>
+<li>後で Vercel の <code>STRIPE_WEBHOOK_SECRET</code> に貼る</li>
+</ol>
+<h3 id="36-動作確認">3.6 動作確認</h3>
+<ul>
+<li>左メニュー「Webhook」→ 作成したエンドポイント →
+<strong>「イベントを送信 (Send test webhook)」</strong></li>
+<li>任意のイベントで「送信」→ <strong>200 レスポンス</strong>
+が返ればサーバー側で受信できている（Vercel デプロイ完了後に実施）</li>
+</ul>
+<hr />
+<h2 id="4-remotelock-構築">4. RemoteLock 構築</h2>
+<h3 id="41-api-利用申請">4.1 API 利用申請</h3>
+<ol type="1">
+<li>日本国内は代理店経由（<a
+href="https://www.remotelock.jp"><span>https://www.remotelock.jp</span></a>
+から問い合わせ）</li>
+<li>API 開発者アカウントの発行依頼を送付（用途:
+「会員向け予約システムからの PIN 発行」）</li>
+<li>発行されたログイン URL: <a
+href="https://app.remotelock-pf.jp"><span>https://app.remotelock-pf.jp</span></a></li>
+</ol>
+<h3 id="42-oauth-clientclient-credentials発行">4.2 OAuth Client（Client
+Credentials）発行</h3>
+<ol type="1">
+<li>管理コンソールにログイン</li>
+<li>左メニュー <strong>「API クライアント」</strong> →
+<strong>「新規作成」</strong></li>
+<li>入力:
+<ul>
+<li><strong>名称</strong>: <code>gym-checkin</code></li>
+<li><strong>グラントタイプ</strong>:
+<code>Client Credentials</code></li>
+<li><strong>スコープ</strong>:
+画面に表示される項目のうち、予約作成（bookings
+系）・デバイス参照（devices 系）に関するものを
+<strong>全てチェック</strong>。UI
+表記は代理店の発行時に従う（<code>bookings.*</code> /
+<code>devices.*</code> 相当）</li>
+</ul></li>
+<li><strong>「作成」</strong> → 発行された <strong>Client ID / Client
+Secret</strong> をコピー</li>
+<li>後で Vercel の <code>REMOTELOCK_CLIENT_ID</code> /
+<code>REMOTELOCK_CLIENT_SECRET</code> に貼る</li>
+</ol>
+<h3 id="43-デバイス-id-の取得">4.3 デバイス ID の取得</h3>
+<ol type="1">
+<li>左メニュー <strong>「デバイス」</strong></li>
+<li>該当デバイスをクリックして詳細画面へ</li>
+<li>URL の末尾 <code>/devices/&lt;DEVICE_ID&gt;</code>
+の部分をコピー、または詳細画面に表示されている <strong>「デバイス
+ID」</strong> をコピー</li>
+<li>4 デバイス全てについて以下を記録:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>拠点</th>
+<th>施設</th>
+<th>環境変数</th>
+<th>シリアル例</th>
+<th>取得した Device ID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ASP</td>
+<td>玄関</td>
+<td><code>REMOTELOCK_DEVICE_ID_ENTRANCE</code></td>
+<td><code>AC000W017827101</code></td>
+<td>※記録</td>
+</tr>
+<tr>
+<td>ASP</td>
+<td>体育館</td>
+<td><code>REMOTELOCK_DEVICE_ID_GYM</code></td>
+<td><code>AC000W017830299</code></td>
+<td>※記録</td>
+</tr>
+<tr>
+<td>ASP</td>
+<td>トレーニング</td>
+<td><code>REMOTELOCK_DEVICE_ID_TRAINING</code></td>
+<td><code>AC000W017830548</code></td>
+<td>※記録</td>
+</tr>
+<tr>
+<td>YABASE</td>
+<td>八橋</td>
+<td><code>REMOTELOCK_DEVICE_ID_YABASE</code></td>
+<td><code>AC000W017827205</code></td>
+<td>※記録</td>
+</tr>
+</tbody>
+</table>
+<p>詳細台帳は <a
+href="../SmartLockディバイス情報/"><code>../SmartLockディバイス情報/</code></a>
+参照。</p>
+<h3 id="44-動作確認oauth-疎通">4.4 動作確認（OAuth 疎通）</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> <span class="at">-X</span> POST <span class="st">&quot;https://api.remotelock-pf.jp/oauth/token&quot;</span> <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Content-Type: application/x-www-form-urlencoded&quot;</span> <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-d</span> <span class="st">&quot;client_id=</span><span class="va">$RL_ID</span><span class="st">&amp;client_secret=</span><span class="va">$RL_SECRET</span><span class="st">&amp;grant_type=client_credentials&quot;</span></span></code></pre></div>
+<ul>
+<li><code>access_token</code> を含む JSON が返ればOK</li>
+<li>401 の場合: Client ID/Secret 誤り</li>
+</ul>
+<hr />
+<h2 id="5-vercel-構築アプリ配信">5. Vercel 構築（アプリ配信）</h2>
+<h3 id="51-vercel-アカウント登録ログイン">5.1 Vercel
+アカウント登録／ログイン</h3>
+<ol type="1">
+<li><a
+href="https://vercel.com/signup"><span>https://vercel.com/signup</span></a>
+を開く</li>
+<li><strong>「Continue with GitHub」</strong> で GitHub
+連携ログイン</li>
+<li><strong>Personal</strong> プラン（Hobby）でOK（本アプリは Hobby
+プランの関数上限 12 個に収まる）</li>
+</ol>
+<h3 id="52-リポジトリのインポート">5.2 リポジトリのインポート</h3>
+<ol type="1">
+<li>ダッシュボード右上 <strong>「Add New…」 → 「Project」</strong></li>
+<li>初回は GitHub の連携画面で <code>ifJukuManager</code>
+リポジトリを選択肢に入るように <strong>「Adjust GitHub App
+Permissions」</strong></li>
+<li>対象リポジトリを検索 → <strong>「Import」</strong></li>
+<li><strong>Configure Project</strong> 画面:
+<ul>
+<li><strong>Project Name</strong>: <code>gym-checkin</code></li>
+<li><strong>Framework Preset</strong>:
+<code>Vite</code>（自動検出）</li>
+<li><strong>Root Directory</strong>: <strong>「Edit」をクリック →
+<code>LINEMiniApp/gym-checkin</code> を選択</strong></li>
+<li><strong>Build and Output Settings</strong>:
+デフォルト（<code>vercel.json</code> が優先される）</li>
+<li><strong>Environment Variables</strong>:
+この時点では空のまま（次ステップで入力）</li>
+</ul></li>
+<li><strong>「Deploy」</strong> をクリック</li>
+<li>初回デプロイが始まる（失敗しても OK。環境変数未設定のため）</li>
+</ol>
+<h3 id="53-環境変数の投入">5.3 環境変数の投入</h3>
+<ol type="1">
+<li>プロジェクト画面 → <strong>「Settings」</strong> タブ</li>
+<li>左メニュー <strong>「Environment Variables」</strong></li>
+<li>以下をそれぞれ <strong>Production / Preview / Development</strong>
+全てにチェックを入れて追加:</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Value</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>VITE_LIFF_ID</code></td>
+<td><code>2008793930-iDPTCREA</code></td>
+<td>§2.3 の LIFF ID</td>
+</tr>
+<tr>
+<td><code>FIREBASE_SERVICE_ACCOUNT_KEY</code></td>
+<td>Base64 文字列</td>
+<td>§1.4 でコピーした値</td>
+</tr>
+<tr>
+<td><code>STRIPE_SECRET_KEY</code></td>
+<td><code>sk_live_...</code> or <code>sk_test_...</code></td>
+<td>§3.3</td>
+</tr>
+<tr>
+<td><code>STRIPE_WEBHOOK_SECRET</code></td>
+<td><code>whsec_...</code></td>
+<td>§3.5</td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_CLIENT_ID</code></td>
+<td>§4.2 の Client ID</td>
+<td></td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_CLIENT_SECRET</code></td>
+<td>§4.2 の Secret</td>
+<td></td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_DEVICE_ID_ENTRANCE</code></td>
+<td>ASP 玄関</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_DEVICE_ID_GYM</code></td>
+<td>ASP 体育館</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_DEVICE_ID_TRAINING</code></td>
+<td>ASP トレーニング</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td><code>REMOTELOCK_DEVICE_ID_YABASE</code></td>
+<td>八橋</td>
+<td>§4.3</td>
+</tr>
+<tr>
+<td><code>ADMIN_LINE_USER_IDS</code></td>
+<td><code>Uxxxx,Uyyyy</code></td>
+<td>管理者 LINE userId。後述 §7 で取得</td>
+</tr>
+<tr>
+<td><code>NEXT_PUBLIC_BASE_URL</code></td>
+<td><code>https://&lt;vercel-domain&gt;</code></td>
+<td>Stripe redirect 用（後述 §5.4 で確定）</td>
+</tr>
+<tr>
+<td><code>SKIP_PAYMENT</code></td>
+<td>（未設定 or <code>false</code>）</td>
+<td>本番は未設定のままで OK。<code>true</code> を入れると Stripe
+をスキップして PIN のみ発行（テスト用）</td>
+</tr>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td><code>info</code></td>
+<td>調査時は <code>debug</code> に変更</td>
+</tr>
+<tr>
+<td><code>LINE_CHANNEL_ACCESS_TOKEN</code></td>
+<td>（任意）</td>
+<td>将来 LINE Messaging API で Push
+通知を行う場合に設定。無くても予約機能は動作する</td>
+</tr>
+</tbody>
+</table>
+<p><strong>投入手順（1 件ずつ）</strong>:</p>
+<ul>
+<li><strong>Key</strong>: 変数名を入力</li>
+<li><strong>Value</strong>: 値を貼り付け</li>
+<li><strong>Environment</strong>: ☑ Production ☑ Preview ☑ Development
+すべてチェック</li>
+<li><strong>「Save」</strong></li>
+</ul>
+<blockquote>
+<p>⚠️ <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> は改行を含まない Base64
+1 行で貼る。貼り付け後に改行が入ると復号に失敗する。</p>
+</blockquote>
+<h3 id="54-本番-url-の確認と関連設定の更新">5.4 本番 URL
+の確認と関連設定の更新</h3>
+<ol type="1">
+<li>プロジェクト Overview → 本番 URL（例:
+<code>gym-checkin.vercel.app</code>）を確認</li>
+<li>以下を更新する:
+<ul>
+<li>Vercel 側 <code>NEXT_PUBLIC_BASE_URL</code> =
+<code>https://gym-checkin.vercel.app</code></li>
+<li>LIFF チャネル画面の <strong>「エンドポイント URL」</strong> を
+<code>https://gym-checkin.vercel.app/</code> に変更</li>
+<li>Stripe Webhook のエンドポイント URL を
+<code>https://gym-checkin.vercel.app/api/payments/stripe-webhook</code>
+に変更</li>
+</ul></li>
+</ol>
+<h3 id="55-再デプロイ">5.5 再デプロイ</h3>
+<ol type="1">
+<li>プロジェクト画面 → 上部 <strong>「Deployments」</strong> タブ</li>
+<li>最新デプロイの右端 <code>…</code> →
+<strong>「Redeploy」</strong></li>
+<li><strong>「Use existing Build Cache」</strong> のチェックは外して
+<strong>「Redeploy」</strong></li>
+<li>✅ 成功を確認（2〜3 分）</li>
+</ol>
+<h3 id="56-リージョン関数タイムアウトの設定">5.6
+リージョン／関数タイムアウトの設定</h3>
+<p><strong>リージョン（実行リージョン）</strong>:</p>
+<ol type="1">
+<li>プロジェクト → <strong>「Settings」</strong> → 左メニュー
+<strong>「Functions」</strong></li>
+<li><strong>「Region」</strong> セクションを探す</li>
+<li>既定の <code>Washington, D.C., USA (iad1)</code> のままで OK（Fluid
+Compute は自動最適化）</li>
+<li>東京リージョン固定にしたい場合（Pro 以上）:
+<ul>
+<li>プルダウンから <strong><code>Tokyo, Japan (hnd1)</code></strong>
+を選択</li>
+<li><strong>「Save」</strong></li>
+</ul></li>
+</ol>
+<p><strong>関数タイムアウト</strong>:</p>
+<ol type="1">
+<li>同じ <strong>「Functions」</strong> 画面の <strong>「Default
+Function Timeout」</strong> を確認</li>
+<li>2026 年現在、全プラン既定 <strong>300 秒</strong>
+で問題なし（変更不要）</li>
+<li>個別関数でタイムアウトを変えたい場合は、<code>api/**.ts</code>
+側に以下を追記:</li>
+</ol>
+<div class="sourceCode" id="cb4"><pre class="sourceCode ts"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co">// ファイル末尾</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> config <span class="op">=</span> { maxDuration<span class="op">:</span> <span class="dv">60</span> }<span class="op">;</span>  <span class="co">// 秒</span></span></code></pre></div>
+<h3 id="57-カスタムドメイン任意">5.7 カスタムドメイン（任意）</h3>
+<ol type="1">
+<li>プロジェクト → <strong>「Settings」</strong> →
+<strong>「Domains」</strong></li>
+<li>入力欄に <code>reserve.example.com</code> 等を入力 →
+<strong>「Add」</strong></li>
+<li>指示通りに DNS（CNAME or A レコード）を追加</li>
+<li>数分〜数十分で有効化</li>
+<li>有効化後、<strong>§5.4 と同じく LIFF / Stripe /
+<code>NEXT_PUBLIC_BASE_URL</code> を新ドメインに更新</strong></li>
+</ol>
+<h3 id="58-動作確認">5.8 動作確認</h3>
+<ol type="1">
+<li>LIFF URL (<code>https://liff.line.me/&lt;LIFF_ID&gt;</code>) を LINE
+内で開く</li>
+<li>拠点選択画面が表示される</li>
+<li>テスト予約 → Stripe テストカード <code>4242 4242 4242 4242</code> /
+任意の有効期限・CVC で決済</li>
+<li>完了画面に 4 桁 PIN が表示される</li>
+<li>RemoteLock 管理コンソールに <code>bookings</code>
+が作成されている</li>
+<li>Stripe ダッシュボード → Webhook → Attempts でイベント 200
+を確認</li>
+<li>Vercel → <strong>「Logs」</strong> で <code>[OPERATION]</code>
+ログが出ていることを確認</li>
+</ol>
+<hr />
+<h2 id="6-管理者-line-userid-の取得方法">6. 管理者 LINE userId
+の取得方法</h2>
+<p>管理画面 <code>/admin</code> にアクセスする LINE userId
+を特定する手順。</p>
+<h3 id="方法-a推奨-vercel-logs-から取得">方法 A（推奨）: Vercel Logs
+から取得</h3>
+<ol type="1">
+<li>対象者に LINE から LIFF
+URL（公式アカウントのリッチメニュー等）を<strong>一度起動してもらう</strong></li>
+<li>Vercel ダッシュボード → 対象プロジェクト → <strong>「Logs」</strong>
+タブ</li>
+<li>画面上部の検索ボックスに <code>user.autoRegister.ok</code> または
+<code>checkin.create</code> を入力</li>
+<li>直近のログに含まれる <code>lineUserId</code>
+フィールドの値（<code>U...</code> で始まる文字列）が対象者の userId</li>
+</ol>
+<h3 id="方法-b-firestore-から取得">方法 B: Firestore から取得</h3>
+<ol type="1">
+<li>対象者に LIFF を一度起動してもらう（= <code>users</code>
+コレクションに自動登録される）</li>
+<li>Firebase Console → Firestore Database → <code>users</code>
+コレクションを開く</li>
+<li><code>displayName</code>
+で対象者のドキュメントを探し、<code>lineUserId</code>
+フィールドをコピー</li>
+</ol>
+<h3 id="userid-の反映">userId の反映</h3>
+<ol start="4" type="1">
+<li>取得した userId を Vercel の <code>ADMIN_LINE_USER_IDS</code>
+にカンマ区切りで追加</li>
+</ol>
+<pre><code>ADMIN_LINE_USER_IDS=Uab12cd34ef56,U99aabb77cc33</code></pre>
+<ol start="5" type="1">
+<li>Vercel で環境変数を更新 →
+次回関数実行時に自動反映される。即時反映したい場合は <strong>Deployments
+→ 最新の <code>…</code> → Redeploy</strong></li>
+</ol>
+<hr />
+<h2 id="7-事前に準備するアカウント連絡先チェックリスト">7.
+事前に準備するアカウント／連絡先チェックリスト</h2>
+<p>環境構築に着手する前に揃えておくもの:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" />Google アカウント（Firebase
+用）</label></li>
+<li><label><input type="checkbox" />LINE Business ID（LINE Developers
+用）</label></li>
+<li><label><input type="checkbox" />Stripe
+の登記情報・銀行口座・本人確認書類（本番モード有効化用）</label></li>
+<li><label><input type="checkbox" />RemoteLock
+の契約（代理店経由）</label></li>
+<li><label><input type="checkbox" />GitHub アカウント（Vercel
+連携用）</label></li>
+<li><label><input type="checkbox" />Vercel アカウント（GitHub
+で登録）</label></li>
+<li><label><input
+type="checkbox" />ドメイン（カスタムドメインを使う場合）</label></li>
+</ul>
+<hr />
+<h2 id="8-パラメータ設定-まとめ本番">8. パラメータ設定
+まとめ（本番）</h2>
+<table>
+<thead>
+<tr>
+<th>設定項目</th>
+<th>値 / 場所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node.js バージョン</td>
+<td>20.x（<code>package.json engines</code> / Vercel 自動認識）</td>
+</tr>
+<tr>
+<td>Build Command</td>
+<td><code>npm run build</code>（<code>vercel.json</code>）</td>
+</tr>
+<tr>
+<td>Output Directory</td>
+<td><code>dist</code>（<code>vercel.json</code>）</td>
+</tr>
+<tr>
+<td>Install Command</td>
+<td><code>npm ci</code>（<code>vercel.json</code>）</td>
+</tr>
+<tr>
+<td>SPA Fallback</td>
+<td><code>vercel.json rewrites</code>（<code>/((?!api/).*)</code> →
+<code>/index.html</code>）</td>
+</tr>
+<tr>
+<td>CORS</td>
+<td><code>vercel.json headers</code></td>
+</tr>
+<tr>
+<td>関数実行リージョン</td>
+<td>既定（<code>iad1</code>）または東京（<code>hnd1</code>）※Pro
+以上</td>
+</tr>
+<tr>
+<td>関数タイムアウト</td>
+<td>既定 300 秒（個別は <code>maxDuration</code> で上書き）</td>
+</tr>
+<tr>
+<td>Firestore モード</td>
+<td>Native mode / <code>asia-northeast1</code></td>
+</tr>
+<tr>
+<td>Firestore ルール</td>
+<td>全拒否（サーバ経由のみ）</td>
+</tr>
+<tr>
+<td>相席トレ定員</td>
+<td>コード定数 <code>SHARED_CAPACITY = 10</code></td>
+</tr>
+<tr>
+<td>営業時間</td>
+<td>ASP: 08-21 / YABASE: 07-21（コード定数）</td>
+</tr>
+<tr>
+<td>ログレベル</td>
+<td><code>LOG_LEVEL=info</code>（障害調査時に <code>debug</code>）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-再現性確認の記録テンプレート">9.
+再現性確認の記録テンプレート</h2>
+<p>手順が再現可能か検証する際の記録テンプレート（構築担当者が記入）。</p>
+<pre><code>構築担当:
+日付:
+所要時間:  (実測)
+
+[1. Firebase]
+  - プロジェクト作成  □ 成功 / □ 失敗 (理由: )
+  - Firestore 有効化  □ 成功 / □ 失敗
+  - サービスアカウント □ 成功 / □ 失敗
+
+[2. LINE]
+  - LIFF 作成         □ 成功 / □ 失敗
+  - LIFF ID:
+
+[3. Stripe]
+  - 決済方法          □ カード □ PayPay
+  - Webhook           □ 登録済
+
+[4. RemoteLock]
+  - Client Credentials  □ 発行済
+  - Device ID × 4       □ 取得済
+
+[5. Vercel]
+  - 環境変数投入      □ 全項目完了
+  - 本番デプロイ      □ 成功
+  - LIFF 起動確認     □ 成功
+  - 決済→PIN発行     □ 成功
+
+障害・ハマりポイント:</code></pre>
+</body>
+</html>

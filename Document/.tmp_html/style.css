@@ -1,0 +1,37 @@
+@page { size: A4; margin: 18mm 16mm; }
+html, body {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+               "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.65;
+  color: #1f2937;
+}
+h1 { font-size: 18pt; border-bottom: 2px solid #2563eb; padding-bottom: 6px; margin-top: 1.2em; }
+h2 { font-size: 14pt; border-bottom: 1px solid #93c5fd; padding-bottom: 4px; margin-top: 1.5em; }
+h3 { font-size: 12pt; margin-top: 1.3em; }
+h4 { font-size: 11pt; }
+code, pre {
+  font-family: "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 9pt;
+}
+pre {
+  background: #f3f4f6;
+  padding: 10px 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+code { background: #eef2ff; padding: 1px 4px; border-radius: 3px; }
+pre code { background: transparent; padding: 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
+th, td { border: 1px solid #d1d5db; padding: 6px 8px; vertical-align: top; }
+th { background: #f3f4f6; text-align: left; }
+blockquote {
+  margin: 8px 0; padding: 6px 12px;
+  border-left: 4px solid #60a5fa;
+  background: #eff6ff; color: #1e3a8a;
+}
+.mermaid { text-align: center; margin: 12px 0; }
+a { color: #2563eb; word-break: break-all; }
+img { max-width: 100%; }

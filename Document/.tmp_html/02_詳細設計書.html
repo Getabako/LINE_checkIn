@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>02_詳細設計書</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">02_詳細設計書</h1>
+</header>
+<h1 id="02-詳細設計書">02. 詳細設計書</h1>
+<h2 id="1-画面設計">1. 画面設計</h2>
+<h3 id="11-画面遷移">1.1 画面遷移</h3>
+<pre><code>LocationPage (/)
+  └─▶ HomePage (/facility)
+        └─▶ CheckinPage (/checkin)
+              └─▶ PaymentPage (/payment)
+                    └─▶ Stripe Checkout (外部)
+                          └─▶ CompletePage (/complete)  ──▶ ReviewPage (/review)
+
+サイドフロー:
+  ReservationsPage (/reservations)
+  EventListPage (/events) ─▶ EventDetailPage (/events/:id)
+  SchoolListPage (/schools) ─▶ SchoolDetailPage (/schools/:id)
+  AdminPage (/admin)  (認可: lineUserId が ADMIN_LINE_USER_IDS に含まれる場合)
+  PrivacyPolicyPage (/privacy) / CommerceLawPage (/commerce-law)</code></pre>
+<h3 id="12-ルーティング定義">1.2 ルーティング定義</h3>
+<table>
+<thead>
+<tr>
+<th>ルート</th>
+<th>コンポーネント</th>
+<th>認可</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td><code>LocationPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/facility</code></td>
+<td><code>HomePage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/checkin</code></td>
+<td><code>CheckinPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/payment</code></td>
+<td><code>PaymentPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/complete</code></td>
+<td><code>CompletePage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/review</code></td>
+<td><code>ReviewPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/reservations</code></td>
+<td><code>ReservationsPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/events</code> / <code>/events/:id</code></td>
+<td><code>EventListPage</code> / <code>EventDetailPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/schools</code> / <code>/schools/:id</code></td>
+<td><code>SchoolListPage</code> / <code>SchoolDetailPage</code></td>
+<td>LIFF</td>
+</tr>
+<tr>
+<td><code>/admin</code></td>
+<td><code>AdminPage</code></td>
+<td><code>ADMIN_LINE_USER_IDS</code> 一致時のみ</td>
+</tr>
+<tr>
+<td><code>/privacy</code> / <code>/commerce-law</code></td>
+<td>法的ページ</td>
+<td>公開</td>
+</tr>
+</tbody>
+</table>
+<h3 id="13-画面別の主な入出力">1.3 画面別の主な入出力</h3>
+<table>
+<thead>
+<tr>
+<th>画面</th>
+<th>入力</th>
+<th>状態</th>
+<th>出力（API 呼び出し）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LocationPage</td>
+<td>拠点タップ</td>
+<td><code>checkinStore.setLocation</code></td>
+<td><code>GET /api/checkins?type=events</code>,
+<code>?type=schools</code>,
+<code>GET /api/admin?action=announcementsPublic</code>,
+<code>GET /api/users/membership</code></td>
+</tr>
+<tr>
+<td>HomePage</td>
+<td>施設タップ</td>
+<td><code>checkinStore.setFacilityType</code></td>
+<td>-</td>
+</tr>
+<tr>
+<td>CheckinPage</td>
+<td>日付/開始時刻/時間数、タブ切替</td>
+<td><code>checkinStore</code></td>
+<td><code>GET /api/checkins?type=availability</code></td>
+</tr>
+<tr>
+<td>PaymentPage</td>
+<td>クーポンコード入力</td>
+<td><code>checkinStore.setCoupon</code></td>
+<td><code>POST /api/coupons/validate</code>,
+<code>POST /api/payments/create-checkout</code></td>
+</tr>
+<tr>
+<td>CompletePage</td>
+<td>-</td>
+<td>クエリ <code>checkin_id</code> を読み込み</td>
+<td><code>GET /api/checkins/:id</code></td>
+</tr>
+<tr>
+<td>ReviewPage</td>
+<td>星・コメント</td>
+<td>-</td>
+<td><code>POST /api/reviews</code></td>
+</tr>
+<tr>
+<td>AdminPage</td>
+<td>タブ切替・各種フォーム</td>
+<td>-</td>
+<td><code>GET/POST/PUT/DELETE /api/admin?action=...</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="14-共通仕様">1.4 共通仕様</h3>
+<h4 id="141-liff-初期化--認可srcapptsx">1.4.1 LIFF 初期化 /
+認可（<code>src/App.tsx</code>）</h4>
+<table>
+<thead>
+<tr>
+<th>イベント</th>
+<th>トリガー</th>
+<th>仕様</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>アプリ起動</td>
+<td><code>App</code> マウント時</td>
+<td><code>initializeLiff()</code> を呼び出し、LIFF SDK を
+<code>VITE_LIFF_ID</code> で初期化</td>
+</tr>
+<tr>
+<td>自動ユーザー登録</td>
+<td>LIFF 初期化完了後</td>
+<td><code>userApi.getMe()</code> を投げ、失敗しても UI
+はブロックしない</td>
+</tr>
+<tr>
+<td>初期化失敗（本番）</td>
+<td><code>initializeLiff</code> reject</td>
+<td>画面に「LIFFの初期化に失敗しました」＋「再読み込み」ボタンを表示（<code>window.location.reload()</code>）</td>
+</tr>
+<tr>
+<td>初期化失敗（開発）</td>
+<td>同上</td>
+<td>モックユーザー <code>U_dev_user_12345</code> で継続</td>
+</tr>
+<tr>
+<td>ルーティング</td>
+<td>初期化成功後</td>
+<td><code>BrowserRouter</code> で各 <code>Route</code> をマウント</td>
+</tr>
+</tbody>
+</table>
+<h4 id="142-共通-ui-コンポーネント">1.4.2 共通 UI コンポーネント</h4>
+<table>
+<thead>
+<tr>
+<th>コンポーネント</th>
+<th>トリガー / props</th>
+<th>仕様</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Header</code></td>
+<td><code>showBack</code></td>
+<td><code>true</code> のとき <code>history.back()</code>
+ボタンを表示</td>
+</tr>
+<tr>
+<td><code>Button</code></td>
+<td><code>disabled</code> / <code>onClick</code></td>
+<td><code>disabled=true</code> のとき CSS
+でグレー化しイベントを受けない</td>
+</tr>
+<tr>
+<td><code>Loading</code></td>
+<td><code>fullScreen</code></td>
+<td>画面全面のスピナー</td>
+</tr>
+<tr>
+<td><code>DebugPanel</code></td>
+<td>画面下ゲージを長押し</td>
+<td><code>debugStore</code> のスキップフラグを切替（本番でも有効）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="143-状態管理zustand">1.4.3 状態管理（Zustand）</h4>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>永続化</th>
+<th>ライフサイクル</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>checkinStore</code></td>
+<td>なし（メモリのみ）</td>
+<td><code>LocationPage</code> マウント時に <code>reset()</code>
+で初期化、<code>CompletePage</code> 成功時にもリセットされる</td>
+</tr>
+<tr>
+<td><code>debugStore</code></td>
+<td>localStorage（<code>gym-checkin-debug</code>）</td>
+<td>セッションをまたいで保持</td>
+</tr>
+</tbody>
+</table>
+<h4 id="144-エラー表示ルール">1.4.4 エラー表示ルール</h4>
+<ul>
+<li>API 呼び出し失敗: 呼出し元
+<code>useState&lt;string \| null&gt;</code>
+にメッセージを保持し、インライン赤帯で表示</li>
+<li>409 競合（重複予約・定員）: エラーメッセージをそのまま表示</li>
+<li>その他 500:
+「決済処理中にエラーが発生しました。もう一度お試しください。」等の汎用メッセージ</li>
+</ul>
+<hr />
+<h3 id="15-画面別イベント仕様初期表示onclick-等">1.5
+画面別イベント仕様（初期表示・onClick 等）</h3>
+<p>各画面について、<strong>画面表示時処理</strong> と
+<strong>主要なユーザーイベント</strong> を列挙する。</p>
+<h4 id="151-locationpage拠点選択">1.5.1
+LocationPage（<code>/</code>）拠点選択</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td><code>checkinStore.reset()</code> で全状態をクリア</td>
+</tr>
+<tr>
+<td>2</td>
+<td>データ取得</td>
+<td>マウント直後</td>
+<td>並列で 4 つの API を発火: <code>eventApi.getAll()</code> /
+<code>schoolApi.getAll()</code> /
+<code>announcementApi.getPublic()</code> /
+<code>membershipApi.get()</code>。各々失敗時は空配列/<code>null</code>
+にフォールバック</td>
+</tr>
+<tr>
+<td>3</td>
+<td>会員バッジ表示</td>
+<td><code>membership</code> 取得後</td>
+<td><code>memberType.discountType</code>
+に応じて「利用無料」「○%OFF」「¥○/h OFF」を表示</td>
+</tr>
+<tr>
+<td>4</td>
+<td>お知らせ表示</td>
+<td><code>announcements</code> 取得後</td>
+<td><code>priority</code> により色分け（<code>critical</code>=赤 /
+<code>warning</code>=橙 / <code>info</code>=水色）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>拠点カードタップ</td>
+<td><code>onClick</code></td>
+<td><code>setLocation(id)</code> → 選択状態に切替。遷移はしない</td>
+</tr>
+<tr>
+<td>6</td>
+<td>イベントカードタップ</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/events/:id')</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>スクールカードタップ</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/schools/:id')</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>「マイ予約」タップ</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/reservations')</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>「管理画面」タップ</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/admin')</code>（管理者以外は <code>/admin</code>
+側で 403）</td>
+</tr>
+<tr>
+<td>10</td>
+<td>「プライバシーポリシー」</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/privacy')</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>「特商法に基づく表記」</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/commerce-law')</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>「次へ進む」タップ</td>
+<td><code>onClick</code></td>
+<td><code>location</code> が空なら無効。選択済なら
+<code>navigate('/facility')</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>バリデーション</strong>: 「次へ進む」は
+<code>location == null</code> のとき <code>disabled</code>。</p>
+<hr />
+<h4 id="152-homepagefacility施設選択">1.5.2
+HomePage（<code>/facility</code>）施設選択</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td><code>location</code> が未選択なら <code>/</code>
+に戻る（<code>useEffect</code>）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>料金表表示</td>
+<td><code>location</code> 変更時</td>
+<td><code>PRICE_TABLE[location]</code>
+を参照し施設別・時間帯別の料金を描画</td>
+</tr>
+<tr>
+<td>3</td>
+<td>施設カードタップ</td>
+<td><code>onClick</code></td>
+<td><code>setFacilityType(type)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>「次へ進む」</td>
+<td><code>onClick</code></td>
+<td><code>facilityType</code> 未選択時は無効。選択済なら
+<code>navigate('/checkin')</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>戻るボタン</td>
+<td><code>Header.showBack</code></td>
+<td><code>history.back()</code> で <code>/</code> へ</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="153-checkinpagecheckin日時選択">1.5.3
+CheckinPage（<code>/checkin</code>）日時選択</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td><code>location</code> / <code>facilityType</code>
+のどちらかが未選択なら <code>/</code> に戻る</td>
+</tr>
+<tr>
+<td>2</td>
+<td>日付候補生成</td>
+<td>マウント</td>
+<td><code>addDays(today, 0..13)</code> の 14 日分を <code>useMemo</code>
+で生成</td>
+</tr>
+<tr>
+<td>3</td>
+<td>空き状況取得</td>
+<td>選択日・施設・時間変更時</td>
+<td><code>checkinApi.getAvailability({ location, facilityType, dates, startTime, duration })</code>
+を呼び出し、結果で「空き/残りわずか/満員」バッジを表示</td>
+</tr>
+<tr>
+<td>4</td>
+<td>タブ切替「単日／複数日」</td>
+<td><code>onClick</code></td>
+<td><code>setMultiDateMode(enabled)</code>。複数日 OFF にした場合
+<code>dates</code> と <code>recurringType</code> もクリア</td>
+</tr>
+<tr>
+<td>5</td>
+<td>単日：日付タップ</td>
+<td><code>onClick</code></td>
+<td><code>setDate(date)</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>複数日：日付チップ</td>
+<td><code>onClick</code></td>
+<td><code>toggleDate(date)</code> で追加/削除。並び順は昇順ソート</td>
+</tr>
+<tr>
+<td>7</td>
+<td>定期予約切替</td>
+<td>ラジオ</td>
+<td><code>setRecurring('WEEKLY' | 'BIWEEKLY' | null, count)</code>。選択時は基準日＋<code>interval * i</code>
+で日付配列を <code>setDates</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>開始時刻プルダウン</td>
+<td><code>onChange</code></td>
+<td><code>setStartTime(time)</code>。候補は
+<code>LOCATION_TIME_SLOTS[location]</code>（ASP: 08-20 / YABASE:
+07-20）</td>
+</tr>
+<tr>
+<td>9</td>
+<td>利用時間プルダウン</td>
+<td><code>onChange</code></td>
+<td><code>setDuration(hours)</code>。候補は
+<code>getAvailableDurations(startTime)</code>（<code>endHour &lt;= 21</code>
+制約）</td>
+</tr>
+<tr>
+<td>10</td>
+<td>料金計算</td>
+<td>条件変更時</td>
+<td><code>useMemo</code> で
+<code>calculatePrice(location, facilityType, date, startTime, duration)</code>
+を再実行し <code>setTotalPrice</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>「確認画面へ」</td>
+<td><code>onClick</code></td>
+<td>必須項目全部揃っていれば <code>navigate('/payment')</code>。不足なら
+disabled</td>
+</tr>
+</tbody>
+</table>
+<p><strong>バリデーション</strong>:</p>
+<ul>
+<li>単日モード:
+<code>location &amp;&amp; facilityType &amp;&amp; date &amp;&amp; startTime &amp;&amp; duration</code></li>
+<li>複数日モード:
+<code>dates.length &gt;= 1 &amp;&amp; startTime &amp;&amp; duration</code></li>
+<li>定期予約:
+<code>recurringType &amp;&amp; recurringCount &gt;= 1</code>（基準日必須）</li>
+</ul>
+<hr />
+<h4 id="154-paymentpagepayment確認クーポン決済">1.5.4
+PaymentPage（<code>/payment</code>）確認・クーポン・決済</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示（必須チェック）</td>
+<td>マウント</td>
+<td><code>location &amp;&amp; facilityType &amp;&amp; date &amp;&amp; startTime &amp;&amp; totalPrice</code>
+のどれか欠落で <code>/</code> に戻る</td>
+</tr>
+<tr>
+<td>2</td>
+<td>会員割引の自動適用</td>
+<td>価格・日数変更時</td>
+<td><code>membershipApi.get()</code> → <code>discountType</code>
+に応じて 1 日あたり割引を算出し
+<code>setMemberDiscount(total, typeName)</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>キャンセル時メッセージ</td>
+<td>クエリ <code>?cancelled=true</code></td>
+<td>Stripe で戻ったときに「決済がキャンセルされました」を表示</td>
+</tr>
+<tr>
+<td>4</td>
+<td>クーポンコード入力</td>
+<td><code>onChange</code></td>
+<td><code>couponInput</code> を更新（未検証）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>「適用」ボタン</td>
+<td><code>onClick</code></td>
+<td><code>couponApi.validate({ code, location, totalPrice: totalPrice - memberDiscount })</code>
+→
+<code>setCoupon(code, discount)</code>。失敗時はメッセージ表示のみ</td>
+</tr>
+<tr>
+<td>6</td>
+<td>「クーポンを外す」</td>
+<td><code>onClick</code></td>
+<td><code>setCoupon(null, 0)</code> + 入力欄クリア</td>
+</tr>
+<tr>
+<td>7</td>
+<td>合計表示</td>
+<td><code>totalPrice</code> / <code>couponDiscount</code> /
+<code>memberDiscount</code> 変更時</td>
+<td><code>finalPrice = max(0, totalPrice - couponDiscount - memberDiscount)</code>
+を描画</td>
+</tr>
+<tr>
+<td>8</td>
+<td>「カードで支払う」</td>
+<td><code>onClick</code></td>
+<td><code>setIsLoading(true)</code> →
+<code>POST /api/payments/create-checkout</code></td>
+</tr>
+<tr>
+<td>8a</td>
+<td>応答 <code>mode == "skip"</code></td>
+<td>-</td>
+<td><code>navigate('/complete?checkinId=...&amp;groupId=...')</code></td>
+</tr>
+<tr>
+<td>8b</td>
+<td>応答 <code>mode == "stripe"</code></td>
+<td>-</td>
+<td><code>window.location.href = checkoutUrl</code>（Stripe
+に遷移）</td>
+</tr>
+<tr>
+<td>8c</td>
+<td>409（重複/定員）</td>
+<td>-</td>
+<td>エラーメッセージを赤帯で表示。ボタン再活性化</td>
+</tr>
+<tr>
+<td>8d</td>
+<td>500 等</td>
+<td>-</td>
+<td>汎用エラーを表示。ボタン再活性化</td>
+</tr>
+<tr>
+<td>9</td>
+<td>デバッグスキップ</td>
+<td><code>debugStore</code> 参照</td>
+<td><code>paymentEnabled == false</code> なら
+<code>skipPayment: true</code>、<code>remoteLockEnabled == false</code>
+なら <code>skipRemoteLock: true</code> をリクエストに付与</td>
+</tr>
+</tbody>
+</table>
+<p><strong>リクエストペイロード（例）</strong>:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;location&quot;</span><span class="fu">:</span> <span class="st">&quot;ASP&quot;</span><span class="fu">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;facilityType&quot;</span><span class="fu">:</span> <span class="st">&quot;GYM&quot;</span><span class="fu">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;date&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-05-01&quot;</span><span class="fu">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;startTime&quot;</span><span class="fu">:</span> <span class="st">&quot;10:00&quot;</span><span class="fu">,</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;duration&quot;</span><span class="fu">:</span> <span class="dv">2</span><span class="fu">,</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;couponCode&quot;</span><span class="fu">:</span> <span class="st">&quot;WELCOME500&quot;</span><span class="fu">,</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;skipPayment&quot;</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;skipRemoteLock&quot;</span><span class="fu">:</span> <span class="kw">false</span><span class="fu">,</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;dates&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;2026-05-01&quot;</span><span class="ot">,</span><span class="st">&quot;2026-05-08&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;recurring&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;type&quot;</span><span class="fu">:</span> <span class="st">&quot;WEEKLY&quot;</span><span class="fu">,</span> <span class="dt">&quot;count&quot;</span><span class="fu">:</span> <span class="dv">2</span> <span class="fu">}</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h4 id="155-completepagecomplete完了pin-表示">1.5.5
+CompletePage（<code>/complete</code>）完了・PIN 表示</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td>クエリ <code>checkinId</code> / <code>groupId</code> /
+<code>mock</code> を取得</td>
+</tr>
+<tr>
+<td>2</td>
+<td>モック表示</td>
+<td><code>mock=true</code></td>
+<td><code>checkinStore</code> の状態からランダム PIN の擬似 Checkin
+を生成（LIFF モック用）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>単日取得</td>
+<td><code>checkinId</code> あり &amp; <code>groupId</code> なし</td>
+<td><code>checkinApi.getById(checkinId)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>複数日取得</td>
+<td><code>groupId</code> あり</td>
+<td><code>checkinApi.getByGroup(groupId)</code> →
+<code>groupCheckins</code> にセット</td>
+</tr>
+<tr>
+<td>5</td>
+<td>完了時リセット</td>
+<td>取得成功後</td>
+<td><code>checkinStore.reset()</code> で次の予約に備える</td>
+</tr>
+<tr>
+<td>6</td>
+<td>PIN コピー</td>
+<td>「コピーする」</td>
+<td><code>navigator.clipboard.writeText(pinCode)</code> +
+<code>setCopied</code> で 2 秒後に解除</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Google カレンダー登録</td>
+<td><code>onClick</code></td>
+<td><code>buildGoogleCalendarUrl({ title, startsAt, endsAt, details: PIN メモ })</code>
+→ <code>window.open</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>領収書 DL</td>
+<td><code>onClick</code></td>
+<td><code>checkinApi.getReceipt(id)</code> →
+<code>{ pdf: base64 }</code> を Blob 化して <code>a[download]</code>
+でダウンロード</td>
+</tr>
+<tr>
+<td>9</td>
+<td>「レビューを書く」</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/review?checkinId=...')</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>「ホームに戻る」</td>
+<td><code>onClick</code></td>
+<td><code>navigate('/')</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>エラー</strong>: PIN
+未発行（<code>pinCode == null</code>）の場合は「PIN
+は後ほど発行されます」を表示し自動リロード（10 秒間隔 / 最大 3
+回）。</p>
+<hr />
+<h4 id="156-reviewpagereview">1.5.6
+ReviewPage（<code>/review</code>）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td>クエリ <code>checkinId</code>
+を取得。<code>reviewApi.getByCheckin(id)</code>
+で既存レビューの有無を確認</td>
+</tr>
+<tr>
+<td>2</td>
+<td>既に投稿済</td>
+<td>既存あり</td>
+<td>編集不可で過去レビューを表示</td>
+</tr>
+<tr>
+<td>3</td>
+<td>星タップ</td>
+<td><code>onClick</code></td>
+<td><code>setRating(1..5)</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>コメント入力</td>
+<td><code>onChange</code></td>
+<td><code>setComment(text)</code>（最大 500 文字）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>「投稿する」</td>
+<td><code>onClick</code></td>
+<td><code>reviewApi.create({ checkinId, rating, comment })</code> →
+成功で「ご協力ありがとうございました」表示</td>
+</tr>
+<tr>
+<td>6</td>
+<td>バリデーション</td>
+<td>クリック時</td>
+<td><code>rating &gt;= 1</code> 必須。コメント任意</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="157-reservationspagereservations">1.5.7
+ReservationsPage（<code>/reservations</code>）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td><code>checkinApi.getAll()</code>
+で自分の予約を取得。<code>createdAt</code> 降順で並べる</td>
+</tr>
+<tr>
+<td>2</td>
+<td>タブ切替「予定／履歴」</td>
+<td><code>onClick</code></td>
+<td>ローカル state で <code>status</code>
+絞込み（<code>PAID &amp; 未来</code> / <code>USED or CANCELLED</code>
+など）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>「キャンセル」タップ</td>
+<td><code>onClick</code></td>
+<td><code>window.confirm</code> で確認 →
+<code>checkinApi.cancel(id)</code> → 成功で一覧再取得</td>
+</tr>
+<tr>
+<td>4</td>
+<td>キャンセル不可</td>
+<td>利用開始 1 時間前以降</td>
+<td>ボタンを <code>disabled</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>「領収書 DL」タップ</td>
+<td><code>onClick</code></td>
+<td><code>checkinApi.getReceipt(id)</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="158-eventlistpage--eventdetailpage">1.5.8 EventListPage /
+EventDetailPage</h4>
+<table>
+<thead>
+<tr>
+<th>画面</th>
+<th>イベント</th>
+<th>処理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一覧</td>
+<td>初期表示</td>
+<td><code>eventApi.getAll()</code> → <code>isActive==true</code>
+を未来日ソート</td>
+</tr>
+<tr>
+<td>一覧</td>
+<td>カードタップ</td>
+<td><code>navigate('/events/:id')</code></td>
+</tr>
+<tr>
+<td>詳細</td>
+<td>初期表示</td>
+<td>一覧から <code>find(id)</code>、なければ再取得</td>
+</tr>
+<tr>
+<td>詳細</td>
+<td>「申込む」</td>
+<td><code>eventApi.register(eventId)</code> →
+成功で「申込完了」表示・定員 +1</td>
+</tr>
+<tr>
+<td>詳細</td>
+<td>定員到達時</td>
+<td>ボタン <code>disabled</code> + 「定員に達しました」</td>
+</tr>
+</tbody>
+</table>
+<p>SchoolListPage / SchoolDetailPage
+も同じ構造（<code>schoolApi</code>）。</p>
+<hr />
+<h4 id="159-adminpageadmin">1.5.9 AdminPage（<code>/admin</code>）</h4>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>イベント</th>
+<th>トリガー</th>
+<th>処理内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>初期表示</td>
+<td>マウント</td>
+<td>自分の <code>lineUserId</code>
+を取得し、<code>ADMIN_LINE_USER_IDS</code>
+に含まれるかサーバー側で検証（API 403
+なら「権限がありません」を表示）</td>
+</tr>
+<tr>
+<td>2</td>
+<td>タブ切替</td>
+<td>カレンダー / イベント / スクール / 会員 / クーポン / お知らせ /
+売上</td>
+<td>ローカル state で表示切替。タブごとに必要な <code>adminApi</code>
+を呼び出す</td>
+</tr>
+<tr>
+<td>3</td>
+<td>カレンダー月送り</td>
+<td>「◀/▶/今日」</td>
+<td>表示月を変え <code>adminApi.getCheckins({ from, to })</code>
+で月初〜月末の予約を取得</td>
+</tr>
+<tr>
+<td>4</td>
+<td>日セルタップ</td>
+<td><code>onClick</code></td>
+<td>下部パネルにその日の予約・イベント・スクールを描画</td>
+</tr>
+<tr>
+<td>5</td>
+<td>「+予約を追加」</td>
+<td><code>onClick</code></td>
+<td>モーダルを開き、<code>adminApi.createCheckin(...)</code> を送信</td>
+</tr>
+<tr>
+<td>6</td>
+<td>予約削除</td>
+<td>🗑️ クリック → <code>confirm</code></td>
+<td><code>adminApi.deleteCheckin(id)</code> → 成功で再取得</td>
+</tr>
+<tr>
+<td>7</td>
+<td>イベント CRUD</td>
+<td>各ボタン</td>
+<td><code>adminApi.getEvents / createEvent / updateEvent / deleteEvent</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>スクール CRUD</td>
+<td>各ボタン</td>
+<td><code>adminApi.getSchools / createSchool / updateSchool / deleteSchool</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>会員付与</td>
+<td>ユーザー検索 → 選択</td>
+<td><code>adminApi.getUsers(search)</code> →
+<code>assignMembership({...})</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>会員解除</td>
+<td>一覧の「解除」</td>
+<td><code>adminApi.revokeMembership(id)</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>クーポン CRUD</td>
+<td>各ボタン</td>
+<td><code>adminApi.getCoupons / createCoupon / updateCoupon / deleteCoupon</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>お知らせ CRUD</td>
+<td>各ボタン</td>
+<td><code>adminApi.getAnnouncements / createAnnouncement / updateAnnouncement / deleteAnnouncement</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>売上集計</td>
+<td>タブ「日別/月別/拠点別」</td>
+<td><code>adminApi.getSales({ period, from, to, groupBy })</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>売上 CSV</td>
+<td>「CSV出力」</td>
+<td>フロント側で結果を CSV にシリアライズし <code>a[download]</code>
+でダウンロード</td>
+</tr>
+</tbody>
+</table>
+<p><strong>モーダル共通</strong>: 「保存」クリックでバリデーション→ API
+→成功トースト→再取得。エラーは赤帯で表示、ボタンを再活性化。</p>
+<hr />
+<h4 id="1510-その他">1.5.10 その他</h4>
+<table>
+<thead>
+<tr>
+<th>画面</th>
+<th>イベント</th>
+<th>処理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PrivacyPolicyPage / CommerceLawPage</td>
+<td>初期表示のみ</td>
+<td>静的コンテンツ表示</td>
+</tr>
+<tr>
+<td>DebugPanel</td>
+<td>画面下ゲージを長押し</td>
+<td><code>debugStore.togglePanel()</code>
+で開閉。<code>togglePayment</code> / <code>toggleRemoteLock</code>
+はチェックボックス <code>onChange</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-api-設計">2. API 設計</h2>
+<p>Vercel Hobby プランの関数上限 12 個の制約のため、関連機能を 1
+本にまとめクエリ <code>type</code>/<code>action</code>
+で分岐している。</p>
+<h3 id="21-エンドポイント一覧12-個">2.1 エンドポイント一覧（12 個）</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>メソッド</th>
+<th>パス</th>
+<th>概要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>GET/PUT</td>
+<td><code>/api/users/me</code></td>
+<td>自ユーザー取得／更新</td>
+</tr>
+<tr>
+<td>2</td>
+<td>GET</td>
+<td><code>/api/users/membership</code></td>
+<td>自分の会員情報</td>
+</tr>
+<tr>
+<td>3</td>
+<td>GET/POST</td>
+<td><code>/api/checkins</code></td>
+<td>一覧・作成／空き状況／イベント・スクール一覧・申込</td>
+</tr>
+<tr>
+<td>4</td>
+<td>GET/DELETE</td>
+<td><code>/api/checkins/[id]</code></td>
+<td>詳細／キャンセル／領収書 PDF</td>
+</tr>
+<tr>
+<td>5</td>
+<td>POST</td>
+<td><code>/api/prices/calculate</code></td>
+<td>料金計算</td>
+</tr>
+<tr>
+<td>6</td>
+<td>POST</td>
+<td><code>/api/coupons/validate</code></td>
+<td>クーポン検証</td>
+</tr>
+<tr>
+<td>7</td>
+<td>GET</td>
+<td><code>/api/member-types</code></td>
+<td>会員種別一覧</td>
+</tr>
+<tr>
+<td>8</td>
+<td>POST</td>
+<td><code>/api/reviews</code></td>
+<td>レビュー作成／取得</td>
+</tr>
+<tr>
+<td>9</td>
+<td>POST</td>
+<td><code>/api/payments/create-checkout</code></td>
+<td>Stripe セッション発行</td>
+</tr>
+<tr>
+<td>10</td>
+<td>GET</td>
+<td><code>/api/payments/stripe-callback</code></td>
+<td>Stripe 完了コールバック</td>
+</tr>
+<tr>
+<td>11</td>
+<td>POST</td>
+<td><code>/api/payments/stripe-webhook</code></td>
+<td>Stripe Webhook</td>
+</tr>
+<tr>
+<td>12</td>
+<td>GET/POST/PUT/DELETE</td>
+<td><code>/api/admin</code></td>
+<td>管理系全般（<code>action</code> パラメータで分岐）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-認証方式">2.2 認証方式</h3>
+<ul>
+<li><strong>通常 API</strong>:
+<code>Authorization: Bearer &lt;LIFF_accessToken&gt;</code> サーバー側で
+<code>https://api.line.me/v2/profile</code> に問い合わせて検証</li>
+<li><strong>Webhook</strong> (<code>stripe-webhook</code>):
+<code>Stripe-Signature</code> ヘッダで署名検証</li>
+<li><strong>管理者 API</strong> (<code>/api/admin</code>): LIFF
+トークン検証に加え、<code>ADMIN_LINE_USER_IDS</code>（カンマ区切り）に含まれることを確認</li>
+</ul>
+<h3 id="23-apicheckins">2.3 <code>/api/checkins</code></h3>
+<h4 id="post-apicheckins通常予約の-draft-作成">POST
+<code>/api/checkins</code>（通常予約の DRAFT 作成）</h4>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="er">//</span> <span class="er">Request</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;location&quot;</span><span class="fu">:</span> <span class="st">&quot;ASP&quot;</span><span class="fu">,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;facilityType&quot;</span><span class="fu">:</span> <span class="st">&quot;GYM&quot;</span><span class="fu">,</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;date&quot;</span><span class="fu">:</span> <span class="st">&quot;2026-05-01&quot;</span><span class="fu">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;startTime&quot;</span><span class="fu">:</span> <span class="st">&quot;10:00&quot;</span><span class="fu">,</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;duration&quot;</span><span class="fu">:</span> <span class="dv">2</span><span class="fu">,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;totalPrice&quot;</span><span class="fu">:</span> <span class="dv">4400</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="er">//</span> <span class="er">Response</span> <span class="dv">201</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span> <span class="dt">&quot;checkin&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span> <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;PENDING&quot;</span><span class="fu">,</span> <span class="er">...</span> <span class="fu">}</span> <span class="fu">}</span></span></code></pre></div>
+<h4
+id="get-apicheckinstypeavailabilitylocationaspfacilitytypegymdates2026-05-012026-05-02starttime1000duration2">GET
+<code>/api/checkins?type=availability&amp;location=ASP&amp;facilityType=GYM&amp;dates=2026-05-01,2026-05-02&amp;startTime=10:00&amp;duration=2</code></h4>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="er">//</span> <span class="er">Response</span> <span class="dv">200</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;2026-05-01&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;available&quot;</span><span class="fu">,</span> <span class="dt">&quot;count&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span> <span class="dt">&quot;capacity&quot;</span><span class="fu">:</span> <span class="dv">1</span> <span class="fu">},</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;2026-05-02&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;status&quot;</span><span class="fu">:</span> <span class="st">&quot;full&quot;</span><span class="fu">,</span>      <span class="dt">&quot;count&quot;</span><span class="fu">:</span> <span class="dv">1</span><span class="fu">,</span> <span class="dt">&quot;capacity&quot;</span><span class="fu">:</span> <span class="dv">1</span> <span class="fu">}</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><code>status</code> は <code>available</code> / <code>few</code> /
+<code>full</code>。<code>few</code> は相席トレのときのみ（定員の 70%
+超）。</p>
+<h4 id="get-apicheckinstypeevents--typeschools">GET
+<code>/api/checkins?type=events</code> / <code>?type=schools</code></h4>
+<ul>
+<li><code>isActive == true</code> のみ。メモリで <code>date</code> /
+<code>createdAt</code> 順にソート。</li>
+</ul>
+<h4 id="post-apicheckinstypeevent-register">POST
+<code>/api/checkins?type=event-register</code></h4>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span> <span class="dt">&quot;eventId&quot;</span><span class="fu">:</span> <span class="st">&quot;evt_xxx&quot;</span> <span class="fu">}</span></span></code></pre></div>
+<p>定員と重複申込を検証 → <code>eventRegistrations</code> に作成 →
+<code>events.currentCount</code> をインクリメント。</p>
+<h3 id="24-apipaymentscreate-checkout">2.4
+<code>/api/payments/create-checkout</code></h3>
+<p>入力:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode ts"><code class="sourceCode typescript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  location<span class="op">:</span> LocationId<span class="op">;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  facilityType<span class="op">:</span> FacilityType<span class="op">;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// 単日: date / 複数日: dates / 定期: date + recurring</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  date<span class="op">?:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  dates<span class="op">?:</span> <span class="dt">string</span>[]<span class="op">;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  recurring<span class="op">?:</span> { type<span class="op">:</span> <span class="st">&#39;WEEKLY&#39;</span><span class="op">|</span><span class="st">&#39;BIWEEKLY&#39;</span><span class="op">;</span> count<span class="op">:</span> <span class="dt">number</span> }<span class="op">;</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  startTime<span class="op">:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  duration<span class="op">:</span> <span class="dt">number</span><span class="op">;</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  couponCode<span class="op">?:</span> <span class="dt">string</span><span class="op">;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  skipPayment<span class="op">?:</span> <span class="dt">boolean</span><span class="op">;</span>       <span class="co">// デバッグ用</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  skipRemoteLock<span class="op">?:</span> <span class="dt">boolean</span><span class="op">;</span>    <span class="co">// デバッグ用</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>処理シーケンス:</p>
+<ol type="1">
+<li>認可 → ユーザー特定（無ければ自動作成）</li>
+<li>定期予約なら日付配列を展開</li>
+<li>重複チェック（定員1なら 1 件でも重なれば 409、相席は 10 件）</li>
+<li>各日ごとに <code>calculatePrice</code></li>
+<li>会員種別の <code>discountType</code> で日ごとの割引額を算出</li>
+<li>クーポン検証 → 会員割引後の合計に適用</li>
+<li>日数分の <code>checkins</code> を <code>status=PENDING</code>
+で作成（<code>groupId</code> で紐付け）</li>
+<li><strong>skipPayment</strong> なら即 RemoteLock 呼び出し→ PIN 設定→
+<code>PAID</code> 更新</li>
+<li>通常は Stripe Checkout Session を作成、<code>paymentId</code> を各
+<code>checkin</code> に保存</li>
+</ol>
+<p>応答:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;checkoutUrl&quot;</span><span class="fu">:</span> <span class="st">&quot;https://checkout.stripe.com/...&quot;</span><span class="fu">,</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;checkinId&quot;</span><span class="fu">:</span> <span class="st">&quot;...&quot;</span><span class="fu">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;checkinIds&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;...&quot;</span><span class="ot">,</span> <span class="st">&quot;...&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;groupId&quot;</span><span class="fu">:</span> <span class="st">&quot;uuid-...&quot;</span><span class="fu">,</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mode&quot;</span><span class="fu">:</span> <span class="st">&quot;stripe&quot;</span>  <span class="er">//</span> <span class="er">or</span> <span class="st">&quot;skip&quot;</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h3 id="25-apipaymentsstripe-webhook">2.5
+<code>/api/payments/stripe-webhook</code></h3>
+<ul>
+<li>受信: <code>checkout.session.completed</code></li>
+<li>処理:
+<ol type="1">
+<li><code>metadata.checkinId</code> で Firestore の予約を取得</li>
+<li><code>status == PAID</code> ならスキップ（冪等）</li>
+<li>RemoteLock に予約登録 → PIN 取得（失敗時はランダム 4
+桁フォールバック）</li>
+<li><code>status=PAID</code>, <code>pinCode</code>,
+<code>paymentId</code>, <code>updatedAt</code> を更新</li>
+<li>クーポン使用回数更新／<code>couponRedemptions</code> 記録</li>
+</ol></li>
+</ul>
+<h3 id="26-apiadminaction">2.6 <code>/api/admin?action=...</code></h3>
+<p>主な <code>action</code>:</p>
+<table>
+<thead>
+<tr>
+<th>action</th>
+<th>メソッド</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>events</code></td>
+<td>GET</td>
+<td>イベント一覧</td>
+</tr>
+<tr>
+<td><code>createEvent</code> / <code>updateEvent</code> /
+<code>deleteEvent</code></td>
+<td>POST/PUT/DELETE</td>
+<td>イベント CRUD</td>
+</tr>
+<tr>
+<td><code>eventRegistrations</code></td>
+<td>GET</td>
+<td>参加者</td>
+</tr>
+<tr>
+<td><code>schools</code> / <code>createSchool</code> /
+<code>updateSchool</code> / <code>deleteSchool</code> /
+<code>schoolRegistrations</code></td>
+<td>-</td>
+<td>スクール系</td>
+</tr>
+<tr>
+<td><code>checkins</code> / <code>createCheckin</code> /
+<code>deleteCheckin</code></td>
+<td>GET/POST/DELETE</td>
+<td>予約 CRUD（カレンダー用）</td>
+</tr>
+<tr>
+<td><code>sales</code></td>
+<td>GET</td>
+<td>売上集計（<code>period</code>, <code>from/to</code>,
+<code>groupBy</code>）</td>
+</tr>
+<tr>
+<td><code>receipt</code></td>
+<td>POST</td>
+<td>領収書 PDF 再発行</td>
+</tr>
+<tr>
+<td><code>announcements</code> / <code>announcementsPublic</code> /
+<code>createAnnouncement</code> / <code>updateAnnouncement</code> /
+<code>deleteAnnouncement</code></td>
+<td>-</td>
+<td>お知らせ CRUD（Public は認証不要）</td>
+</tr>
+<tr>
+<td><code>memberTypes</code> / <code>createMemberType</code> /
+<code>updateMemberType</code> / <code>deleteMemberType</code></td>
+<td>-</td>
+<td>会員種別マスタ CRUD</td>
+</tr>
+<tr>
+<td><code>memberships</code> / <code>assignMembership</code> /
+<code>revokeMembership</code> / <code>assignSelfMembership</code></td>
+<td>-</td>
+<td>会員付与</td>
+</tr>
+<tr>
+<td><code>coupons</code> / <code>createCoupon</code> /
+<code>updateCoupon</code> / <code>deleteCoupon</code></td>
+<td>-</td>
+<td>クーポン CRUD</td>
+</tr>
+<tr>
+<td><code>users</code></td>
+<td>GET</td>
+<td>ユーザー検索（会員付与用）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-処理ロジック詳細">3. 処理ロジック詳細</h2>
+<h3
+id="31-料金計算srclibpricets-apipricescalculatets-apipaymentscreate-checkoutts">3.1
+料金計算（<code>src/lib/price.ts</code>,
+<code>api/prices/calculate.ts</code>,
+<code>api/payments/create-checkout.ts</code>）</h3>
+<p>3 箇所に同一ロジックが存在するため
+<strong>同期が必要</strong>（CLAUDE.md のメモリに記載）。</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode ts"><code class="sourceCode typescript"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co">// 疑似コード</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (<span class="kw">let</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> duration<span class="op">;</span> i<span class="op">++</span>) {</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> hour <span class="op">=</span> startHour <span class="op">+</span> i<span class="op">;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> dayType <span class="op">=</span> <span class="fu">isWeekend</span>(date) <span class="op">?</span> <span class="st">&#39;WEEKEND&#39;</span> <span class="op">:</span> <span class="st">&#39;WEEKDAY&#39;</span><span class="op">;</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> dayPrices <span class="op">=</span> PRICE_TABLE[location][facilityType][dayType]<span class="op">;</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> price <span class="op">=</span> <span class="st">&#39;ALLDAY&#39;</span> <span class="kw">in</span> dayPrices</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">?</span> dayPrices<span class="op">.</span><span class="at">ALLDAY</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">:</span> dayPrices[hour <span class="op">&lt;</span> <span class="dv">17</span> <span class="op">?</span> <span class="st">&#39;DAYTIME&#39;</span> <span class="op">:</span> <span class="st">&#39;EVENING&#39;</span>]<span class="op">;</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  total <span class="op">+=</span> price<span class="op">;</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<h3 id="32-割引の適用順">3.2 割引の適用順</h3>
+<pre><code>通常料金
+  ├─ 会員種別（FREE / PERCENTAGE / FIXED_PER_HOUR）→ 各日料金から差し引く
+  └─ クーポン（PERCENTAGE / FIXED）             → 会員割引後の合計から差し引く
+最終額 = max(0, 通常料金合計 − 会員割引合計 − クーポン)
+※ クーポン割引は日数で按分し、剰余は先頭日に加算。</code></pre>
+<h3 id="33-pin-発行remotelock-連携">3.3 PIN 発行（RemoteLock 連携）</h3>
+<ul>
+<li>拠点・施設別に 1〜2 台のデバイスへ <code>/bookings</code> を
+POST</li>
+<li>ASP は <strong>玄関 + 施設</strong>（2 台）／やばせは
+<strong>八橋ロック 1 台</strong></li>
+<li>1 台目のレスポンス <code>pin</code> を採用し、2
+台目以降は明示的に同じ <code>pin</code> を送信</li>
+<li>複数日予約は 1 本目の PIN を <code>groupPinCode</code>
+として再利用（利用者は同じ PIN を使い回せる）</li>
+<li>API 失敗時: ランダム 4 桁生成（運用上は手動で PIN
+を再発行する）</li>
+</ul>
+<h3 id="34-重複予約チェック">3.4 重複予約チェック</h3>
+<ul>
+<li><code>checkins</code> から対象 <code>date</code>
+で取得し、<code>location</code> / <code>facilityType</code> /
+<code>status in (PENDING, PAID)</code> でメモリフィルタ</li>
+<li><code>TRAINING_SHARED</code> は 10 件まで許容、それ以外は 1
+件でも重なれば <code>409</code></li>
+</ul>
+<h3 id="35-管理者判定server-libadmints-相当">3.5
+管理者判定（<code>server-lib/admin.ts</code> 相当）</h3>
+<ul>
+<li><code>/api/admin</code> エントリで LIFF トークン検証 →
+<code>profile.userId</code> を取得</li>
+<li>環境変数
+<code>ADMIN_LINE_USER_IDS</code>（カンマ区切り）に含まれていなければ
+403</li>
+</ul>
+<hr />
+<h2 id="4-ログ仕様">4. ログ仕様</h2>
+<h3 id="41-フロントエンド-srclibloggerts">4.1 フロントエンド
+(<code>src/lib/logger.ts</code>)</h3>
+<ul>
+<li><code>createLogger(scope)</code> で
+<code>{ debug, info, warn, error, op }</code> を返す</li>
+<li>出力形式:
+<code>[LEVEL] HH:mm:ss.SSS [scope] message { ...payload }</code></li>
+<li>本番も <code>info</code> 以上を出力（Sentry
+等に流す場合のフック地点）</li>
+<li><code>op()</code> は操作ログ専用（接頭辞
+<code>[OPERATION]</code>）</li>
+</ul>
+<h3 id="42-サーバー-server-libloggerts">4.2 サーバー
+(<code>server-lib/logger.ts</code>)</h3>
+<ul>
+<li>1 行 JSON を <code>console.log</code> に出力 → Vercel
+ログで検索・集計可能</li>
+<li>フィールド: <code>ts</code>, <code>level</code>, <code>scope</code>,
+<code>msg</code>, 任意の <code>payload</code></li>
+<li><code>op(action, payload)</code> は
+<code>msg: "[OPERATION] &lt;action&gt;"</code> で出力</li>
+</ul>
+<h3 id="43-出力する主な操作ログ">4.3 出力する主な操作ログ</h3>
+<table>
+<thead>
+<tr>
+<th>スコープ</th>
+<th>action</th>
+<th>タイミング</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>App</code></td>
+<td><code>app.boot</code>, <code>user.autoRegister.ok/fail</code></td>
+<td>起動時</td>
+</tr>
+<tr>
+<td><code>api.checkins</code></td>
+<td><code>checkin.create</code></td>
+<td>DRAFT 作成</td>
+</tr>
+<tr>
+<td><code>api.payments.create-checkout</code></td>
+<td><code>checkout.skip.paid</code>,
+<code>checkout.stripe.session.created</code></td>
+<td>決済準備</td>
+</tr>
+<tr>
+<td><code>api.payments.stripe-webhook</code></td>
+<td><code>webhook.paid</code></td>
+<td>決済確定（※既存 <code>console.log</code> のまま）</td>
+</tr>
+<tr>
+<td><code>api.admin</code></td>
+<td><code>admin.*</code></td>
+<td>管理操作</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>ログには <code>lineUserId</code> / <code>checkinId</code> /
+<code>sessionId</code> /
+金額などを含めることで事後追跡を容易にしている。</p>
+</blockquote>
+<hr />
+<h2 id="5-エラーハンドリング">5. エラーハンドリング</h2>
+<table>
+<thead>
+<tr>
+<th>条件</th>
+<th>戻り値</th>
+<th>備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Authorization</code> 無効</td>
+<td>401 <code>{ error: 'Unauthorized' }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>必須項目欠落</td>
+<td>400 <code>{ error: 'Missing required fields' }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>列挙値不正</td>
+<td>400 <code>{ error: 'Invalid location' }</code> 等</td>
+<td></td>
+</tr>
+<tr>
+<td>重複予約</td>
+<td>409 <code>{ error: '...は既に予約されています' }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>定員超過</td>
+<td>400 / 409 <code>{ error: '定員に達しています' }</code></td>
+<td></td>
+</tr>
+<tr>
+<td>RemoteLock 失敗</td>
+<td>200（予約は成立）＋ランダム PIN</td>
+<td>要監視</td>
+</tr>
+<tr>
+<td>Stripe 失敗</td>
+<td>500</td>
+<td></td>
+</tr>
+<tr>
+<td>例外</td>
+<td>500 <code>{ error: 'Internal server error' }</code></td>
+<td>ログに詳細を残す</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

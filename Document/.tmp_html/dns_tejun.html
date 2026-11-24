@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><style>
+html { font-size: 17px; }
+body { font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif; line-height: 1.9; letter-spacing: 0.04em; color:#222; max-width: 46em; margin: 2em auto; padding: 0 1.5em; }
+h1 { font-size: 1.5rem; border-bottom: 3px solid #2a7d4f; padding-bottom: .4em; margin-bottom: 1em; }
+h2 { font-size: 1.2rem; background:#eef6f0; padding:.4em .6em; border-left: 5px solid #2a7d4f; margin-top:1.6em; }
+h3 { font-size: 1.05rem; margin-top:1.4em; color:#2a7d4f; }
+li { margin:.3em 0 .3em 1.5em; list-style: disc; }
+p { margin:.4em 0; }
+code { background:#f2f2f2; padding:.1em .4em; border-radius:4px; font-size:.95em; }
+.code { background:#f5f5f5; border:1px solid #ddd; border-radius:6px; padding:.8em 1em; font-family: Menlo, monospace; font-size: .8rem; word-break: break-all; line-height:1.6; }
+br { line-height: .5; }
+</style></head><body><h1>lpower.jp のDNS設定手順（領収書メールの送信元設定）</h1>
+<br>
+<p>予約アプリから送る領収書メールの送信元を mintai@lpower.jp にするため、</p>
+<p>lpower.jp のDNSにレコードを3件追加していただく作業です。所要10分ほどです。</p>
+<br>
+<h2>事前にご安心いただきたい点</h2>
+<br>
+<li>追加するのは認証用の行3件だけです。</li>
+<p>  現在お使いのメール（さくらのメール送受信）やWebサイトには一切影響しません。</p>
+<li>間違えた場合も、追加した行を削除すれば元通りです。</li>
+<br>
+<h2>手順</h2>
+<br>
+<p>1. さくらインターネットの会員メニュー（ https://secure.sakura.ad.jp/ ）にログインします。</p>
+<p>2. 「契約中のドメイン一覧」（メニューでは「ドメイン/SSL」→「ドメイン一覧」）を開き、</p>
+<p>   lpower.jp の「設定」または「ゾーン編集」をクリックします。</p>
+<p>   ※一覧に「ゾーン編集」が見当たらない場合は、「さくらのドメインコントロールパネル」から</p>
+<p>   lpower.jp を選び「ゾーン」タブを開いてください。</p>
+<p>3. 「レコード追加」（＋ボタン）から、以下の3件を1件ずつ追加します。</p>
+<br>
+<h3>1件目（TXTレコード・DKIM認証）</h3>
+<li>エントリ名（ホスト名）: <code>resend._domainkey</code></li>
+<li>種別: TXT</li>
+<li>値（下の1行をそのまま全部コピーして貼り付けてください）:</li>
+<br>
+<div class="code">
+p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDW4X1Hl2hQMpOWx/4FEe00BDJBNuFJndRVebaCcg+oo0YNG5NnP7t33Qub0S5vIlAZ7SDLfsPCXTZ7x2nRWXO5uJQeMBbl1c5IPF5M6TYUY9hohwYoYkmH8UaOf2RW4iBXJ2zBYokkTm48UhumIsAXeHAhSTs2Z3+Zi1Elr5CVCQIDAQAB
+</div>
+<br>
+<h3>2件目（CNAMEレコード）</h3>
+<li>エントリ名（ホスト名）: <code>rsend</code></li>
+<li>種別: CNAME</li>
+<li>値: <code>rsend.forge.rmta.net.</code></li>
+<p>  （さくらでは末尾にピリオド「.」が必要です。エラーになる場合はピリオドを外してお試しください）</p>
+<br>
+<h3>3件目（CNAMEレコード）</h3>
+<li>エントリ名（ホスト名）: <code>send</code></li>
+<li>種別: CNAME</li>
+<li>値: <code>send.forge.rmta.net.</code></li>
+<p>  （こちらも同様に末尾ピリオド付きで）</p>
+<br>
+<p>4. 「保存」を押して完了です。完了しましたら高崎までご一報ください。</p>
+<p>   ※反映には数分〜最大数時間かかることがあります。こちらで認証の完了を確認し、</p>
+<p>   テスト送信の結果をご連絡します。</p>
+<br></body></html>

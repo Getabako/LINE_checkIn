@@ -1,0 +1,20 @@
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+    // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+    document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+      const pre = code.parentElement;
+      const div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code.textContent;
+      pre.replaceWith(div);
+    });
+    mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    mermaid.run();
+    // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+    setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+  });
+</script>

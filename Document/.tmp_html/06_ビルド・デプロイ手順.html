@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>06_ビルド・デプロイ手順</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">06_ビルド・デプロイ手順</h1>
+</header>
+<h1 id="06-ビルドデプロイ手順">06. ビルド・デプロイ手順</h1>
+<h2 id="1-ビルドパイプライン">1. ビルドパイプライン</h2>
+<pre><code>npm run build
+  ├─ tsc -b       # 型チェック（Project References）
+  └─ vite build   # フロントを dist/ に出力</code></pre>
+<p>Vercel 上では <code>vercel.json</code> の
+<code>buildCommand: "npm run build"</code> が実行される。
+<code>/api/**</code> のファイルは Vercel が自動的に <strong>Serverless
+Functions</strong> としてビルドする。</p>
+<h3 id="11-ローカル確認">1.1 ローカル確認</h3>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run build</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npm</span> run preview   <span class="co"># dist/ を 4173 番で起動</span></span></code></pre></div>
+<hr />
+<h2 id="2-vercel-プロジェクト初期設定">2. Vercel
+プロジェクト初期設定</h2>
+<h3 id="21-github-連携">2.1 GitHub 連携</h3>
+<ol type="1">
+<li>GitHub リポジトリにプッシュ</li>
+<li>Vercel ダッシュボード → <strong>Add New → Project</strong></li>
+<li>リポジトリをインポート</li>
+<li><strong>Root Directory</strong>:
+<code>LINEMiniApp/gym-checkin</code></li>
+<li><strong>Framework Preset</strong>:
+<code>Vite</code>（自動検出）</li>
+<li>ビルド／出力は <code>vercel.json</code> の指定を優先</li>
+</ol>
+<h3 id="22-初回-cli-リンク">2.2 初回 CLI リンク</h3>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> LINEMiniApp/gym-checkin</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> vercel link</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># &gt; プロジェクトを選択</span></span></code></pre></div>
+<h3 id="23-環境変数を-vercel-に投入">2.3 環境変数を Vercel に投入</h3>
+<p><a href="./07_動作環境構築手順.md">07. 動作環境構築手順</a>
+の一覧にある <strong>すべての環境変数</strong> を Production と Preview
+の両方に登録する。</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># CLI から</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> vercel env add VITE_LIFF_ID production</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">npx</span> vercel env add FIREBASE_SERVICE_ACCOUNT_KEY production</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ...（全項目）</span></span></code></pre></div>
+<p>GUI の場合: Project → <strong>Settings → Environment
+Variables</strong>。</p>
+<blockquote>
+<p>⚠️ <code>FIREBASE_SERVICE_ACCOUNT_KEY</code> は <strong>Base64
+エンコードした JSON 文字列</strong> を登録する。</p>
+</blockquote>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># macOS</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> firebase-service-account.json <span class="kw">|</span> <span class="fu">base64</span> <span class="kw">|</span> <span class="fu">tr</span> <span class="at">-d</span> <span class="st">&#39;\n&#39;</span> <span class="kw">|</span> <span class="ex">pbcopy</span></span></code></pre></div>
+<hr />
+<h2 id="3-デプロイ方法">3. デプロイ方法</h2>
+<h3 id="31-production-デプロイ">3.1 Production デプロイ</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>手順</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GitHub プッシュ</td>
+<td><code>main</code> ブランチに push
+するだけで自動デプロイ（推奨）</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td><code>npx vercel --prod</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-preview-デプロイ">3.2 Preview デプロイ</h3>
+<ul>
+<li>PR を作成すると自動で Preview URL が発行される</li>
+<li>CLI: <code>npx vercel</code> （Preview）</li>
+</ul>
+<h3 id="33-rollbackロールバック">3.3 Rollback（ロールバック）</h3>
+<p>Vercel ダッシュボード → <strong>Deployments</strong> →
+任意の過去デプロイ → <strong>Promote to Production</strong>。</p>
+<hr />
+<h2 id="4-デプロイ前チェックリスト">4. デプロイ前チェックリスト</h2>
+<ul class="task-list">
+<li><label><input
+type="checkbox" /><code>npm ci &amp;&amp; npm run build</code>
+がローカルで成功する</label></li>
+<li><label><input type="checkbox" /><code>package-lock.json</code>
+がコミットされている</label></li>
+<li><label><input type="checkbox" /><code>node</code> バージョンが 20.x
+固定（<code>package.json engines</code>）</label></li>
+<li><label><input type="checkbox" /><code>.env</code> は commit
+されていない（<code>.gitignore</code> 確認）</label></li>
+<li><label><input type="checkbox" />Firestore/Stripe/RemoteLock
+の環境変数が <strong>Production</strong> に設定済</label></li>
+<li><label><input type="checkbox" />Stripe Webhook の URL を本番 URL
+に更新している</label></li>
+<li><label><input type="checkbox" />LIFF エンドポイント URL を本番 URL
+に変更している</label></li>
+<li><label><input type="checkbox" /><code>ADMIN_LINE_USER_IDS</code>
+を本番運営者の LINE userId に更新している</label></li>
+</ul>
+<hr />
+<h2 id="5-デプロイ後確認">5. デプロイ後確認</h2>
+<ol type="1">
+<li>本番 URL を LINE Developers Console で LIFF の <strong>Endpoint
+URL</strong> に設定</li>
+<li>LINE 公式アカウントのリッチメニューから LIFF URL を起動</li>
+<li>LIFF 画面が白画面にならず「拠点選択」が表示されることを確認</li>
+<li>テスト予約 → Stripe
+テストカード（<code>4242 4242 4242 4242</code>）→ 完了画面で PIN
+が表示されることを確認</li>
+<li>RemoteLock 管理画面側で <code>bookings</code>
+が作成されているか確認</li>
+<li>Vercel <strong>Logs</strong> で <code>[OPERATION]</code>
+ログが流れているか確認</li>
+</ol>
+<hr />
+<h2 id="6-cicd-の補足">6. CI/CD の補足</h2>
+<ul>
+<li>本プロジェクトは Vercel の GitHub Integration のみで CI
+を構成している</li>
+<li>追加で GitHub Actions を導入する場合の例:</li>
+</ul>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># .github/workflows/check.yml</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> lint-and-build</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">on</span><span class="kw">:</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">pull_request</span><span class="kw">:</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">build</span><span class="kw">:</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">runs-on</span><span class="kw">:</span><span class="at"> ubuntu-latest</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/setup-node@v4</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">with</span><span class="kw">:</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">node-version</span><span class="kw">:</span><span class="at"> </span><span class="st">&#39;20&#39;</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">cache</span><span class="kw">:</span><span class="at"> </span><span class="st">&#39;npm&#39;</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">cache-dependency-path</span><span class="kw">:</span><span class="at"> LINEMiniApp/gym-checkin/package-lock.json</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">working-directory</span><span class="kw">:</span><span class="at"> LINEMiniApp/gym-checkin</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">        run</span><span class="kw">: </span><span class="ch">|</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>          npm ci</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>          npm run lint</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>          npm run build</span></code></pre></div>
+<hr />
+<h2 id="7-デプロイ時のトラブルシュート">7.
+デプロイ時のトラブルシュート</h2>
+<table>
+<thead>
+<tr>
+<th>症状</th>
+<th>対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Function exceeds 12 limit</code></td>
+<td>新規 API を作らず、<code>/api/admin</code> 等の既存関数に
+<code>action</code> を足す</td>
+</tr>
+<tr>
+<td><code>FIREBASE_SERVICE_ACCOUNT_KEY is not set</code></td>
+<td>Production / Preview の両方に設定されているか確認</td>
+</tr>
+<tr>
+<td>Stripe Webhook が 401</td>
+<td>Webhook シークレットが本番用 <code>whsec_*</code> か確認</td>
+</tr>
+<tr>
+<td>LIFF が真っ白</td>
+<td>Endpoint URL の末尾に <code>/</code>
+を含めない／<code>VITE_LIFF_ID</code> を設定</td>
+</tr>
+<tr>
+<td><code>NEXT_PUBLIC_BASE_URL</code> の不一致</td>
+<td>本番では <code>https://&lt;production-domain&gt;</code> に設定</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

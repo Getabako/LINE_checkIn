@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>10_運用マニュアル</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // pandoc はフェンス言語 "mermaid" を <pre class="mermaid"><code>...</code></pre> の
+      // 形で出すので、mermaid が認識できるよう <div class="mermaid">...</div> に置換する。
+      document.querySelectorAll('pre.mermaid > code').forEach((code) => {
+        const pre = code.parentElement;
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        pre.replaceWith(div);
+      });
+      mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+      mermaid.run();
+      // Chrome headless が --virtual-time-budget で確実に待てるようにフラグ
+      setTimeout(() => { document.body.dataset.ready = '1'; }, 1500);
+    });
+  </script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">10_運用マニュアル</h1>
+</header>
+<h1 id="10-運用マニュアル管理者運営者向け">10.
+運用マニュアル（管理者・運営者向け）</h1>
+<p>本書は運営スタッフ・システム管理者が <strong>日常運用</strong>
+で行う作業をまとめたものです。</p>
+<hr />
+<h2 id="1-管理画面へのアクセス">1. 管理画面へのアクセス</h2>
+<ul>
+<li>URL: <code>https://&lt;production-domain&gt;/admin</code></li>
+<li>認可: <code>ADMIN_LINE_USER_IDS</code> に登録された LINE
+アカウントのみ利用可能</li>
+<li>画面上部タブで <strong>カレンダー / イベント / スクール / 会員 /
+クーポン / お知らせ / 売上</strong> を切替</li>
+</ul>
+<h3 id="11-新規管理者を追加する">1.1 新規管理者を追加する</h3>
+<ol type="1">
+<li>対象者に LIFF 画面を開いてもらう</li>
+<li>ブラウザの DevTools Console で <code>liff.getProfile()</code>
+を実行（または運営側がサポート）</li>
+<li>取得した <code>userId</code>（<code>U...</code>）を
+<code>ADMIN_LINE_USER_IDS</code> に追加</li>
+<li>Vercel で再デプロイ（環境変数更新後の再ビルドは不要 —
+次回関数実行時に反映）</li>
+</ol>
+<hr />
+<h2 id="2-カレンダー運用">2. カレンダー運用</h2>
+<h3 id="21-日常チェック">2.1 日常チェック</h3>
+<ol type="1">
+<li>毎朝、管理画面の <strong>カレンダー</strong>
+タブを開き当日の予約を確認</li>
+<li>「予約●件」をタップして詳細パネルを開く</li>
+<li>予約キャンセル対応は詳細パネルの 🗑️ から（※取り消し不可）</li>
+</ol>
+<h3 id="22-手動で予約を入れる">2.2 手動で予約を入れる</h3>
+<ul>
+<li>「＋ 予約を追加」ボタン</li>
+<li>利用者名 欄に displayName
+を入力すると既存ユーザーに紐付け、空欄なら管理者名義</li>
+<li>PIN は即時発行される（RemoteLock 連携済）</li>
+</ul>
+<hr />
+<h2 id="3-イベントスクール運営">3. イベント・スクール運営</h2>
+<h3 id="31-イベント作成">3.1 イベント作成</h3>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>入力例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>タイトル</td>
+<td>GW スポーツイベント</td>
+</tr>
+<tr>
+<td>拠点 / 施設</td>
+<td>ASP / 体育館</td>
+</tr>
+<tr>
+<td>開催日</td>
+<td>2026-05-03</td>
+</tr>
+<tr>
+<td>時間</td>
+<td>10:00 – 12:00</td>
+</tr>
+<tr>
+<td>定員 / 料金</td>
+<td>20 / 1500</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-スクール作成一般募集型">3.2 スクール作成（一般募集型）</h3>
+<ul>
+<li>曜日・開始〜終了時刻・総回数・料金（1 回あたり）を入力</li>
+<li>利用者は <strong>一括申込</strong> で全回分を前払い（Stripe
+決済）</li>
+<li>カレンダー上で毎週の開催日に緑バッジが自動展開</li>
+</ul>
+<h3 id="33-定期利用団体s-01-等の請求書払い">3.3 定期利用（団体・S-01
+等の請求書払い）</h3>
+<blockquote>
+<p><strong>オンライン決済は発生しません。</strong>
+月次の利用実績をもとに集計後、別途請求書を発行する運用です。</p>
+</blockquote>
+<ul>
+<li><strong>会員区分マスタ</strong> で
+<code>discountType=FREE</code>（または相当）の会員区分を作成</li>
+<li><strong>会員管理</strong>
+タブで対象ユーザー（団体代表）に会員区分を付与</li>
+<li><strong>管理者が代理予約</strong>: <strong>カレンダー →
+＋ボタン</strong>（または管理者用予約作成）から、対象ユーザー名で年度分を一括登録
+<ul>
+<li>会員区分が <code>FREE</code> の場合、合計請求額は ¥0（PIN
+は通常通り発行）</li>
+<li>元金額（割引前）は <code>originalPrice</code>、割引額は
+<code>memberDiscount</code> として保存される</li>
+</ul></li>
+<li><strong>利用者側の挙動</strong>:
+<ul>
+<li>一括登録された予約は <strong>マイ予約</strong> に表示される</li>
+<li><strong>キャンセルは利用開始 1
+時間前まで可</strong>（自分でキャンセル可能）</li>
+<li><strong>追加予約は通常フローで可能</strong>（FREE
+会員区分が自動適用される）</li>
+<li><strong>時刻・施設の変更は不可</strong> →
+キャンセル後に取り直し、または運営に連絡（管理者が代理修正）</li>
+</ul></li>
+<li><strong>利用者の決済画面</strong>: FREE 会員区分のユーザーには
+**「請求書払い（後日請求）」**カードのみが表示され、クレジットカード／PayPay
+は出ません。フッターの金額表示も「請求書払い」、ボタンは「予約を確定する」に切り替わります。</li>
+</ul>
+<hr />
+<h2 id="4-会員クーポン運用">4. 会員・クーポン運用</h2>
+<h3 id="41-会員種別の変更">4.1 会員種別の変更</h3>
+<ul>
+<li><strong>会員区分マスタ</strong> タブ → 既存種別の編集</li>
+<li><code>discountType</code>
+を変えた場合、既存予約には遡らない（新規予約から適用）</li>
+</ul>
+<h3 id="42-会員付与">4.2 会員付与</h3>
+<ul>
+<li><strong>会員管理</strong> タブ → ユーザー検索（displayName）→
+会員種別を選択 → 有効期間を設定</li>
+<li><code>FREE</code> 区分は慎重に（無料で予約が成立する）</li>
+</ul>
+<h3 id="43-クーポン発行">4.3 クーポン発行</h3>
+<ol type="1">
+<li><strong>クーポン</strong> タブ → ＋作成</li>
+<li><code>code</code> は半角英数の大文字推奨</li>
+<li><code>maxUses</code> で発行枚数を制限できる</li>
+<li>配布は LINE 公式アカウント・ポスター等で</li>
+</ol>
+<hr />
+<h2 id="5-お知らせ">5. お知らせ</h2>
+<ul>
+<li><strong>お知らせ</strong> タブから追加／編集</li>
+<li><code>priority</code> は
+<code>info</code>/<code>warning</code>/<code>critical</code></li>
+<li><code>location</code> を指定すると拠点別に表示</li>
+<li>利用者画面ではトップに常時表示される</li>
+</ul>
+<hr />
+<h2 id="6-売上管理">6. 売上管理</h2>
+<h3 id="61-集計対象">6.1 集計対象</h3>
+<ul>
+<li><strong>売上</strong> タブ → 日別 / 月別 / 拠点別</li>
+<li>集計対象は <code>status == PAID</code> の
+<code>checkins</code>（FREE 会員区分の予約も <code>PAID</code>
+で記録されるが <code>totalPrice=0</code>
+のため売上額には影響しない）</li>
+</ul>
+<h3 id="62-売上計上日タイムラグの扱い">6.2
+売上計上日（タイムラグの扱い）</h3>
+<ul>
+<li><strong>売上計上日 = <code>date</code>（利用日）</strong>
+を採用</li>
+<li>例: 4/30(水) 20:00〜21:00 の予約 → <strong>4 月の CSV
+に確実に含まれる</strong>（与信日／確定処理日に依存しない）</li>
+<li>LaBOLA で発生していた「月末利用 → 翌月計上」のラグは
+<strong>新システムでは発生しません</strong></li>
+<li><code>createdAt</code> は予約作成日時として CSV
+にも別途記録（参考用）</li>
+</ul>
+<h3 id="63-詳細-csv-の項目">6.3 詳細 CSV の項目</h3>
+<p>「詳細 CSV」ボタンで以下の列を出力します（Excel
+ピボットでの集計を想定）。</p>
+<table>
+<thead>
+<tr>
+<th>列</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>利用区分</td>
+<td><code>一般</code> / <code>定期</code>（会員区分が紐付いている予約は
+<code>定期</code>）</td>
+</tr>
+<tr>
+<td>会員区分(団体名)</td>
+<td><code>memberTypeName</code>（S-01
+等の名称・団体名としても運用可）</td>
+</tr>
+<tr>
+<td>時間帯区分</td>
+<td><code>平日昼</code> / <code>平日夜</code> / <code>土日祝</code><br>※
+夜間は <strong>開始時刻 18:00
+以降</strong>。<strong>土日祝は曜日判定＋日本の祝日カレンダー（<code>@holiday-jp/holiday_jp</code>）</strong>
+に連動。祝日は WEEKEND 料金が自動適用されます</td>
+</tr>
+<tr>
+<td>元金額(税込)</td>
+<td>割引適用前の金額</td>
+</tr>
+<tr>
+<td>会員割引</td>
+<td>会員区分による割引額（FREE の場合は元金額相当）</td>
+</tr>
+<tr>
+<td>クーポン割引</td>
+<td>クーポン適用額</td>
+</tr>
+<tr>
+<td>請求額(税込)</td>
+<td>実際の請求額</td>
+</tr>
+<tr>
+<td>請求額(税抜)</td>
+<td><code>Math.floor(請求額(税込) ÷ 1.1)</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-一般--定期s-01-の集計手順">6.4 一般 / 定期(S-01)
+の集計手順</h3>
+<p>詳細 CSV を Excel
+で開き、ピボットテーブルで以下のように集計してください。</p>
+<p><strong>① 一般</strong></p>
+<ul>
+<li>フィルタ: <code>利用区分 = 一般</code></li>
+<li>行: <code>時間帯区分</code>（平日昼 / 平日夜 / 土日祝）</li>
+<li>値: 件数、<code>請求額(税抜)</code> の合計</li>
+</ul>
+<p><strong>② 定期（S-01 等）</strong></p>
+<ul>
+<li>フィルタ: <code>利用区分 = 定期</code></li>
+<li>行: <code>会員区分(団体名)</code>、<code>時間帯区分</code></li>
+<li>値: 件数、<code>元金額(税込)</code> の合計、<code>会員割引</code>
+の合計、<code>請求額(税抜)</code><br>※ 定期の請求額は ¥0
+のため、請求書ベースは元金額（または割引額）から起こす運用</li>
+</ul>
+<hr />
+<h2 id="7-入館対応現地トラブル">7. 入館対応・現地トラブル</h2>
+<table>
+<thead>
+<tr>
+<th>状況</th>
+<th>対応</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PIN が通らない</td>
+<td>予約時間帯を再確認／RemoteLock
+コンソールでデバイス状態確認／ランダム PIN フォールバック疑い</td>
+</tr>
+<tr>
+<td>電池切れ</td>
+<td>RemoteLock の電池残量通知を定期確認（台帳参照）</td>
+</tr>
+<tr>
+<td>誤予約（利用者から）</td>
+<td>利用開始 1
+時間前までは利用者自身でキャンセル可／それ以降は管理画面でキャンセル</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-毎週毎月の運用タスク">8. 毎週／毎月の運用タスク</h2>
+<h3 id="81-週次">8.1 週次</h3>
+<ul class="task-list">
+<li><label><input
+type="checkbox" />予約状況の確認（カレンダー）</label></li>
+<li><label><input
+type="checkbox" />レビュー閲覧（運営改善へのヒント）</label></li>
+<li><label><input type="checkbox" />RemoteLock
+電池残量のチェック</label></li>
+</ul>
+<h3 id="82-月次">8.2 月次</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />売上 CSV を経理へ共有</label></li>
+<li><label><input
+type="checkbox" />クーポン使用状況の確認（使い切り／停止判断）</label></li>
+<li><label><input type="checkbox" />Firestore のエクスポート確認（<a
+href="./07_動作環境構築手順.md#5-バックアップ--リストア">07_動作環境構築手順
+§バックアップ</a>）</label></li>
+</ul>
+<hr />
+<h2 id="9-監視アラート">9. 監視・アラート</h2>
+<table>
+<thead>
+<tr>
+<th>項目</th>
+<th>監視方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>決済失敗</td>
+<td>Stripe ダッシュボードの通知メール</td>
+</tr>
+<tr>
+<td>Webhook 失敗</td>
+<td>Stripe → Developers → Webhooks → Attempts</td>
+</tr>
+<tr>
+<td>RemoteLock API 失敗</td>
+<td>Vercel ログで <code>RemoteLock API error</code> を検索</td>
+</tr>
+<tr>
+<td>Firestore 障害</td>
+<td>Firebase Console のアラート</td>
+</tr>
+<tr>
+<td>操作ログ</td>
+<td>Vercel ログで <code>[OPERATION]</code> を検索</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>重大障害時は LINE
+公式アカウントで告知＋お知らせ機能（<code>critical</code>）を投稿。</p>
+</blockquote>
+<hr />
+<h2 id="10-セキュリティ個人情報">10. セキュリティ・個人情報</h2>
+<ul>
+<li>LIFF 経由で取得するのは <code>userId</code>（内部
+ID）／<code>displayName</code>／<code>pictureUrl</code> のみ</li>
+<li>カード情報は <strong>Stripe</strong>
+が保持し、本システムには保存しない</li>
+<li>領収書 PDF
+には氏名・利用日時・金額が含まれる（データ受渡しに注意）</li>
+<li>バックアップ／ログは <strong>アクセス制限されたストレージ</strong>
+に保管</li>
+</ul>
+<hr />
+<h2 id="11-問い合わせフロー">11. 問い合わせフロー</h2>
+<pre><code>利用者 ──LINE公式アカウント──▶ 運営スタッフ
+                                     │
+                                     ├─ 予約関連 → 管理画面で対応
+                                     ├─ 決済関連 → Stripe を確認
+                                     └─ システム障害 → 開発担当へエスカレーション</code></pre>
+</body>
+</html>
