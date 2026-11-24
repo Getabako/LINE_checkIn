@@ -187,7 +187,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
+if (process.argv[1]?.endsWith("sales-testdata.ts")) main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
