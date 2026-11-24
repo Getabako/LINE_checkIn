@@ -1,20 +1,15 @@
 // RPA 向け 日次売上CSV。
 // LINE ログイン不要の専用URL（推測不能なトークン付き）を開くだけで、指定日（既定: 前日）の
-// 決済・返金の明細を CSV でダウンロードできる。トークンは管理画面で確認・再発行する。
+// 売上明細を CSV でダウンロードできる。トークンは管理画面で確認・再発行する。
+//
+// 数え方は 2 通り:
+//   既定（利用日）   … 利用日がその日の予約を数える。管理画面の売上タブ（日別）と同じ数字になる
+//   basis=payment … お金が動いた日で数える（オンライン決済の入金と返金の明細）。入金の突き合わせ用
 import crypto from 'node:crypto';
 import { getDb, COLLECTIONS } from './db.js';
+import { buildUsageSalesRows, LOCATION_NAMES, FACILITY_NAMES } from './salesCore.js';
 
 const SETTINGS_DOC = 'salesExport';
-
-const LOCATION_NAMES: Record<string, string> = {
-  ASP: 'みんなの体育館 ASP',
-  YABASE: 'みんなの体育館 やばせ',
-};
-const FACILITY_NAMES: Record<string, string> = {
-  GYM: '体育館',
-  TRAINING_PRIVATE: 'トレーニングルーム（貸切）',
-  TRAINING_SHARED: 'トレーニングルーム（相席）',
-};
 
 export async function getSalesExportToken(): Promise<string> {
   const db = getDb();
@@ -65,9 +60,39 @@ function csvEscape(v: string | number): string {
 /** 期間指定の上限（日数）。RPA の設定ミスで全期間を引かないように */
 export const SALES_CSV_MAX_DAYS = 366;
 
+/** 予約者名（会員の氏名。無ければ LINE の表示名） */
+async function loadUserNames(userIds: string[]): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  const ids = Array.from(new Set(userIds.filter(Boolean)));
+  if (ids.length === 0) return names;
+  const us = await getDb().collection(COLLECTIONS.USERS).where('id', 'in', ids).get();
+  for (const u of us.docs) names.set(u.id, (u.data().name as string) || (u.data().displayName as string) || '');
+  return names;
+}
+
+// Excel で文字化けしないよう BOM 付き
+const toCsv = (lines: (string | number)[][]): string =>
+  '\uFEFF' + lines.map((l) => l.map(csvEscape).join(',')).join('\r\n');
+
 /**
- * 指定期間（日本時間・両端の日を含む）に発生した 決済（＋）と 返金（－）の明細CSV。
- * 1日分なら from と to に同じ日を渡す。
+ * 利用日で数える売上CSV（既定）。指定期間（両端の日を含む）に利用日がある予約のうち、
+ * 売上に数えるもの（予約完了）だけを 1 行ずつ出す。請求書払いの定期利用も含む。合計行は付けない。
+ * 管理画面の売上タブと同じ決まり（salesCore）で数えるので、同じ日・同じ期間なら金額が一致する。
+ */
+export async function buildUsageSalesCsv(from: string, to: string): Promise<string> {
+  const snap = await getDb()
+    .collection(COLLECTIONS.CHECKINS)
+    .where('date', '>=', from)
+    .where('date', '<=', to)
+    .get();
+  const checkins = snap.docs.map((d) => ({ ...d.data(), id: d.id })) as (Record<string, any> & { id: string })[];
+  const names = await loadUserNames(checkins.map((c) => c.userId));
+  return toCsv(buildUsageSalesRows(checkins, names));
+}
+
+/**
+ * お金が動いた日で数える明細CSV（basis=payment）。
+ * 指定期間（日本時間・両端の日を含む）に発生した 決済（＋）と 返金（－）を出す。合計行は付けない。
  * 請求書払い（定期）や無料予約はオンライン決済がないので含めない。
  */
 export async function buildSalesCsv(from: string, to: string): Promise<string> {
@@ -104,13 +129,7 @@ export async function buildSalesCsv(from: string, to: string): Promise<string> {
   }
   rows.sort((a, b) => String(a.at).localeCompare(String(b.at)));
 
-  // 予約者名
-  const userIds = Array.from(new Set(rows.map((r) => r.c.userId).filter(Boolean)));
-  const names = new Map<string, string>();
-  if (userIds.length > 0) {
-    const us = await db.collection(COLLECTIONS.USERS).where('id', 'in', userIds).get();
-    for (const u of us.docs) names.set(u.id, (u.data().name as string) || (u.data().displayName as string) || '');
-  }
+  const names = await loadUserNames(rows.map((r) => r.c.userId));
 
   const header = ['日時', '区分', '金額（税込）', '拠点', '施設', '利用日', '開始時刻', '利用時間', '予約者', '会員区分', '予約ID'];
   const lines = [header];
@@ -129,9 +148,5 @@ export async function buildSalesCsv(from: string, to: string): Promise<string> {
       r.id,
     ]);
   }
-  const total = rows.reduce((s, r) => s + r.amount, 0);
-  lines.push(['合計', '', String(total), '', '', '', '', '', '', '', '']);
-
-  // Excel で文字化けしないよう BOM 付き
-  return '﻿' + lines.map((l) => l.map(csvEscape).join(',')).join('\r\n');
+  return toCsv(lines);
 }

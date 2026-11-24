@@ -364,13 +364,13 @@ const SalesTab: React.FC = () => {
   };
 
   // 詳細CSVダウンロード（個別予約一覧）
-  // 時間帯区分: 平日昼 / 平日夜 / 土日祝（夜間=18:00以降開始）
+  // 時間帯区分: 平日昼 / 平日夜 / 土日祝（夜間=17:00以降開始。料金表・経理用CSVと同じ境界）
   const classifySlot = (dateStr: string, startTime: string): string => {
     const d = new Date(dateStr);
     const dow = d.getDay();
     if (dow === 0 || dow === 6 || isJpHoliday(d)) return '土日祝';
     const hour = parseInt(startTime.split(':')[0], 10);
-    return hour >= 18 ? '平日夜' : '平日昼';
+    return hour >= 17 ? '平日夜' : '平日昼';
   };
   const handleDetailCsv = async () => {
     setIsDownloading(true);
@@ -390,7 +390,7 @@ const SalesTab: React.FC = () => {
         ...paid.map((c) => {
           const isMember = !!c.memberTypeName;
           const total = c.totalPrice || 0;
-          const ex = Math.floor(total / 1.1);
+          const ex = Math.round(total / 1.1); // 経理用CSV・RPA用CSVと同じ四捨五入
           return [
             c.id,
             c.date,
@@ -671,9 +671,14 @@ const SalesExportUrlCard: React.FC = () => {
       </div>
       <div className="panel-body space-y-3">
         <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
-          このURLを開くだけで、前日分の売上（決済・返金）CSVがダウンロードされます。LINEログインは不要です。
+          このURLを開くだけで、前日に利用があった分の売上CSVがダウンロードされます。LINEログインは不要です。
+          上の売上（日別）と同じ数え方なので、同じ日の金額（税込）を足すと日別の売上と一致します。
+          入っているのは売上に数える予約だけで、キャンセル・未決済は出ません。合計行もありません。
+        </p>
+        <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
           末尾に <code className="bg-gray-100 px-1 rounded">&amp;date=2026-12-01</code> を付けると日付を指定できます。
           期間でまとめて取るときは <code className="bg-gray-100 px-1 rounded">&amp;from=2026-12-01&amp;to=2026-12-31</code> を付けます（両端の日を含む・最長366日）。
+          カード決済の入金・返金を、お金が動いた日ごとに見たいときは <code className="bg-gray-100 px-1 rounded">&amp;basis=payment</code> を付けます。
         </p>
         {!open ? (
           <button

@@ -294,7 +294,7 @@ export const buildMonthlySummary = (checkins: KeiriCheckin[], from: string): Kei
     ['みんなの体育館 総合計', grand, grand, 0, ''],
     [],
     ['※ 自作システムのため Labora CSV の手動変換は不要。予約データから直接集計しています。'],
-    ['※ イベント・登録料/更新料は別管理のため本表には含みません。'],
+    ['※ イベント参加費・登録料/更新料・月会費は本システムで決済していないため、本表・売上タブ・RPA用CSVのいずれにも含みません。'],
   ];
   return { filename: `月次サマリー_${label}.csv`, rows };
 };

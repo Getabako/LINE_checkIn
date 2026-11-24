@@ -37,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ============ RPA向け 日次売上CSV（LINEログイン不要・専用トークンURL） ============
     if (action === 'salesCsv' && req.method === 'GET') {
-      const { verifySalesExportToken, buildSalesCsv, yesterdayJst, SALES_CSV_MAX_DAYS } = await import('../server-lib/salesExport.js');
+      const { verifySalesExportToken, buildSalesCsv, buildUsageSalesCsv, yesterdayJst, SALES_CSV_MAX_DAYS } = await import('../server-lib/salesExport.js');
       if (!(await verifySalesExportToken(req.query.token as string | undefined))) {
         return res.status(403).json({ error: 'Forbidden' });
       }
@@ -65,8 +65,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (days > SALES_CSV_MAX_DAYS) {
         return res.status(400).json({ error: `期間は ${SALES_CSV_MAX_DAYS} 日以内で指定してください` });
       }
-      const csv = await buildSalesCsv(from, to);
-      const fileName = from === to ? `sales_${from}.csv` : `sales_${from}_${to}.csv`;
+      // 数え方: 既定は利用日（売上タブの日別と同じ数字）。&basis=payment で入金・返金の明細
+      const basis = q('basis');
+      if (basis && basis !== 'usage' && basis !== 'payment') {
+        return res.status(400).json({ error: 'basis は usage か payment で指定してください' });
+      }
+      const byPayment = basis === 'payment';
+      const csv = byPayment ? await buildSalesCsv(from, to) : await buildUsageSalesCsv(from, to);
+      const prefix = byPayment ? 'payments' : 'sales';
+      const fileName = from === to ? `${prefix}_${from}.csv` : `${prefix}_${from}_${to}.csv`;
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Cache-Control', 'no-store');
@@ -438,34 +445,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (effectiveTo) query = query.where('date', '<=', effectiveTo);
 
       const snapshot = await query.get();
-      const checkins = snapshot.docs
-        .map((doc) => doc.data())
-        .filter((c) => c.status === 'PAID');
-
-      // 集計
-      const sales: Record<string, { count: number; total: number }> = {};
-
-      for (const c of checkins) {
-        let key: string;
-        if (groupBy === 'location') {
-          key = c.location || 'UNKNOWN';
-        } else if (groupBy === 'facility') {
-          key = `${c.location}_${c.facilityType}`;
-        } else if (period === 'monthly') {
-          key = c.date?.substring(0, 7) || 'UNKNOWN';
-        } else {
-          key = c.date || 'UNKNOWN';
-        }
-
-        if (!sales[key]) {
-          sales[key] = { count: 0, total: 0 };
-        }
-        sales[key].count++;
-        sales[key].total += c.totalPrice || 0;
-      }
-
-      const totalCount = checkins.length;
-      const totalAmount = checkins.reduce((sum, c) => sum + (c.totalPrice || 0), 0);
+      // 数え方は RPA 用の売上CSV と共通（server-lib/salesCore）。ここだけ条件を変えない
+      const { summarizeSales } = await import('../server-lib/salesCore.js');
+      const { sales, totalCount, totalAmount } = summarizeSales(
+        snapshot.docs.map((doc) => doc.data()),
+        { period, groupBy }
+      );
 
       return res.status(200).json({
         period,
