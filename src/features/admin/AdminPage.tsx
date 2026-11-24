@@ -7,10 +7,10 @@ import { Header } from '../../components/common/Header';
 import { useUserStore } from '../../stores/userStore';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, AdminMember, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
+import { adminApi, Event, School, SalesData, OtherSale, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, AdminMember, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
-import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, KeiriCheckin } from './keiriCsv';
+import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, buildOtherSalesDetail, OTHER_SALE_CATEGORIES, OTHER_SALE_PAY_METHODS, KeiriCheckin } from './keiriCsv';
 import { CalendarTab } from './CalendarTab';
 import { LaboraReservationImport, LinkLineAccountModal } from './LaboraReservationImport';
 import clsx from 'clsx';
@@ -375,7 +375,10 @@ const SalesTab: React.FC = () => {
   const handleDetailCsv = async () => {
     setIsDownloading(true);
     try {
-      const checkins = await adminApi.getCheckins({ from, to });
+      const [checkins, otherSales] = await Promise.all([
+        adminApi.getCheckins({ from, to }),
+        adminApi.getOtherSales({ from, to }),
+      ]);
       const paid = checkins.filter((c) => c.status === 'PAID');
       const rows: (string | number)[][] = [
         [
@@ -411,6 +414,26 @@ const SalesTab: React.FC = () => {
             c.createdAt || '',
           ];
         }),
+        // その他の売上（イベント参加費・登録料など）。利用区分に種別、利用者にメモが入る
+        ...otherSales.map((o) => [
+          o.id,
+          o.date,
+          '',
+          '',
+          getLocationName(o.location),
+          '',
+          o.memo || '',
+          OTHER_SALE_CATEGORIES[o.category] || o.category,
+          '',
+          '',
+          o.amount,
+          0,
+          0,
+          o.amount,
+          Math.round(o.amount / 1.1),
+          o.payMethod || '',
+          '',
+        ]),
       ];
       downloadCsv(`売上詳細_${from}_${to}.csv`, rows);
     } catch (e) {
@@ -436,7 +459,7 @@ const SalesTab: React.FC = () => {
           ? buildGeneralDetail(checkins, loc!, from)
           : kind === 'recurring'
           ? buildRecurringDetail(checkins, loc!, from)
-          : buildMonthlySummary(checkins, from);
+          : buildMonthlySummary(checkins, from, await adminApi.getOtherSales({ from, to }));
       downloadCsv(file.filename, file.rows);
     } catch (e) {
       console.error(e);
@@ -451,12 +474,14 @@ const SalesTab: React.FC = () => {
     setKeiriBusy('all_');
     try {
       const checkins = (await adminApi.getCheckins({ from, to })) as KeiriCheckin[];
+      const otherSales = await adminApi.getOtherSales({ from, to });
       const sections: { title: string; rows: (string | number)[][] }[] = [];
       for (const loc of ['ASP', 'YABASE'] as LocationId[]) {
         sections.push({ title: `【${getLocationName(loc)} 一般利用明細】`, rows: buildGeneralDetail(checkins, loc, from).rows });
         sections.push({ title: `【${getLocationName(loc)} 定期利用明細】`, rows: buildRecurringDetail(checkins, loc, from).rows });
       }
-      sections.push({ title: '【月次サマリー】', rows: buildMonthlySummary(checkins, from).rows });
+      sections.push({ title: '【その他の売上 明細（イベント参加費・登録料など）】', rows: buildOtherSalesDetail(otherSales, from).rows });
+      sections.push({ title: '【月次サマリー】', rows: buildMonthlySummary(checkins, from, otherSales).rows });
 
       const combined: (string | number)[][] = [];
       sections.forEach((s, i) => {
@@ -527,6 +552,11 @@ const SalesTab: React.FC = () => {
             <p className="text-primary-100 text-sm">合計売上</p>
             <p className="text-3xl font-bold mt-1">¥{salesData.totalAmount.toLocaleString()}</p>
             <p className="text-primary-200 text-sm mt-1">{salesData.totalCount}件</p>
+            {!!salesData.otherCount && (
+              <p className="text-primary-100 text-sm mt-1">
+                うち その他の売上 ¥{(salesData.otherAmount || 0).toLocaleString()}（{salesData.otherCount}件）
+              </p>
+            )}
           </div>
 
           {/* CSVダウンロード */}
@@ -599,6 +629,8 @@ const SalesTab: React.FC = () => {
             </div>
           </div>
 
+          <OtherSalesCard from={from} to={to} onChanged={load} />
+
           <SalesExportUrlCard />
 
           {/* 棒グラフ */}
@@ -628,6 +660,166 @@ const SalesTab: React.FC = () => {
   );
 };
 
+
+// ============ その他の売上（イベント参加費・登録料・更新料・月会費など）の入力 ============
+// 本システムで決済していない売上をスタッフが入力する。入力した金額は、売上タブ・経理用CSV・RPA用CSV の全部に出る
+const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void }> = ({ from, to, onChanged }) => {
+  const [list, setList] = React.useState<OtherSale[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [date, setDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [location, setLocation] = React.useState<LocationId>('ASP');
+  const [category, setCategory] = React.useState('EVENT_FEE');
+  const [amount, setAmount] = React.useState('');
+  const [payMethod, setPayMethod] = React.useState('現金');
+  const [memo, setMemo] = React.useState('');
+
+  const reload = React.useCallback(() => {
+    adminApi.getOtherSales({ from, to }).then(setList).catch(console.error);
+  }, [from, to]);
+  React.useEffect(reload, [reload]);
+
+  const handleAdd = async () => {
+    const n = Number(amount);
+    if (!date) { setError('日付を入力してください'); return; }
+    if (!Number.isInteger(n) || n <= 0) { setError('金額は 1 円以上の整数で入力してください'); return; }
+    setError('');
+    setBusy(true);
+    try {
+      await adminApi.createOtherSale({ date, location, category, amount: n, payMethod, memo: memo.trim() });
+      setAmount('');
+      setMemo('');
+      reload();
+      onChanged();
+    } catch (e) {
+      console.error(e);
+      setError('登録に失敗しました。もう一度お試しください');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (o: OtherSale) => {
+    const name = OTHER_SALE_CATEGORIES[o.category] || o.category;
+    if (!window.confirm(`${o.date} ${name} ¥${o.amount.toLocaleString()} を削除しますか？`)) return;
+    setBusy(true);
+    try {
+      await adminApi.deleteOtherSale(o.id);
+      reload();
+      onChanged();
+    } catch (e) {
+      console.error(e);
+      alert('削除に失敗しました');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const inputClass = 'w-full px-3 py-2.5 border rounded-lg text-base';
+  const labelClass = 'block text-sm font-semibold text-gray-700 mb-1';
+  return (
+    <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-4 space-y-4">
+      <div>
+        <p className="text-base font-bold text-gray-900">その他の売上（イベント参加費・登録料など）</p>
+        <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+          このシステムで決済していない売上を入力します。入力した金額は、上の合計売上・日別／月別、経理用CSV、RPA用の売上CSVのすべてに同じ金額で出ます。日付は受け取った日を入れてください。
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>日付（受け取った日）</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className={labelClass}>拠点</label>
+          <select value={location} onChange={(e) => setLocation(e.target.value as LocationId)} className={inputClass}>
+            {(['ASP', 'YABASE'] as LocationId[]).map((loc) => (
+              <option key={loc} value={loc}>{getLocationName(loc)}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>種別</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputClass}>
+            {Object.entries(OTHER_SALE_CATEGORIES).map(([key, name]) => (
+              <option key={key} value={key}>{name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>受け取り方法</label>
+          <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputClass}>
+            {OTHER_SALE_PAY_METHODS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>金額（税込・円）</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="例: 3300"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>メモ（任意）</label>
+          <input
+            type="text"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            maxLength={200}
+            placeholder="例: 親子体操イベント 6名分"
+            className={inputClass}
+          />
+        </div>
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button
+        onClick={handleAdd}
+        disabled={busy}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-primary-500 text-white text-base font-semibold disabled:opacity-40"
+      >
+        <FiPlus className="w-4 h-4" /> {busy ? '処理中...' : 'この売上を登録する'}
+      </button>
+
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">集計期間内の登録（{list.length}件）</p>
+        {list.length === 0 ? (
+          <p className="text-sm text-gray-400">この期間の登録はありません</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {list.map((o) => (
+              <li key={o.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {o.date}　{OTHER_SALE_CATEGORIES[o.category] || o.category}　¥{o.amount.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-gray-500 truncate">
+                    {getLocationName(o.location)}{o.payMethod ? `・${o.payMethod}` : ''}{o.memo ? `・${o.memo}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDelete(o)}
+                  disabled={busy}
+                  aria-label="この売上を削除"
+                  className="shrink-0 p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                >
+                  <FiTrash2 className="w-4 h-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ============ RPA向け 売上CSVの専用URL ============
 const SalesExportUrlCard: React.FC = () => {
@@ -673,7 +865,8 @@ const SalesExportUrlCard: React.FC = () => {
         <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
           このURLを開くだけで、前日に利用があった分の売上CSVがダウンロードされます。LINEログインは不要です。
           上の売上（日別）と同じ数え方なので、同じ日の金額（税込）を足すと日別の売上と一致します。
-          入っているのは売上に数える予約だけで、キャンセル・未決済は出ません。合計行もありません。
+          入っているのは売上に数えるものだけで、キャンセル・未決済は出ません。合計行もありません。
+          下の「その他の売上」に入力したイベント参加費・登録料なども、受け取った日の行として入ります（「売上種別」の列で見分けられます）。
         </p>
         <p className="text-gray-600 leading-relaxed" style={{ fontSize: '14px' }}>
           末尾に <code className="bg-gray-100 px-1 rounded">&amp;date=2026-12-01</code> を付けると日付を指定できます。

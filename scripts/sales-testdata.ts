@@ -154,6 +154,14 @@ function check(): boolean {
   return ok;
 }
 
+// その他の売上（イベント参加費・登録料など）のテストデータ。売上タブの「その他の売上」で入力したのと同じ形
+export const OTHER_SALES = [
+  { id: 'TESTSALES_O1', date: '2026-11-18', location: 'ASP', category: 'REGISTRATION_FEE', amount: 1100, payMethod: '現金', memo: '【テスト】新規登録 1名' },
+  { id: 'TESTSALES_O2', date: '2026-11-21', location: 'YABASE', category: 'EVENT_FEE', amount: 6600, payMethod: '現金', memo: '【テスト】親子体操イベント 6名' },
+  { id: 'TESTSALES_O3', date: '2026-11-22', location: 'ASP', category: 'RENEWAL_FEE', amount: 2200, payMethod: '振込', memo: '【テスト】更新 2名' },
+  { id: 'TESTSALES_O4', date: '2026-11-23', location: 'ASP', category: 'MONTHLY_FEE', amount: 5500, payMethod: '振込', memo: '【テスト】月会費 1名' },
+];
+
 async function main() {
   const mode = process.argv[2] || 'check';
   if (mode === 'check') {
@@ -174,13 +182,25 @@ async function main() {
       const { id, ...data } = c;
       await db.collection(COLLECTIONS.CHECKINS).doc(id).set(data);
     }
-    console.log(`入れました: 予約 ${BOOKINGS.length} 件・利用者 ${USERS.length} 件（印: ${SOURCE}）`);
+    for (const o of OTHER_SALES) {
+      const { id, ...data } = o;
+      await db.collection(COLLECTIONS.OTHER_SALES).doc(id).set({ ...data, createdBy: SOURCE, createdAt: now, updatedAt: now });
+    }
+    console.log(`入れました: 予約 ${BOOKINGS.length} 件・利用者 ${USERS.length} 件・その他の売上 ${OTHER_SALES.length} 件（印: ${SOURCE}）`);
+  } else if (mode === 'seed-other') {
+    // その他の売上だけを追加で入れる（予約のテストデータは入れ直さない）
+    for (const o of OTHER_SALES) {
+      const { id, ...data } = o;
+      await db.collection(COLLECTIONS.OTHER_SALES).doc(id).set({ ...data, createdBy: SOURCE, createdAt: now, updatedAt: now });
+    }
+    console.log(`入れました: その他の売上 ${OTHER_SALES.length} 件`);
   } else if (mode === 'remove') {
     const cs = await db.collection(COLLECTIONS.CHECKINS).where('importSource', '==', SOURCE).get();
     for (const d of cs.docs) if (d.id.startsWith('TESTSALES_')) await d.ref.delete();
     const us = await db.collection(COLLECTIONS.USERS).where('importSource', '==', SOURCE).get();
     for (const d of us.docs) if (d.id.startsWith('TESTSALES_U_')) await d.ref.delete();
-    console.log(`消しました: 予約 ${cs.docs.length} 件・利用者 ${us.docs.length} 件`);
+    for (const o of OTHER_SALES) await db.collection(COLLECTIONS.OTHER_SALES).doc(o.id).delete();
+    console.log(`消しました: 予約 ${cs.docs.length} 件・利用者 ${us.docs.length} 件・その他の売上 ${OTHER_SALES.length} 件`);
   } else {
     throw new Error('check / seed / remove のどれかを指定してください');
   }

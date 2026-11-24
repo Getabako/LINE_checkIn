@@ -447,9 +447,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const snapshot = await query.get();
       // 数え方は RPA 用の売上CSV と共通（server-lib/salesCore）。ここだけ条件を変えない
       const { summarizeSales } = await import('../server-lib/salesCore.js');
-      const { sales, totalCount, totalAmount } = summarizeSales(
+      const { loadOtherSales } = await import('../server-lib/salesExport.js');
+      const { sales, totalCount, totalAmount, otherCount, otherAmount } = summarizeSales(
         snapshot.docs.map((doc) => doc.data()),
-        { period, groupBy }
+        { period, groupBy },
+        await loadOtherSales(effectiveFrom || undefined, effectiveTo || undefined)
       );
 
       return res.status(200).json({
@@ -458,7 +460,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sales,
         totalCount,
         totalAmount,
+        otherCount,
+        otherAmount,
       });
+    }
+
+    // ============ その他の売上（イベント参加費・登録料・更新料・月会費など） ============
+    // 本システムで決済していない売上を、スタッフが入力する。売上タブ・経理用CSV・RPA用CSV の全部に出る
+    if (action === 'otherSales' && req.method === 'GET') {
+      const { loadOtherSales } = await import('../server-lib/salesExport.js');
+      const list = await loadOtherSales((req.query.from as string) || undefined, (req.query.to as string) || undefined);
+      list.sort((a, b) => `${b.date}|${b.id}`.localeCompare(`${a.date}|${a.id}`));
+      return res.status(200).json(list);
+    }
+
+    if (action === 'createOtherSale' && req.method === 'POST') {
+      const { OTHER_SALE_CATEGORIES, OTHER_SALE_PAY_METHODS } = await import('../server-lib/salesCore.js');
+      const b = (req.body || {}) as Record<string, unknown>;
+      const date = String(b.date || '').trim();
+      const location = String(b.location || '').trim();
+      const category = String(b.category || '').trim();
+      const amount = Number(b.amount);
+      const payMethod = String(b.payMethod || '').trim();
+      const memo = String(b.memo || '').trim().slice(0, 200);
+      const validDate =
+        /^\d{4}-\d{2}-\d{2}$/.test(date) && new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
+      if (!validDate) return res.status(400).json({ error: '日付を正しく入力してください' });
+      if (location !== 'ASP' && location !== 'YABASE') return res.status(400).json({ error: '拠点を選んでください' });
+      if (!OTHER_SALE_CATEGORIES[category]) return res.status(400).json({ error: '種別を選んでください' });
+      if (!Number.isInteger(amount) || amount <= 0 || amount > 100_000_000) {
+        return res.status(400).json({ error: '金額は 1 円以上の整数で入力してください' });
+      }
+      if (payMethod && !OTHER_SALE_PAY_METHODS.includes(payMethod)) {
+        return res.status(400).json({ error: '受け取り方法を選び直してください' });
+      }
+      const now = new Date().toISOString();
+      const ref = await db.collection(COLLECTIONS.OTHER_SALES).add({
+        date, location, category, amount, payMethod, memo,
+        createdBy: admin.userId, createdAt: now, updatedAt: now,
+      });
+      return res.status(200).json({ id: ref.id, date, location, category, amount, payMethod, memo });
+    }
+
+    if (action === 'deleteOtherSale' && req.method === 'DELETE') {
+      const id = String(req.query.id || '').trim();
+      if (!id) return res.status(400).json({ error: 'id が必要です' });
+      await db.collection(COLLECTIONS.OTHER_SALES).doc(id).delete();
+      return res.status(200).json({ message: 'Deleted' });
     }
 
     // ============ 領収書生成 (Phase 5) ============

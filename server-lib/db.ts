@@ -465,4 +465,5 @@ export const COLLECTIONS = {
   ANNOUNCEMENTS: 'announcements',
   MEMBERSHIP_APPLICATIONS: 'membershipApplications',
   STAFF_ACCESSES: 'staffAccesses',
+  OTHER_SALES: 'otherSales',
 } as const;

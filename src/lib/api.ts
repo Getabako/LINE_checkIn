@@ -454,6 +454,20 @@ export interface SalesData {
   sales: Record<string, { count: number; total: number }>;
   totalCount: number;
   totalAmount: number;
+  /** うち、その他の売上（イベント参加費・登録料など）の件数と金額 */
+  otherCount?: number;
+  otherAmount?: number;
+}
+
+/** 施設予約以外の売上（イベント参加費・登録料・更新料・月会費など）。スタッフが入力する */
+export interface OtherSale {
+  id: string;
+  date: string;
+  location: LocationId;
+  category: string;
+  amount: number;
+  payMethod?: string;
+  memo?: string;
 }
 
 export type AnnouncementPriority = 'info' | 'warning' | 'critical';
@@ -725,6 +739,15 @@ export const adminApi = {
   removeAdminUser: (lineUserId: string) =>
     api.delete<{ lineUserIds: string[] }>(`/admin?action=removeAdminUser&lineUserId=${encodeURIComponent(lineUserId)}`),
   // RPA向け 日次売上CSVの専用URL（POSTで再発行）
+  getOtherSales: (params: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams({ action: 'otherSales' });
+    if (params.from) qs.set('from', params.from);
+    if (params.to) qs.set('to', params.to);
+    return api.get<OtherSale[]>(`/admin?${qs.toString()}`);
+  },
+  createOtherSale: (data: Omit<OtherSale, 'id'>) => api.post<OtherSale>('/admin?action=createOtherSale', data),
+  deleteOtherSale: (id: string) => api.delete<void>(`/admin?action=deleteOtherSale&id=${encodeURIComponent(id)}`),
+
   getSalesExportUrl: () => api.get<{ url: string }>('/admin?action=salesExportUrl'),
   regenerateSalesExportUrl: () => api.post<{ url: string }>('/admin?action=salesExportUrl', {}),
 

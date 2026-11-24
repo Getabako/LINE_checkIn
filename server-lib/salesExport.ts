@@ -7,7 +7,7 @@
 //   basis=payment … お金が動いた日で数える（オンライン決済の入金と返金の明細）。入金の突き合わせ用
 import crypto from 'node:crypto';
 import { getDb, COLLECTIONS } from './db.js';
-import { buildUsageSalesRows, LOCATION_NAMES, FACILITY_NAMES } from './salesCore.js';
+import { buildUsageSalesRows, LOCATION_NAMES, FACILITY_NAMES, type OtherSale } from './salesCore.js';
 
 const SETTINGS_DOC = 'salesExport';
 
@@ -70,6 +70,26 @@ async function loadUserNames(userIds: string[]): Promise<Map<string, string>> {
   return names;
 }
 
+/** その他の売上（イベント参加費・登録料など）を計上日の範囲で取り出す。from / to は省略可 */
+export async function loadOtherSales(from?: string, to?: string): Promise<OtherSale[]> {
+  let q = getDb().collection(COLLECTIONS.OTHER_SALES) as any;
+  if (from) q = q.where('date', '>=', from);
+  if (to) q = q.where('date', '<=', to);
+  const snap = await q.get();
+  return snap.docs.map((d: any) => {
+    const v = d.data();
+    return {
+      id: d.id,
+      date: v.date || '',
+      location: v.location || '',
+      category: v.category || 'OTHER',
+      amount: Number(v.amount) || 0,
+      payMethod: v.payMethod || '',
+      memo: v.memo || '',
+    };
+  });
+}
+
 // Excel で文字化けしないよう BOM 付き
 const toCsv = (lines: (string | number)[][]): string =>
   '\uFEFF' + lines.map((l) => l.map(csvEscape).join(',')).join('\r\n');
@@ -77,6 +97,7 @@ const toCsv = (lines: (string | number)[][]): string =>
 /**
  * 利用日で数える売上CSV（既定）。指定期間（両端の日を含む）に利用日がある予約のうち、
  * 売上に数えるもの（予約完了）だけを 1 行ずつ出す。請求書払いの定期利用も含む。合計行は付けない。
+ * 管理画面で入力した「その他の売上」（イベント参加費・登録料など）も計上日の行として含む。
  * 管理画面の売上タブと同じ決まり（salesCore）で数えるので、同じ日・同じ期間なら金額が一致する。
  */
 export async function buildUsageSalesCsv(from: string, to: string): Promise<string> {
@@ -87,7 +108,7 @@ export async function buildUsageSalesCsv(from: string, to: string): Promise<stri
     .get();
   const checkins = snap.docs.map((d) => ({ ...d.data(), id: d.id })) as (Record<string, any> & { id: string })[];
   const names = await loadUserNames(checkins.map((c) => c.userId));
-  return toCsv(buildUsageSalesRows(checkins, names));
+  return toCsv(buildUsageSalesRows(checkins, names, await loadOtherSales(from, to)));
 }
 
 /**

@@ -279,3 +279,19 @@ CREATE TABLE IF NOT EXISTS staff_accesses (
   extra            jsonb NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE INDEX IF NOT EXISTS staff_accesses_status_idx ON staff_accesses (status);
+
+-- 施設予約以外の売上（イベント参加費・登録料・更新料・月会費など）。管理画面の売上タブでスタッフが入力する
+CREATE TABLE IF NOT EXISTS other_sales (
+  id          text PRIMARY KEY,
+  date        text NOT NULL,
+  location    text NOT NULL,
+  category    text NOT NULL,
+  amount      numeric NOT NULL,
+  pay_method  text,
+  memo        text,
+  created_by  text,
+  created_at  timestamptz,
+  updated_at  timestamptz,
+  extra       jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS other_sales_date_idx ON other_sales (date);

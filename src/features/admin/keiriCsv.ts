@@ -263,7 +263,47 @@ export const buildRecurringDetail = (
 };
 
 // 月次サマリー
-export const buildMonthlySummary = (checkins: KeiriCheckin[], from: string): KeiriFile => {
+// その他の売上（イベント参加費・登録料・更新料・月会費など）。種別の名前は server-lib/salesCore と同じにする
+export const OTHER_SALE_CATEGORIES: Record<string, string> = {
+  EVENT_FEE: 'イベント参加費',
+  REGISTRATION_FEE: '登録料',
+  RENEWAL_FEE: '更新料',
+  MONTHLY_FEE: '月会費',
+  OTHER: 'その他',
+};
+export const OTHER_SALE_PAY_METHODS = ['現金', '振込', 'その他'];
+export interface KeiriOtherSale {
+  id: string;
+  date: string;
+  location: string;
+  category: string;
+  amount: number;
+  payMethod?: string;
+  memo?: string;
+}
+
+/** その他の売上の明細（計上日順）。経理用CSVの一括出力に付ける */
+export const buildOtherSalesDetail = (otherSales: KeiriOtherSale[], from: string): KeiriFile => {
+  const label = periodLabel(from);
+  const sorted = [...otherSales].sort((a, b) => `${a.date}|${a.location}|${a.id}`.localeCompare(`${b.date}|${b.location}|${b.id}`));
+  const rows: Row[] = [
+    [`${label}　その他の売上 明細`],
+    ['計上日', '拠点', '種別', '受け取り方法', 'メモ', '金額(税込)', '金額(税抜)'],
+    ...sorted.map((o): Row => [
+      o.date,
+      o.location === 'ASP' ? 'みんなの体育館ASP' : o.location === 'YABASE' ? 'みんなの体育館やばせ' : o.location,
+      OTHER_SALE_CATEGORIES[o.category] || o.category,
+      o.payMethod || '',
+      o.memo || '',
+      o.amount,
+      toExcl(o.amount),
+    ]),
+    ['合計', '', '', '', '', sorted.reduce((s, o) => s + o.amount, 0), sorted.reduce((s, o) => s + toExcl(o.amount), 0)],
+  ];
+  return { filename: `その他の売上明細_${label}.csv`, rows };
+};
+
+export const buildMonthlySummary = (checkins: KeiriCheckin[], from: string, otherSales: KeiriOtherSale[] = []): KeiriFile => {
   const label = periodLabel(from);
   const paidOnly = checkins.filter((c) => c.status === 'PAID');
   const sumExcl = (pred: (c: KeiriCheckin) => boolean): number =>
@@ -275,8 +315,24 @@ export const buildMonthlySummary = (checkins: KeiriCheckin[], from: string): Kei
   const aspTrainGeneral = sumExcl((c) => c.location === 'ASP' && c.facilityType !== 'GYM' && !isRecurringMember(c.memberTypeName));
   const aspRecurring = sumExcl((c) => c.location === 'ASP' && isRecurringMember(c.memberTypeName));
 
-  const yabaseTotal = yabaseGeneral + yabaseRecurring;
-  const aspTotal = aspGymGeneral + aspTrainGeneral + aspRecurring;
+  // その他の売上（イベント参加費・登録料など。スタッフが入力したもの）。税抜は 1 件ごとに四捨五入
+  const otherExcl = (loc: string, category?: string): number =>
+    otherSales
+      .filter((o) => o.location === loc && (!category || o.category === category))
+      .reduce((s, o) => s + toExcl(o.amount), 0);
+  const yabaseOther = otherExcl('YABASE');
+  const aspOther = otherExcl('ASP');
+  const otherNote = '管理画面で入力した売上（受け取った日で計上）';
+  const otherBreakdown: Row[] = [];
+  for (const [loc, name] of [['YABASE', 'みんなの体育館やばせ'], ['ASP', 'みんなの体育館ASP']] as const) {
+    for (const [key, catName] of Object.entries(OTHER_SALE_CATEGORIES)) {
+      const v = otherExcl(loc, key);
+      if (v !== 0) otherBreakdown.push([`　内訳 ${name} ${catName}`, v, v, 0, '']);
+    }
+  }
+
+  const yabaseTotal = yabaseGeneral + yabaseRecurring + yabaseOther;
+  const aspTotal = aspGymGeneral + aspTrainGeneral + aspRecurring + aspOther;
   const grand = yabaseTotal + aspTotal;
 
   // 自作システムでは予約日＝決済日（即時キャプチャ）のため、予約売上＝入金予定額で差異は発生しない
@@ -289,12 +345,15 @@ export const buildMonthlySummary = (checkins: KeiriCheckin[], from: string): Kei
     ['③ みんなの体育館ASP 一般利用（体育館）', aspGymGeneral, aspGymGeneral, 0, note],
     ['④ みんなの体育館ASP 一般利用（トレーニングルーム）', aspTrainGeneral, aspTrainGeneral, 0, note],
     ['⑤ みんなの体育館ASP 年間定期利用', aspRecurring, aspRecurring, 0, note],
+    ['⑥ みんなの体育館やばせ その他の売上（イベント参加費・登録料など）', yabaseOther, yabaseOther, 0, otherNote],
+    ['⑦ みんなの体育館ASP その他の売上（イベント参加費・登録料など）', aspOther, aspOther, 0, otherNote],
+    ...otherBreakdown,
     ['みんなの体育館やばせ 合計', yabaseTotal, yabaseTotal, 0, ''],
     ['みんなの体育館ASP 合計', aspTotal, aspTotal, 0, ''],
     ['みんなの体育館 総合計', grand, grand, 0, ''],
     [],
     ['※ 自作システムのため Labora CSV の手動変換は不要。予約データから直接集計しています。'],
-    ['※ イベント参加費・登録料/更新料・月会費は本システムで決済していないため、本表・売上タブ・RPA用CSVのいずれにも含みません。'],
+    ['※ イベント参加費・登録料/更新料・月会費は本システムで決済していないため、管理画面の売上タブ「その他の売上」に入力した分を ⑥⑦ に計上しています。同じ金額が売上タブ・RPA用CSVにも出ます。'],
   ];
   return { filename: `月次サマリー_${label}.csv`, rows };
 };
