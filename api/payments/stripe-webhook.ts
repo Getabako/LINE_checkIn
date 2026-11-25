@@ -43,22 +43,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
 
-    // ---- 施設予約以外の決済（イベント参加費・月額会員の登録料／更新料） ----
+    // ---- 施設予約以外の決済（イベント参加費・スクール受講料・月額会員の登録料／更新料） ----
     {
       const billing = await import('../../server-lib/billing.js');
       const obj = event.data.object as any;
       const kind = obj?.metadata?.kind as string | undefined;
       if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-        if (kind === 'event') {
-          await billing.completeEventRegistration(obj as Stripe.Checkout.Session);
+        if (billing.isRegKind(kind)) {
+          await billing.completeRegistration(obj as Stripe.Checkout.Session);
           return res.status(200).json({ received: true });
         }
         // 月額会員の申込みは、続けて届く invoice.paid で会員の有効化と売上計上を行う
         if (kind === 'membership') return res.status(200).json({ received: true });
       }
       if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
-        if (kind === 'event' && obj.metadata?.registrationId) {
-          await billing.releaseEventHold(obj.metadata.registrationId);
+        if (billing.isRegKind(kind) && obj.metadata?.registrationId) {
+          await billing.releaseHold(kind, obj.metadata.registrationId);
         }
         return res.status(200).json({ received: true });
       }

@@ -29,6 +29,29 @@ async function getOrCreateUser(profile: { userId: string; displayName: string; p
   return docRef.id;
 }
 
+/** 一覧に「自分が申込み済みか」「いまキャンセルできるか」を付ける */
+async function withMyRegistration<T extends { id: string }>(
+  kind: 'event' | 'school',
+  items: T[],
+  lineUserId: string
+): Promise<(T & { registered: boolean; canCancel: boolean })[]> {
+  const { canCancelRegistration } = await import('../../server-lib/billing.js');
+  const fkField = kind === 'event' ? 'eventId' : 'schoolId';
+  const mine = await getDb()
+    .collection(kind === 'event' ? COLLECTIONS.EVENT_REGISTRATIONS : COLLECTIONS.SCHOOL_REGISTRATIONS)
+    .where('lineUserId', '==', lineUserId)
+    .get();
+  const regs = new Map<string, Record<string, any>>();
+  for (const d of mine.docs) {
+    const r = d.data() as Record<string, any>;
+    if (r.status === 'REGISTERED') regs.set(r[fkField], r);
+  }
+  return items.map((it) => {
+    const reg = regs.get(it.id);
+    return { ...it, registered: !!reg, canCancel: !!reg && canCancelRegistration(kind, it, reg) };
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -186,16 +209,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const events = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; date?: string }))
           .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        // 自分が申込み済み（決済完了）のイベントに印を付ける
-        const mine = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
-          .where('lineUserId', '==', profile.userId)
-          .get();
-        const registeredIds = new Set(
-          mine.docs
-            .filter((d) => (d.data() as { status?: string }).status !== 'PENDING')
-            .map((d) => (d.data() as { eventId?: string }).eventId)
-        );
-        return res.status(200).json(events.map((e) => ({ ...e, registered: registeredIds.has(e.id) })));
+        return res.status(200).json(await withMyRegistration('event', events, profile.userId));
       }
 
       // 公開スクール一覧
@@ -206,7 +220,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const schools = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
           .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-        return res.status(200).json(schools);
+        return res.status(200).json(await withMyRegistration('school', schools, profile.userId));
       }
       const { groupId } = req.query;
 
@@ -240,60 +254,69 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const type = req.query.type as string;
 
-      // イベント申込み
-      if (type === 'event-register') {
-        const { eventId } = req.body;
-        if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
+      // イベント／スクールの申込み（料金があるものは、申込み時にカード・PayPay で決済する）
+      if (type === 'event-register' || type === 'school-register') {
+        const kind = type === 'event-register' ? 'event' : 'school';
+        const parentId = (kind === 'event' ? req.body.eventId : req.body.schoolId) as string | undefined;
+        if (!parentId) return res.status(400).json({ error: kind === 'event' ? 'Missing eventId' : 'Missing schoolId' });
+        const fkField = kind === 'event' ? 'eventId' : 'schoolId';
+        const parentColl = kind === 'event' ? COLLECTIONS.EVENTS : COLLECTIONS.SCHOOLS;
+        const regColl = kind === 'event' ? COLLECTIONS.EVENT_REGISTRATIONS : COLLECTIONS.SCHOOL_REGISTRATIONS;
 
         const billing = await import('../../server-lib/billing.js');
         // 決済待ちのまま時間が過ぎた申込みの席を戻してから、定員を見る
-        await billing.releaseStaleEventHolds(eventId);
+        await billing.releaseStaleHolds(kind, parentId);
 
-        const eventDoc = await db.collection(COLLECTIONS.EVENTS).doc(eventId).get();
-        if (!eventDoc.exists) return res.status(404).json({ error: 'Event not found' });
-        const event = eventDoc.data()!;
-        if (event.isActive === false) return res.status(400).json({ error: 'このイベントは受付を終了しました' });
+        const parentDoc = await db.collection(parentColl).doc(parentId).get();
+        if (!parentDoc.exists) return res.status(404).json({ error: kind === 'event' ? 'Event not found' : 'School not found' });
+        const parent = parentDoc.data()!;
+        if (parent.isActive === false) return res.status(400).json({ error: '受付を終了しました' });
 
-        // 重複チェック（決済待ちのまま戻ってきた場合は、前の申込みを取り消してやり直す）
-        const existing = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
-          .where('eventId', '==', eventId)
+        // 重複チェック（決済待ちのまま戻ってきた場合は、前の申込みを取り消してやり直す。キャンセル済みは申込み直せる）
+        const existing = await db.collection(regColl)
+          .where(fkField, '==', parentId)
           .where('lineUserId', '==', profile.userId)
           .get();
         for (const d of existing.docs) {
-          if ((d.data() as { status?: string }).status === 'PENDING') await billing.releaseEventHold(d.id);
-          else return res.status(400).json({ error: '既に申込み済みです' });
+          const st = (d.data() as { status?: string }).status;
+          if (st === 'PENDING') await billing.releaseHold(kind, d.id);
+          else if (st !== 'CANCELLED') return res.status(400).json({ error: '既に申込み済みです' });
         }
 
         // 定員チェック（取り消した分を反映するため読み直す）
-        const fresh = (await eventDoc.ref.get()).data()!;
+        const fresh = (await parentDoc.ref.get()).data()!;
         if (fresh.capacity > 0 && (fresh.currentCount || 0) >= fresh.capacity) {
           return res.status(400).json({ error: '定員に達しています' });
         }
 
         const now = new Date().toISOString();
-        const price = Math.round(Number(event.price) || 0);
+        // イベントは参加費、スクールは全回分の受講料をまとめて支払う
+        const price = Math.round(
+          kind === 'event'
+            ? Number(parent.price) || 0
+            : (Number(parent.pricePerSession) || 0) * (Number(parent.totalSessions) || 1)
+        );
 
-        // 無料のイベント（または開発用の決済スキップ中）は、その場で申込み完了
+        // 無料（または開発用の決済スキップ中）は、その場で申込み完了
         if (price <= 0 || billing.isPaymentSkipped()) {
           const regData = {
-            eventId,
+            [fkField]: parentId,
             userId,
             lineUserId: profile.userId,
             status: 'REGISTERED',
             paidAmount: 0,
             createdAt: now,
           };
-          const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
-          await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+          const regRef = await db.collection(regColl).add(regData);
+          await parentDoc.ref.update({ currentCount: FieldValue.increment(1) });
           return res.status(201).json({ id: regRef.id, ...regData });
         }
 
-        // 参加費があるイベントは、申込み時にカード・PayPay で決済する。
         // 決済が終わるまで席を押さえ（決済待ち）、決済完了で申込み確定＋売上に計上する
         const stripe = billing.getStripe()!;
         const holdUntil = new Date(Date.now() + billing.EVENT_HOLD_MINUTES * 60 * 1000);
         const regData = {
-          eventId,
+          [fkField]: parentId,
           userId,
           lineUserId: profile.userId,
           status: 'PENDING',
@@ -301,8 +324,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           holdUntil: holdUntil.toISOString(),
           createdAt: now,
         };
-        const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
-        await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+        const regRef = await db.collection(regColl).add(regData);
+        await parentDoc.ref.update({ currentCount: FieldValue.increment(1) });
         try {
           const base = billing.baseUrl();
           const session = await stripe.checkout.sessions.create({
@@ -312,68 +335,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               {
                 price_data: {
                   currency: 'jpy',
-                  product_data: {
-                    name: `イベント参加費 ${event.title || ''}`.trim(),
-                    description: `${event.date || ''} ${event.startTime || ''}〜${event.endTime || ''}`.trim(),
-                  },
+                  product_data:
+                    kind === 'event'
+                      ? {
+                          name: `イベント参加費 ${parent.title || ''}`.trim(),
+                          description:
+                            `${parent.date || ''} ${parent.startTime || ''}〜${parent.endTime || ''}`.trim() || undefined,
+                        }
+                      : {
+                          name: `スクール受講料 ${parent.title || ''}`.trim(),
+                          description: `全${parent.totalSessions || 1}回分 ${parent.startTime || ''}〜${parent.endTime || ''}`.trim(),
+                        },
                   unit_amount: price,
                 },
                 quantity: 1,
               },
             ],
             expires_at: Math.floor(holdUntil.getTime() / 1000) + 60,
-            success_url: `${base}/api/payments/stripe-callback?kind=event&session_id={CHECKOUT_SESSION_ID}&event_id=${eventId}`,
-            cancel_url: `${base}/events/${eventId}?payment=cancelled`,
-            metadata: { kind: 'event', registrationId: regRef.id, eventId, userId, lineUserId: profile.userId },
+            success_url: `${base}/api/payments/stripe-callback?kind=${kind}&session_id={CHECKOUT_SESSION_ID}&parent_id=${parentId}`,
+            cancel_url: `${base}/${kind === 'event' ? 'events' : 'schools'}/${parentId}?payment=cancelled`,
+            metadata: { kind, registrationId: regRef.id, [fkField]: parentId, userId, lineUserId: profile.userId },
           });
           await regRef.update({ paymentId: session.id });
           return res.status(200).json({ id: regRef.id, ...regData, checkoutUrl: session.url });
         } catch (e) {
-          await billing.releaseEventHold(regRef.id);
+          await billing.releaseHold(kind, regRef.id);
           throw e;
         }
       }
 
-      // スクール申込み
-      if (type === 'school-register') {
-        const { schoolId } = req.body;
-        if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
-
-        const schoolDoc = await db.collection(COLLECTIONS.SCHOOLS).doc(schoolId).get();
-        if (!schoolDoc.exists) return res.status(404).json({ error: 'School not found' });
-        const school = schoolDoc.data()!;
-
-        // 定員チェック
-        if (school.capacity > 0 && school.currentCount >= school.capacity) {
-          return res.status(400).json({ error: '定員に達しています' });
+      // イベント／スクールの申込みキャンセル（支払い済みの分は自動で全額返金）
+      if (type === 'event-cancel' || type === 'school-cancel') {
+        const kind = type === 'event-cancel' ? 'event' : 'school';
+        const parentId = (kind === 'event' ? req.body.eventId : req.body.schoolId) as string | undefined;
+        if (!parentId) return res.status(400).json({ error: 'Missing id' });
+        const billing = await import('../../server-lib/billing.js');
+        try {
+          const result = await billing.cancelRegistration(kind, parentId, profile.userId);
+          return res.status(200).json({ message: 'Cancelled successfully', ...result });
+        } catch (e) {
+          if (e instanceof billing.CancelError) return res.status(400).json({ error: e.message });
+          log.error('registration.cancel.fail', { message: String(e) });
+          return res.status(500).json({
+            error: '返金処理に失敗したため、キャンセルできませんでした。時間をおいて再度お試しいただくか、施設までお問い合わせください',
+          });
         }
-
-        // 重複チェック
-        const existing = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS)
-          .where('schoolId', '==', schoolId)
-          .where('lineUserId', '==', profile.userId)
-          .limit(1)
-          .get();
-        if (!existing.empty) {
-          return res.status(400).json({ error: '既に申込み済みです' });
-        }
-
-        const now = new Date().toISOString();
-        const totalPrice = (school.pricePerSession || 0) * (school.totalSessions || 1);
-        const regData = {
-          schoolId,
-          userId,
-          lineUserId: profile.userId,
-          status: 'REGISTERED',
-          paidAmount: totalPrice,
-          createdAt: now,
-        };
-        const regRef = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS).add(regData);
-
-        // カウントアップ
-                await schoolDoc.ref.update({ currentCount: FieldValue.increment(1) });
-
-        return res.status(201).json({ id: regRef.id, ...regData });
       }
       const { location, facilityType, date, startTime, duration, totalPrice } = req.body;
 

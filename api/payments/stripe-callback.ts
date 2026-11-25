@@ -19,16 +19,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ---- イベント参加費・月額会員の決済から戻ってきたとき ----
     const kind = req.query.kind as string | undefined;
-    if ((kind === 'event' || kind === 'membership') && session_id) {
+    if ((kind === 'event' || kind === 'school' || kind === 'membership') && session_id) {
       const billing = await import('../../server-lib/billing.js');
       const stripe = billing.getStripe();
       if (!stripe) return res.redirect(`${baseUrl}/?error=stripe_not_configured`);
       const session = await stripe.checkout.sessions.retrieve(session_id as string);
-      if (kind === 'event') {
-        const eventId = (session.metadata?.eventId || req.query.event_id || '') as string;
-        if (session.payment_status !== 'paid') return res.redirect(`${baseUrl}/events/${eventId}?payment=cancelled`);
-        await billing.completeEventRegistration(session);
-        return res.redirect(`${baseUrl}/events/${eventId}?payment=done`);
+      if (kind === 'event' || kind === 'school') {
+        const parentId = (session.metadata?.eventId || session.metadata?.schoolId || req.query.parent_id || '') as string;
+        const page = `${baseUrl}/${kind === 'event' ? 'events' : 'schools'}/${parentId}`;
+        if (session.payment_status !== 'paid') return res.redirect(`${page}?payment=cancelled`);
+        await billing.completeRegistration(session);
+        return res.redirect(`${page}?payment=done`);
       }
       // 月額会員: 初回の請求が支払い済みなら、通知（Webhook）を待たずに会員を有効にする
       if (session.payment_status === 'paid' && session.invoice) {

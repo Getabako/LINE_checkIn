@@ -38,30 +38,66 @@ export const SchoolDetailPage: React.FC = () => {
   const [registering, setRegistering] = React.useState(false);
   const [registered, setRegistered] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [canCancel, setCanCancel] = React.useState(false);
+  const [cancelling, setCancelling] = React.useState(false);
+  const [cancelError, setCancelError] = React.useState<string | null>(null);
+  const [cancelled, setCancelled] = React.useState<string | null>(null);
+  // 決済画面から戻ってきたときの結果（done = 決済完了 / cancelled = 決済をやめた）
+  const paymentResult = new URLSearchParams(location.search).get('payment');
 
   React.useEffect(() => {
-    if (passedSchool) return;
+    // 一覧から来たときも読み直す（申込み済みかどうかと、最新の人数を出すため）
     schoolApi.getAll()
       .then((schools) => {
         const found = schools.find((s) => s.id === id);
         setSchool(found || null);
+        if (found?.registered) setRegistered(true);
+        setCanCancel(!!found?.canCancel);
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, [id, passedSchool]);
+  }, [id]);
 
   const handleRegister = async () => {
     if (!id) return;
     setRegistering(true);
     setError(null);
     try {
-      await schoolApi.register(id);
+      const result = await schoolApi.register(id);
+      if (result.checkoutUrl) {
+        // 受講料の決済画面へ（決済が終わると、この画面に戻って申込み完了になる）
+        window.location.href = result.checkoutUrl;
+        return;
+      }
       setRegistered(true);
+      setCanCancel(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '申込みに失敗しました';
       setError(message);
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!id) return;
+    if (!window.confirm('このスクールの申込みをキャンセルしますか？')) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const result = await schoolApi.cancel(id);
+      setRegistered(false);
+      setCanCancel(false);
+      setCancelled(
+        result.refunded
+          ? `申込みをキャンセルしました。¥${result.refundAmount.toLocaleString()} を返金しました（カード会社・PayPay への反映まで数日かかる場合があります）。`
+          : '申込みをキャンセルしました。'
+      );
+      schoolApi.getAll().then((list) => setSchool(list.find((x) => x.id === id) || null)).catch(console.error);
+    } catch (err: unknown) {
+      setCancelError(err instanceof Error ? err.message : 'キャンセルに失敗しました');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -91,7 +127,11 @@ export const SchoolDetailPage: React.FC = () => {
               <FiCheckCircle className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">申込み完了</h2>
-            <p className="text-gray-400 text-sm">スクールへの参加登録が完了しました</p>
+            <p className="text-gray-500 text-base leading-relaxed">
+              {totalPrice > 0
+                ? `受講料 ¥${totalPrice.toLocaleString()} のお支払いと、参加登録が完了しました`
+                : 'スクールへの参加登録が完了しました'}
+            </p>
             <div className="mt-8 space-y-2 max-w-xs mx-auto">
               <Button
                 fullWidth
@@ -113,6 +153,32 @@ export const SchoolDetailPage: React.FC = () => {
                 Googleカレンダーに追加
               </Button>
               <Button fullWidth onClick={() => navigate('/')}>ホームに戻る</Button>
+              <div className="pt-6 mt-4 border-t border-gray-200 text-left">
+                {cancelError && (
+                  <div className="mb-3 p-4 bg-red-50 rounded-2xl border border-red-200">
+                    <p className="text-red-700 text-sm leading-relaxed">{cancelError}</p>
+                  </div>
+                )}
+                {canCancel ? (
+                  <>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                      スクール開始日の前日まで（お申込みから1時間以内は当日でも）キャンセルできます。{totalPrice > 0 ? 'お支払いいただいた受講料は全額返金します。' : ''}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={cancelling}
+                      onClick={handleCancel}
+                      className="w-full min-h-[48px] rounded-xl bg-white text-red-600 font-bold border-2 border-red-300 shadow-[0_3px_0_0_rgba(252,165,165,1)] active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
+                    >
+                      {cancelling ? 'キャンセルしています…' : '申込みをキャンセルする'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    キャンセルできる期限（スクール開始日の前日まで）を過ぎています。ご事情がある場合は施設までお問い合わせください。
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -169,6 +235,21 @@ export const SchoolDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {cancelled && (
+              <div className="mb-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                <p className="text-emerald-800 text-sm leading-relaxed">{cancelled}</p>
+              </div>
+            )}
+            {totalPrice > 0 && (
+              <p className="mb-4 text-sm text-gray-600 leading-relaxed">
+                受講料（全{school.totalSessions || 1}回分）は、申込みのときにクレジットカードまたは PayPay でお支払いいただきます。お支払いが終わると申込み完了です。
+              </p>
+            )}
+            {paymentResult === 'cancelled' && !error && !cancelled && (
+              <div className="mb-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                <p className="text-amber-800 text-sm leading-relaxed">お支払いが完了していないため、申込みはまだ終わっていません。もう一度「支払いに進む」を押してください。</p>
+              </div>
+            )}
             {error && (
               <div className="mb-4 p-4 bg-red-50 rounded-2xl border border-red-200">
                 <p className="text-red-700 text-sm">{error}</p>
@@ -186,7 +267,7 @@ export const SchoolDetailPage: React.FC = () => {
             disabled={isFull}
             onClick={handleRegister}
           >
-            {isFull ? '定員に達しています' : '申込む'}
+            {isFull ? '定員に達しています' : totalPrice > 0 ? `支払いに進む（¥${totalPrice.toLocaleString()}）` : '申込む'}
           </Button>
         </div>
       )}

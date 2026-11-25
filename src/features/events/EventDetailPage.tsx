@@ -21,6 +21,10 @@ export const EventDetailPage: React.FC = () => {
   const [registering, setRegistering] = React.useState(false);
   const [registered, setRegistered] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [canCancel, setCanCancel] = React.useState(false);
+  const [cancelling, setCancelling] = React.useState(false);
+  const [cancelError, setCancelError] = React.useState<string | null>(null);
+  const [cancelled, setCancelled] = React.useState<string | null>(null);
   // 決済画面から戻ってきたときの結果（done = 決済完了 / cancelled = 決済をやめた）
   const paymentResult = new URLSearchParams(location.search).get('payment');
 
@@ -31,6 +35,7 @@ export const EventDetailPage: React.FC = () => {
         const found = events.find((e) => e.id === id);
         setEvent(found || null);
         if (found?.registered) setRegistered(true);
+        setCanCancel(!!found?.canCancel);
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
@@ -53,6 +58,28 @@ export const EventDetailPage: React.FC = () => {
       setError(message);
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!id) return;
+    if (!window.confirm('このイベントの申込みをキャンセルしますか？')) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const result = await eventApi.cancel(id);
+      setRegistered(false);
+      setCanCancel(false);
+      setCancelled(
+        result.refunded
+          ? `申込みをキャンセルしました。¥${result.refundAmount.toLocaleString()} を返金しました（カード会社・PayPay への反映まで数日かかる場合があります）。`
+          : '申込みをキャンセルしました。'
+      );
+      eventApi.getAll().then((list) => setEvent(list.find((x) => x.id === id) || null)).catch(console.error);
+    } catch (err: unknown) {
+      setCancelError(err instanceof Error ? err.message : 'キャンセルに失敗しました');
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -105,6 +132,32 @@ export const EventDetailPage: React.FC = () => {
                 Googleカレンダーに追加
               </Button>
               <Button fullWidth onClick={() => navigate('/')}>ホームに戻る</Button>
+              <div className="pt-6 mt-4 border-t border-gray-200 text-left">
+                {cancelError && (
+                  <div className="mb-3 p-4 bg-red-50 rounded-2xl border border-red-200">
+                    <p className="text-red-700 text-sm leading-relaxed">{cancelError}</p>
+                  </div>
+                )}
+                {canCancel ? (
+                  <>
+                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                      開催日の前日まで（お申込みから1時間以内は当日でも）キャンセルできます。{event.price > 0 ? 'お支払いいただいた参加費は全額返金します。' : ''}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={cancelling}
+                      onClick={handleCancel}
+                      className="w-full min-h-[48px] rounded-xl bg-white text-red-600 font-bold border-2 border-red-300 shadow-[0_3px_0_0_rgba(252,165,165,1)] active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
+                    >
+                      {cancelling ? 'キャンセルしています…' : '申込みをキャンセルする'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 leading-relaxed">
+                    キャンセルできる期限（開催日の前日まで）を過ぎています。ご事情がある場合は施設までお問い合わせください。
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         ) : (
@@ -151,12 +204,17 @@ export const EventDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {cancelled && (
+              <div className="mb-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                <p className="text-emerald-800 text-sm leading-relaxed">{cancelled}</p>
+              </div>
+            )}
             {event.price > 0 && (
               <p className="mb-4 text-sm text-gray-600 leading-relaxed">
                 参加費は、申込みのときにクレジットカードまたは PayPay でお支払いいただきます。お支払いが終わると申込み完了です。
               </p>
             )}
-            {paymentResult === 'cancelled' && !error && (
+            {paymentResult === 'cancelled' && !error && !cancelled && (
               <div className="mb-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
                 <p className="text-amber-800 text-sm leading-relaxed">お支払いが完了していないため、申込みはまだ終わっていません。もう一度「支払いに進む」を押してください。</p>
               </div>

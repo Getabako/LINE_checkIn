@@ -406,6 +406,7 @@ export interface Event {
   isActive: boolean;
   createdAt: string;
   registered?: boolean; // 自分が申込み済み
+  canCancel?: boolean; // いまキャンセルできる（前日まで／申込みから1時間以内）
 }
 
 export interface School {
@@ -426,6 +427,8 @@ export interface School {
   endDate?: string;
   isActive: boolean;
   createdAt: string;
+  registered?: boolean; // 自分が申込み済み
+  canCancel?: boolean; // いまキャンセルできる（開始日の前日まで／申込みから1時間以内）
 }
 
 export interface EventRegistration {
@@ -452,11 +455,15 @@ export const eventApi = {
   getAll: () => api.get<Event[]>('/checkins?type=events'),
   // 参加費があるイベントは checkoutUrl（カード・PayPay の決済画面）が返る。決済が終わると申込み完了
   register: (eventId: string) => api.post<EventRegistration & { checkoutUrl?: string }>('/checkins?type=event-register', { eventId }),
+  // 申込みのキャンセル。支払い済みの参加費は自動で全額返金される
+  cancel: (eventId: string) => api.post<{ refunded: boolean; refundAmount: number }>('/checkins?type=event-cancel', { eventId }),
 };
 
 export const schoolApi = {
   getAll: () => api.get<School[]>('/checkins?type=schools'),
-  register: (schoolId: string) => api.post<SchoolRegistration>('/checkins?type=school-register', { schoolId }),
+  // 受講料があるスクールは checkoutUrl（カード・PayPay の決済画面）が返る。決済が終わると申込み完了
+  register: (schoolId: string) => api.post<SchoolRegistration & { checkoutUrl?: string }>('/checkins?type=school-register', { schoolId }),
+  cancel: (schoolId: string) => api.post<{ refunded: boolean; refundAmount: number }>('/checkins?type=school-cancel', { schoolId }),
 };
 
 // 管理者API

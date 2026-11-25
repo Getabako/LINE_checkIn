@@ -1,4 +1,4 @@
-// 施設予約以外のオンライン決済（イベント参加費・月額会員の登録料／更新料）の共通処理。
+// 施設予約以外のオンライン決済（イベント参加費・スクール受講料・月額会員の登録料／更新料）の共通処理。
 // どちらも Stripe で決済し、決済された日（日本時間）の売上として「その他の売上」に自動で 1 行入れる。
 // スタッフの入力は要らない。売上タブ・経理用CSV・RPA用CSV は「その他の売上」を読むので、全部に同じ金額で出る。
 //
@@ -54,7 +54,7 @@ export async function recordOnlineSale(s: {
   id: string;
   date: string;
   location: string;
-  category: 'EVENT_FEE' | 'REGISTRATION_FEE' | 'RENEWAL_FEE';
+  category: 'EVENT_FEE' | 'SCHOOL_FEE' | 'REGISTRATION_FEE' | 'RENEWAL_FEE';
   amount: number;
   memo: string;
   sourceRef: string;
@@ -79,55 +79,88 @@ export async function recordOnlineSale(s: {
   return true;
 }
 
-// ------------------------------------------------------------------ イベント
+// ------------------------------------------------- イベント・スクールの申込み
+
+/** 申込みの種類。イベント（参加費）とスクール（全回分の受講料）は同じ流れで決済・キャンセルする */
+export type RegKind = 'event' | 'school';
+
+const REG = {
+  event: {
+    table: 'event_registrations',
+    parentTable: 'events',
+    fk: 'event_id',
+    fkField: 'eventId',
+    coll: COLLECTIONS.EVENT_REGISTRATIONS,
+    parentColl: COLLECTIONS.EVENTS,
+    category: 'EVENT_FEE',
+    prefix: 'ev',
+    label: 'イベント',
+  },
+  school: {
+    table: 'school_registrations',
+    parentTable: 'schools',
+    fk: 'school_id',
+    fkField: 'schoolId',
+    coll: COLLECTIONS.SCHOOL_REGISTRATIONS,
+    parentColl: COLLECTIONS.SCHOOLS,
+    category: 'SCHOOL_FEE',
+    prefix: 'sc',
+    label: 'スクール',
+  },
+} as const;
+
+export const isRegKind = (k: unknown): k is RegKind => k === 'event' || k === 'school';
 
 /** 決済待ちのまま時間が過ぎた申込みを消して、押さえていた席を戻す */
-export async function releaseStaleEventHolds(eventId: string): Promise<void> {
-  const db = getDb();
+export async function releaseStaleHolds(kind: RegKind, parentId: string): Promise<void> {
+  const r = REG[kind];
   const limit = new Date(Date.now() - (EVENT_HOLD_MINUTES + 5) * 60 * 1000).toISOString();
-  const snap = await db
-    .collection(COLLECTIONS.EVENT_REGISTRATIONS)
-    .where('eventId', '==', eventId)
-    .where('status', '==', 'PENDING')
-    .get();
+  const snap = await getDb().collection(r.coll).where(r.fkField, '==', parentId).where('status', '==', 'PENDING').get();
   for (const d of snap.docs) {
     const created = (d.data() as { createdAt?: string }).createdAt || '';
-    if (created && new Date(created).toISOString() < limit) await releaseEventHold(d.id);
+    if (created && new Date(created).toISOString() < limit) await releaseHold(kind, d.id);
   }
 }
 
 /** 決済待ちの申込み 1 件を取り消し、席を戻す（決済済みのものには何もしない） */
-export async function releaseEventHold(registrationId: string): Promise<boolean> {
-  const { rows } = await sql<{ event_id: string }>(
-    `delete from event_registrations where id = $1 and status = 'PENDING' returning event_id`,
+export async function releaseHold(kind: RegKind, registrationId: string): Promise<boolean> {
+  const r = REG[kind];
+  const { rows } = await sql<{ pid: string }>(
+    `delete from ${r.table} where id = $1 and status = 'PENDING' returning ${r.fk} as pid`,
     [registrationId]
   );
   if (rows.length === 0) return false;
-  await sql(`update events set current_count = greatest(coalesce(current_count, 0) - 1, 0) where id = $1`, [
-    rows[0].event_id,
+  await sql(`update ${r.parentTable} set current_count = greatest(coalesce(current_count, 0) - 1, 0) where id = $1`, [
+    rows[0].pid,
   ]);
   return true;
 }
 
+const DAY_JA: Record<string, string> = { MON: '月', TUE: '火', WED: '水', THU: '木', FRI: '金', SAT: '土', SUN: '日' };
+
 /**
- * イベント参加費の決済完了。申込みを確定し、参加費を決済日の売上に入れ、本人に LINE で知らせる。
- * 戻り値: 確定できた（または確定済み）なら eventId
+ * イベント参加費・スクール受講料の決済完了。申込みを確定し、決済日の売上に入れ、本人に LINE で知らせる。
+ * 戻り値: 確定できた（または確定済み）なら 種類と イベント／スクールの ID
  */
-export async function completeEventRegistration(session: Stripe.Checkout.Session): Promise<string | null> {
+export async function completeRegistration(
+  session: Stripe.Checkout.Session
+): Promise<{ kind: RegKind; parentId: string } | null> {
   const meta = session.metadata || {};
+  const kind = meta.kind;
   const registrationId = meta.registrationId;
-  const eventId = meta.eventId;
-  if (meta.kind !== 'event' || !registrationId || !eventId) return null;
+  const parentId = meta.eventId || meta.schoolId;
+  if (!isRegKind(kind) || !registrationId || !parentId) return null;
   if (session.payment_status !== 'paid') return null;
+  const r = REG[kind];
 
   const db = getDb();
-  const regRef = db.collection(COLLECTIONS.EVENT_REGISTRATIONS).doc(registrationId);
+  const regRef = db.collection(r.coll).doc(registrationId);
   const paidAt = new Date();
   const amount = session.amount_total || 0;
 
   // 決済待ち → 確定 への切り替えは 1 回だけ成功する
   const claimed = await sql(
-    `update event_registrations set status = 'REGISTERED', paid_amount = $2 where id = $1 and status = 'PENDING' returning id`,
+    `update ${r.table} set status = 'REGISTERED', paid_amount = $2 where id = $1 and status = 'PENDING' returning id`,
     [registrationId, amount]
   );
   let firstTime = claimed.rows.length > 0;
@@ -136,14 +169,14 @@ export async function completeEventRegistration(session: Stripe.Checkout.Session
     if (!existing.exists) {
       // 席の押さえが時間切れで消えたあとに決済が通った場合。支払い済みなので申込みを作り直す
       await regRef.set({
-        eventId,
+        [r.fkField]: parentId,
         userId: meta.userId || null,
         lineUserId: meta.lineUserId || null,
         status: 'REGISTERED',
         paidAmount: amount,
         createdAt: paidAt.toISOString(),
       });
-      await db.collection(COLLECTIONS.EVENTS).doc(eventId).update({ currentCount: FieldValue.increment(1) });
+      await db.collection(r.parentColl).doc(parentId).update({ currentCount: FieldValue.increment(1) });
       firstTime = true;
     }
   }
@@ -151,38 +184,144 @@ export async function completeEventRegistration(session: Stripe.Checkout.Session
     await regRef.update({ paymentId: session.id, paidAt: paidAt.toISOString(), holdUntil: null });
   }
 
-  const eventDoc = await db.collection(COLLECTIONS.EVENTS).doc(eventId).get();
-  const event = (eventDoc.exists ? eventDoc.data() : {}) as {
-    title?: string;
-    location?: string;
-    date?: string;
-    startTime?: string;
-    endTime?: string;
-  };
+  const parentDoc = await db.collection(r.parentColl).doc(parentId).get();
+  const parent = (parentDoc.exists ? parentDoc.data() : {}) as Record<string, any>;
   const name = await userName(meta.userId);
   await recordOnlineSale({
-    id: `ev_${registrationId}`,
+    id: `${r.prefix}_${registrationId}`,
     date: jstDate(paidAt),
-    location: event.location || 'ASP',
-    category: 'EVENT_FEE',
+    location: parent.location || 'ASP',
+    category: r.category,
     amount,
-    memo: [event.title || 'イベント', name].filter(Boolean).join('／'),
+    memo: [parent.title || r.label, name].filter(Boolean).join('／'),
     sourceRef: session.id,
   });
 
   if (firstTime) {
     try {
-      const { notifyEventComplete } = await import('./notify.js');
-      await notifyEventComplete(meta.lineUserId, {
-        title: event.title,
-        date: event.date,
-        time: event.startTime && event.endTime ? `${event.startTime}〜${event.endTime}` : event.startTime,
-      });
+      if (kind === 'event') {
+        const { notifyEventComplete } = await import('./notify.js');
+        await notifyEventComplete(meta.lineUserId, {
+          title: parent.title,
+          date: parent.date,
+          time: parent.startTime && parent.endTime ? `${parent.startTime}〜${parent.endTime}` : parent.startTime,
+        });
+      } else if (meta.lineUserId && isLineConfigured()) {
+        await sendTextMessage(
+          meta.lineUserId,
+          `スクール「${parent.title || ''}」のお申し込みとお支払い（${amount.toLocaleString()}円）が完了しました。\n毎週${DAY_JA[parent.dayOfWeek] || ''}曜日 ${parent.startTime || ''}〜${parent.endTime || ''}／全${parent.totalSessions || '-'}回`
+        );
+      }
     } catch (e) {
-      console.error('notifyEventComplete error:', e);
+      console.error('registration notify error:', e);
     }
   }
-  return eventId;
+  return { kind, parentId };
+}
+
+/**
+ * 本人がキャンセルできるか。施設予約と同じ決まり:
+ * 開催日（スクールは開始日）の前日まで、または申込みから 1 時間以内。
+ */
+export function canCancelRegistration(
+  kind: RegKind,
+  parent: Record<string, any>,
+  reg: Record<string, any>,
+  now: Date = new Date()
+): boolean {
+  if (reg.status !== 'REGISTERED') return false;
+  const day = kind === 'event' ? parent.date : parent.startDate;
+  if (day && /^\d{4}-\d{2}-\d{2}/.test(String(day))) {
+    if (now < new Date(`${String(day).slice(0, 10)}T00:00:00+09:00`)) return true;
+  }
+  const applied = reg.paidAt || reg.createdAt;
+  return !!applied && now.getTime() - new Date(applied).getTime() <= 60 * 60 * 1000;
+}
+
+export class CancelError extends Error {}
+
+/**
+ * 申込みのキャンセル。カード・PayPay で支払った分は全額を自動で返金し、
+ * 返金した日の売上にマイナスの行を入れる（決済日の売上はそのまま残す）。席を 1 つ戻す。
+ * 返金に失敗したときは例外を投げ、キャンセルもしない（やり直せるようにする）。
+ */
+export async function cancelRegistration(
+  kind: RegKind,
+  parentId: string,
+  lineUserId: string
+): Promise<{ refunded: boolean; refundAmount: number }> {
+  const r = REG[kind];
+  const db = getDb();
+  const snap = await db.collection(r.coll).where(r.fkField, '==', parentId).where('lineUserId', '==', lineUserId).get();
+  const regDoc = snap.docs.find((d) => (d.data() as { status?: string }).status === 'REGISTERED');
+  if (!regDoc) throw new CancelError('申込みが見つかりません');
+  const reg = regDoc.data() as Record<string, any>;
+  const parentDoc = await db.collection(r.parentColl).doc(parentId).get();
+  const parent = (parentDoc.exists ? parentDoc.data() : {}) as Record<string, any>;
+  if (!canCancelRegistration(kind, parent, reg)) {
+    throw new CancelError('キャンセル期限を過ぎています（前日まで／お申込みから1時間以内は可能です）');
+  }
+
+  const amount = Math.round(Number(reg.paidAmount) || 0);
+  const paymentId = typeof reg.paymentId === 'string' ? reg.paymentId : '';
+  let refundId: string | null = null;
+  if (amount > 0 && paymentId.startsWith('cs_')) {
+    const stripe = getStripe();
+    if (!stripe) throw new Error('Stripe not configured');
+    const session = await stripe.checkout.sessions.retrieve(paymentId);
+    const pi = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+    if (!pi) throw new Error(`No payment_intent for session ${paymentId}`);
+    const refund = await stripe.refunds.create(
+      { payment_intent: pi, amount, reason: 'requested_by_customer', metadata: { kind, registrationId: regDoc.id } },
+      { idempotencyKey: `refund_${r.prefix}_${regDoc.id}` }
+    );
+    refundId = refund.id;
+  }
+
+  // 確定 → キャンセル への切り替えは 1 回だけ成功する（二重押しで席や売上を二重に戻さない）
+  const claimed = await sql(`update ${r.table} set status = 'CANCELLED' where id = $1 and status = 'REGISTERED' returning id`, [
+    regDoc.id,
+  ]);
+  if (claimed.rows.length === 0) return { refunded: !!refundId, refundAmount: refundId ? amount : 0 };
+  const now = new Date();
+  await regDoc.ref.update({
+    cancelledAt: now.toISOString(),
+    ...(refundId ? { refundId, refundAmount: amount, refundedAt: now.toISOString() } : {}),
+  });
+  await sql(`update ${r.parentTable} set current_count = greatest(coalesce(current_count, 0) - 1, 0) where id = $1`, [
+    parentId,
+  ]);
+
+  if (refundId) {
+    const name = await userName(reg.userId);
+    const ref = db.collection(COLLECTIONS.OTHER_SALES).doc(`${r.prefix}rf_${regDoc.id}`);
+    if (!(await ref.get()).exists) {
+      await ref.set({
+        date: jstDate(now),
+        location: parent.location || 'ASP',
+        category: r.category,
+        amount: -amount,
+        payMethod: ONLINE_PAY_METHOD,
+        memo: ['キャンセル返金', parent.title || r.label, name].filter(Boolean).join('／').slice(0, 200),
+        source: 'STRIPE',
+        sourceRef: refundId,
+        createdBy: 'system',
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      });
+    }
+  }
+
+  if (isLineConfigured()) {
+    await sendTextMessage(
+      lineUserId,
+      `${r.label}「${parent.title || ''}」の申込みをキャンセルしました。` +
+        (refundId
+          ? `\n${amount.toLocaleString()}円を返金しました（カード会社・PayPay への反映まで数日かかる場合があります）。`
+          : '')
+    ).catch((e) => console.error('cancel notify failed:', e));
+  }
+  return { refunded: !!refundId, refundAmount: refundId ? amount : 0 };
 }
 
 // ---------------------------------------------------------------- 月額会員
