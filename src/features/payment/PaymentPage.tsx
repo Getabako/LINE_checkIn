@@ -27,6 +27,8 @@ export const PaymentPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // 月額会員で、この施設が月額に含まれている（請求書払いではなく、追加の支払いなし）
+  const [monthlyFree, setMonthlyFree] = React.useState(false);
   const cancelled = searchParams.get('cancelled') === 'true';
 
   // クーポン状態
@@ -60,6 +62,7 @@ export const PaymentPage: React.FC = () => {
       const isFree = getEffectiveDiscount(mt, facilityType).type === 'FREE';
       const totalDiscount = perDay * dayCount;
       if (totalDiscount > 0) setMemberDiscount(totalDiscount, mt.name, isFree);
+      setMonthlyFree(isFree && Number(mt.monthlyFee) > 0);
     }).catch(() => {
       // 会員情報取得失敗は無視
     });
@@ -341,16 +344,18 @@ export const PaymentPage: React.FC = () => {
             <>
               <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
                 <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-400 rounded-xl flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-xs">請求</span>
+                  <span className="text-white font-bold text-xs">{monthlyFree ? '無料' : '請求'}</span>
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-gray-900 text-sm">請求書払い（後日請求）</p>
+                  <p className="font-bold text-gray-900 text-sm">{monthlyFree ? '月額会員の利用（追加のお支払いなし）' : '請求書払い（後日請求）'}</p>
                   <p className="text-[11px] text-gray-500 mt-0.5">{memberTypeName ? `${memberTypeName} 会員区分` : '定期利用会員'}</p>
                 </div>
                 <FiCheckCircle className="w-5 h-5 text-emerald-500" />
               </div>
               <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
-                オンライン決済は発生しません。月次の利用実績に基づき、後日 別途請求書を発行いたします。
+                {monthlyFree
+                  ? 'この施設の利用は月額に含まれています。今回のお支払いはありません。'
+                  : 'オンライン決済は発生しません。月次の利用実績に基づき、後日 別途請求書を発行いたします。'}
               </p>
             </>
           ) : (
@@ -392,7 +397,7 @@ export const PaymentPage: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <span className="text-gray-500 text-sm">{isInvoicePayment ? '今回のお支払い' : 'お支払い金額'}</span>
           <span className="text-xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-            {isInvoicePayment ? '請求書払い' : `¥${finalPrice.toLocaleString()}`}
+            {isInvoicePayment ? (monthlyFree ? '¥0（月額に含む）' : '請求書払い') : `¥${finalPrice.toLocaleString()}`}
           </span>
         </div>
         <Button

@@ -288,7 +288,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // スキップフラグ（環境変数のみで制御。クライアントからの指定は受け付けない）
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-    const skipPayment = !stripeSecretKey || process.env.SKIP_PAYMENT === 'true';
+    // 支払いが 0 円（月額会員でトレーニングルームが月額に含まれる等）のときも、決済画面を通さずその場で確定する
+    const skipPayment = !stripeSecretKey || process.env.SKIP_PAYMENT === 'true' || finalPrice === 0;
     const skipRemoteLock = process.env.SKIP_REMOTELOCK === 'true';
 
     // Firestore: 各日付のCheckin作成 (status: PENDING)
