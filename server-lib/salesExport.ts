@@ -86,6 +86,7 @@ export async function loadOtherSales(from?: string, to?: string): Promise<OtherS
       amount: Number(v.amount) || 0,
       payMethod: v.payMethod || '',
       memo: v.memo || '',
+      source: v.source || '',
     };
   });
 }

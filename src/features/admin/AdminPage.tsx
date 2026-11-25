@@ -661,8 +661,9 @@ const SalesTab: React.FC = () => {
 };
 
 
-// ============ その他の売上（イベント参加費・登録料・更新料・月会費など）の入力 ============
-// 本システムで決済していない売上をスタッフが入力する。入力した金額は、売上タブ・経理用CSV・RPA用CSV の全部に出る
+// ============ その他の売上（イベント参加費・登録料・更新料など） ============
+// イベント参加費と月額会員の登録料／更新料は、カード・PayPay で決済された日に自動で入る（一覧に「自動」と出る）。
+// ここで入力するのは、銀行振込で受け取った分だけ。どちらも売上タブ・経理用CSV・RPA用CSV の全部に出る
 const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void }> = ({ from, to, onChanged }) => {
   const [list, setList] = React.useState<OtherSale[]>([]);
   const [busy, setBusy] = React.useState(false);
@@ -671,7 +672,7 @@ const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void
   const [location, setLocation] = React.useState<LocationId>('ASP');
   const [category, setCategory] = React.useState('EVENT_FEE');
   const [amount, setAmount] = React.useState('');
-  const [payMethod, setPayMethod] = React.useState('現金');
+  const [payMethod, setPayMethod] = React.useState('振込');
   const [memo, setMemo] = React.useState('');
 
   const reload = React.useCallback(() => {
@@ -722,7 +723,7 @@ const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void
       <div>
         <p className="text-base font-bold text-gray-900">その他の売上（イベント参加費・登録料など）</p>
         <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-          このシステムで決済していない売上を入力します。入力した金額は、上の合計売上・日別／月別、経理用CSV、RPA用の売上CSVのすべてに同じ金額で出ます。日付は受け取った日を入れてください。
+          イベント参加費（申込みのとき）と、月額会員の登録料・更新料（毎月の更新日）は、カード・PayPay で決済された日に自動でここに入ります。入力は要りません。銀行振込で受け取った分（行政関連の団体、カード決済ができなかったとき）だけ、下の欄で入力してください。どちらも、上の合計売上・日別／月別、経理用CSV、RPA用の売上CSVのすべてに同じ金額で出ます。
         </p>
       </div>
 
@@ -789,7 +790,7 @@ const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void
       </button>
 
       <div>
-        <p className="text-sm font-semibold text-gray-700 mb-2">集計期間内の登録（{list.length}件）</p>
+        <p className="text-sm font-semibold text-gray-700 mb-2">集計期間内のその他の売上（{list.length}件）</p>
         {list.length === 0 ? (
           <p className="text-sm text-gray-400">この期間の登録はありません</p>
         ) : (
@@ -804,14 +805,18 @@ const OtherSalesCard: React.FC<{ from: string; to: string; onChanged: () => void
                     {getLocationName(o.location)}{o.payMethod ? `・${o.payMethod}` : ''}{o.memo ? `・${o.memo}` : ''}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleDelete(o)}
-                  disabled={busy}
-                  aria-label="この売上を削除"
-                  className="shrink-0 p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-40"
-                >
-                  <FiTrash2 className="w-4 h-4" />
-                </button>
+                {o.source === 'STRIPE' ? (
+                  <span className="shrink-0 text-sm text-gray-500">自動</span>
+                ) : (
+                  <button
+                    onClick={() => handleDelete(o)}
+                    disabled={busy}
+                    aria-label="この売上を削除"
+                    className="shrink-0 p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-40"
+                  >
+                    <FiTrash2 className="w-4 h-4" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -2161,6 +2166,16 @@ const MembersTab: React.FC = () => {
     load();
   };
 
+  // 月額のある会員区分を、アプリから申し込めるようにする／止める
+  const handleToggleSelfSignup = async (m: MemberType) => {
+    const message = m.selfSignup
+      ? `「${m.name}」のアプリからの新しい申込みを止めます。すでに申し込んだ会員の毎月の決済は続きます。よろしいですか？`
+      : `「${m.name}」を、アプリから申し込めるようにします。\n申し込んだ人には、月額 ¥${(m.monthlyFee || 0).toLocaleString()} を申込み日と毎月の同じ日に、カードで自動決済します。よろしいですか？`;
+    if (!confirm(message)) return;
+    await adminApi.updateMemberType(m.id, { selfSignup: !m.selfSignup });
+    load();
+  };
+
   const handleAssign = async () => {
     if (!assignForm.lineUserId || !assignForm.memberTypeId) return;
     await adminApi.assignMembership({
@@ -2452,6 +2467,22 @@ const MembersTab: React.FC = () => {
                 <p className="text-xs text-primary-600 font-semibold mt-0.5">{formatDiscount(m)}</p>
                 {m.monthlyFee ? <p className="text-[10px] text-gray-500">月額¥{m.monthlyFee.toLocaleString()}</p> : null}
                 {m.description && <p className="text-[10px] text-gray-400 mt-0.5">{m.description}</p>}
+                {m.monthlyFee ? (
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-700">
+                      アプリからの申込み（カードで毎月自動決済）: {m.selfSignup ? '受付中' : '受け付けていない'}
+                    </p>
+                    <button
+                      onClick={() => handleToggleSelfSignup(m)}
+                      className={clsx(
+                        'mt-1 min-h-[44px] px-4 py-2 rounded-lg text-sm font-bold text-white shadow-[0_3px_0_rgba(0,0,0,0.2)] active:translate-y-[2px] active:shadow-none transition',
+                        m.selfSignup ? 'bg-gray-500' : 'bg-primary-500'
+                      )}
+                    >
+                      {m.selfSignup ? '申込みの受付を止める' : '申込みを受け付ける'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => handleToggleType(m)} className="text-xs text-primary-500 px-2">

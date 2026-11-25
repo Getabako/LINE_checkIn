@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle, FiAward, FiFileText, FiLoader } from 'react-icons/fi';
+import { FiCalendar, FiClock, FiMapPin, FiTrash2, FiPlus, FiCopy, FiAlertCircle, FiAward, FiFileText, FiLoader, FiCreditCard, FiXCircle } from 'react-icons/fi';
 import { FaBasketballBall, FaDumbbell } from 'react-icons/fa';
 import { Header } from '../../components/common/Header';
 import { Button } from '../../components/common/Button';
@@ -66,22 +66,57 @@ export const ReservationsPage: React.FC = () => {
   const [emailMsg, setEmailMsg] = React.useState('');
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
   const [withdrawing, setWithdrawing] = React.useState(false);
+  const [plans, setPlans] = React.useState<MemberType[]>([]);
+  const [joiningId, setJoiningId] = React.useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = React.useState(false);
+  // 月額会員のカード決済から戻ってきたときの結果
+  const [membershipNotice] = React.useState(() => new URLSearchParams(window.location.search).get('membership'));
 
   const reloadMembership = React.useCallback(() => {
-    membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
+    membershipApi.get()
+      .then((res) => { setMembership(res.membership); setPlans(res.plans || []); })
+      .catch(() => setMembership(null));
   }, []);
+
+  // 月額プランに申し込む（カード決済の画面へ）
+  const handleJoin = async (plan: MemberType) => {
+    if (!confirm(`${plan.name}に申し込みます。\n月額 ¥${(plan.monthlyFee || 0).toLocaleString()}（税込）を、今日と、毎月の同じ日に、登録するカードで自動決済します。\n解約はこの画面からいつでもできます。\n\nカードの登録に進みますか？`)) return;
+    setJoiningId(plan.id);
+    try {
+      const { checkoutUrl } = await membershipApi.subscribe(plan.id);
+      window.location.href = checkoutUrl;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '申し込みに失敗しました');
+      setJoiningId(null);
+    }
+  };
+
+  const handleOpenPortal = async () => {
+    setOpeningPortal(true);
+    try {
+      const { url } = await membershipApi.portal();
+      window.location.href = url;
+    } catch {
+      alert('カードの変更ページを開けませんでした');
+      setOpeningPortal(false);
+    }
+  };
 
   React.useEffect(() => {
     reloadMembership();
   }, [reloadMembership]);
 
   const handleWithdraw = async () => {
-    if (!confirm('現在の会員区分を退会します。よろしいですか？\n（割引が適用されなくなります。再登録は施設へお問い合わせください）')) return;
+    const isSubscription = !!membership?.stripeSubscriptionId;
+    const message = isSubscription
+      ? `月額会員を解約します。よろしいですか？\n${membership?.currentPeriodEnd || '次回更新日'} までは会員のままご利用いただけます。それ以降の請求はありません。`
+      : '現在の会員区分を退会します。よろしいですか？\n（割引が適用されなくなります。再登録は施設へお問い合わせください）';
+    if (!confirm(message)) return;
     setWithdrawing(true);
     try {
-      await membershipApi.withdraw();
+      const result = await membershipApi.withdraw();
       reloadMembership();
-      alert('退会手続きが完了しました');
+      alert(isSubscription ? `解約の手続きが完了しました。${result.endsOn || '次回更新日'} まではご利用いただけます` : '退会手続きが完了しました');
     } catch {
       alert('退会手続きに失敗しました');
     } finally {
@@ -346,7 +381,19 @@ export const ReservationsPage: React.FC = () => {
                   {formatMemberDiscount(membership.memberType)}
                 </span>
               </div>
-              {membership.memberType.monthlyFee ? (
+              {membership.stripeSubscriptionId ? (
+                <div className="mt-3 text-sm leading-relaxed">
+                  <p>月額 ¥{(membership.memberType.monthlyFee || 0).toLocaleString()}（税込・カードで毎月自動決済）</p>
+                  <p>
+                    {membership.cancelAtPeriodEnd
+                      ? `解約の手続き済みです。${membership.currentPeriodEnd || ''} まで利用できます`
+                      : `次回更新日: ${membership.currentPeriodEnd || '-'}`}
+                  </p>
+                  {membership.paymentFailedAt && !membership.cancelAtPeriodEnd && (
+                    <p className="mt-1 font-bold">更新の決済ができませんでした。カードをご確認ください</p>
+                  )}
+                </div>
+              ) : membership.memberType.monthlyFee ? (
                 <p className="text-[10px] text-primary-100 mt-2">
                   月額¥{membership.memberType.monthlyFee.toLocaleString()}（別途請求）
                 </p>
@@ -356,16 +403,41 @@ export const ReservationsPage: React.FC = () => {
                   期間: {membership.startDate || '指定なし'} 〜 {membership.endDate || '指定なし'}
                 </p>
               )}
-              <button
-                onClick={handleWithdraw}
-                disabled={withdrawing}
-                className="mt-3 w-full py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                {withdrawing ? '手続き中...' : '会員区分を退会する'}
-              </button>
-              <p className="text-[10px] text-primary-100 mt-1 text-center">
-                ※更新・プラン変更は施設・LINEへお問い合わせください
-              </p>
+              {membership.stripeSubscriptionId ? (
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  <button
+                    onClick={handleOpenPortal}
+                    disabled={openingPortal}
+                    className="w-full min-h-[44px] py-2.5 rounded-xl bg-white text-primary-700 text-sm font-bold shadow-[0_3px_0_rgba(0,0,0,0.18)] active:translate-y-[2px] active:shadow-none transition disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                  >
+                    <FiCreditCard className="w-4 h-4" />
+                    {openingPortal ? '開いています...' : 'カードを変更する'}
+                  </button>
+                  {!membership.cancelAtPeriodEnd && (
+                    <button
+                      onClick={handleWithdraw}
+                      disabled={withdrawing}
+                      className="w-full min-h-[44px] py-2.5 rounded-xl bg-primary-700 text-white text-sm font-bold shadow-[0_3px_0_rgba(0,0,0,0.25)] active:translate-y-[2px] active:shadow-none transition disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                    >
+                      <FiXCircle className="w-4 h-4" />
+                      {withdrawing ? '手続き中...' : '月額会員を解約する'}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleWithdraw}
+                    disabled={withdrawing}
+                    className="mt-3 w-full py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {withdrawing ? '手続き中...' : '会員区分を退会する'}
+                  </button>
+                  <p className="text-[10px] text-primary-100 mt-1 text-center">
+                    ※更新・プラン変更は施設・LINEへお問い合わせください
+                  </p>
+                </>
+              )}
             </div>
           ) : (
             <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-center">
@@ -373,6 +445,36 @@ export const ReservationsPage: React.FC = () => {
               <p className="text-[10px] text-gray-400 mt-1">割引会員区分の適用をご希望の場合は、施設の受付・LINEにてお問い合わせください</p>
             </div>
           )}
+
+          {membershipNotice === 'started' && (
+            <p className="mt-3 p-3 rounded-xl bg-emerald-50 text-emerald-800 text-sm leading-relaxed">
+              月額会員のお申し込みが完了しました。表示が変わらないときは、少し待ってからこの画面を開き直してください。
+            </p>
+          )}
+          {membershipNotice === 'cancelled' && (
+            <p className="mt-3 p-3 rounded-xl bg-amber-50 text-amber-800 text-sm leading-relaxed">
+              カードの登録が完了していないため、月額会員の申し込みはまだ終わっていません。
+            </p>
+          )}
+
+          {/* アプリから申し込める月額プラン（カードで毎月自動決済） */}
+          {!membership?.stripeSubscriptionId && plans.map((plan) => (
+            <div key={plan.id} className="mt-3 p-4 rounded-2xl bg-white border border-primary-200">
+              <p className="text-base font-bold text-gray-900">{plan.name}</p>
+              {plan.description && <p className="text-sm text-gray-600 mt-1 leading-relaxed">{plan.description}</p>}
+              <p className="text-sm text-gray-700 mt-2 leading-relaxed">
+                月額 ¥{(plan.monthlyFee || 0).toLocaleString()}（税込）。申し込んだ日と、毎月の同じ日に、クレジットカードで自動決済します。解約はこの画面からいつでもできます。
+              </p>
+              <button
+                onClick={() => handleJoin(plan)}
+                disabled={joiningId !== null}
+                className="mt-3 w-full min-h-[48px] py-3 rounded-xl bg-primary-500 text-white text-base font-bold shadow-[0_4px_0_rgba(0,0,0,0.2)] active:translate-y-[3px] active:shadow-none transition disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+              >
+                <FiCreditCard className="w-5 h-5" />
+                {joiningId === plan.id ? '決済画面を開いています...' : '申し込む（カードの登録へ）'}
+              </button>
+            </div>
+          ))}
         </section>
 
         {error && (

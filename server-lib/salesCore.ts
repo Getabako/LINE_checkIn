@@ -24,9 +24,11 @@ export interface SalesBucket {
 }
 
 /**
- * 施設予約以外の売上（イベント参加費・登録料・更新料・月会費など）。
- * 本システムでは決済していないので、管理画面の売上タブでスタッフが入力する。
- * 入力した日付（date）の売上として、売上タブ・経理用CSV・RPA 用CSV の全部に同じ金額で出す。
+ * 施設予約以外の売上（イベント参加費・登録料・更新料など）。
+ * イベント参加費（申込み時）と月額会員の登録料／更新料（毎月の更新日）は、カード・PayPay で決済された時点で
+ * 自動で 1 行入る（server-lib/billing.ts。source = 'STRIPE'、計上日 = 決済された日）。スタッフの入力は要らない。
+ * 行政関連団体やカード決済エラーで銀行振込になった分だけ、管理画面の売上タブで入力する。
+ * どちらも計上日（date）の売上として、売上タブ・経理用CSV・RPA 用CSV の全部に同じ金額で出す。
  */
 export interface OtherSale {
   id: string;
@@ -36,6 +38,7 @@ export interface OtherSale {
   amount: number; // 税込
   payMethod?: string; // 現金 / 振込 / その他
   memo?: string;
+  source?: string; // 'STRIPE' = 決済から自動で入った行。空 = 管理画面で入力した行
 }
 
 export const OTHER_SALE_CATEGORIES: Record<string, string> = {

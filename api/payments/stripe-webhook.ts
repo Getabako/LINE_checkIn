@@ -43,6 +43,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
 
+    // ---- 施設予約以外の決済（イベント参加費・月額会員の登録料／更新料） ----
+    {
+      const billing = await import('../../server-lib/billing.js');
+      const obj = event.data.object as any;
+      const kind = obj?.metadata?.kind as string | undefined;
+      if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+        if (kind === 'event') {
+          await billing.completeEventRegistration(obj as Stripe.Checkout.Session);
+          return res.status(200).json({ received: true });
+        }
+        // 月額会員の申込みは、続けて届く invoice.paid で会員の有効化と売上計上を行う
+        if (kind === 'membership') return res.status(200).json({ received: true });
+      }
+      if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
+        if (kind === 'event' && obj.metadata?.registrationId) {
+          await billing.releaseEventHold(obj.metadata.registrationId);
+        }
+        return res.status(200).json({ received: true });
+      }
+      if (event.type === 'invoice.paid') {
+        await billing.handleInvoicePaid(stripe, obj as Stripe.Invoice);
+        return res.status(200).json({ received: true });
+      }
+      if (event.type === 'invoice.payment_failed') {
+        await billing.handleInvoicePaymentFailed(stripe, obj as Stripe.Invoice);
+        return res.status(200).json({ received: true });
+      }
+      if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+        await billing.handleSubscriptionChanged(
+          obj as Stripe.Subscription,
+          event.type === 'customer.subscription.deleted'
+        );
+        return res.status(200).json({ received: true });
+      }
+    }
+
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       const checkinId = session.metadata?.checkinId;

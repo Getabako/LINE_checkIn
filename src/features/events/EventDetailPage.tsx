@@ -21,24 +21,32 @@ export const EventDetailPage: React.FC = () => {
   const [registering, setRegistering] = React.useState(false);
   const [registered, setRegistered] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // 決済画面から戻ってきたときの結果（done = 決済完了 / cancelled = 決済をやめた）
+  const paymentResult = new URLSearchParams(location.search).get('payment');
 
   React.useEffect(() => {
-    if (passedEvent) return;
+    // 一覧から来たときも読み直す（申込み済みかどうかと、最新の人数を出すため）
     eventApi.getAll()
       .then((events) => {
         const found = events.find((e) => e.id === id);
         setEvent(found || null);
+        if (found?.registered) setRegistered(true);
       })
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, [id, passedEvent]);
+  }, [id]);
 
   const handleRegister = async () => {
     if (!id) return;
     setRegistering(true);
     setError(null);
     try {
-      await eventApi.register(id);
+      const result = await eventApi.register(id);
+      if (result.checkoutUrl) {
+        // 参加費の決済画面へ（決済が終わると、この画面に戻って申込み完了になる）
+        window.location.href = result.checkoutUrl;
+        return;
+      }
       setRegistered(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '申込みに失敗しました';
@@ -73,7 +81,11 @@ export const EventDetailPage: React.FC = () => {
               <FiCheckCircle className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">申込み完了</h2>
-            <p className="text-gray-400 text-sm">イベントへの参加登録が完了しました</p>
+            <p className="text-gray-500 text-base leading-relaxed">
+              {event.price > 0
+                ? `参加費 ¥${event.price.toLocaleString()} のお支払いと、参加登録が完了しました`
+                : 'イベントへの参加登録が完了しました'}
+            </p>
             <div className="mt-8 space-y-2 max-w-xs mx-auto">
               <Button
                 fullWidth
@@ -139,6 +151,16 @@ export const EventDetailPage: React.FC = () => {
               </div>
             </div>
 
+            {event.price > 0 && (
+              <p className="mb-4 text-sm text-gray-600 leading-relaxed">
+                参加費は、申込みのときにクレジットカードまたは PayPay でお支払いいただきます。お支払いが終わると申込み完了です。
+              </p>
+            )}
+            {paymentResult === 'cancelled' && !error && (
+              <div className="mb-4 p-4 bg-amber-50 rounded-2xl border border-amber-200">
+                <p className="text-amber-800 text-sm leading-relaxed">お支払いが完了していないため、申込みはまだ終わっていません。もう一度「支払いに進む」を押してください。</p>
+              </div>
+            )}
             {error && (
               <div className="mb-4 p-4 bg-red-50 rounded-2xl border border-red-200">
                 <p className="text-red-700 text-sm">{error}</p>
@@ -156,7 +178,7 @@ export const EventDetailPage: React.FC = () => {
             disabled={isFull}
             onClick={handleRegister}
           >
-            {isFull ? '定員に達しています' : '申込む'}
+            {isFull ? '定員に達しています' : event.price > 0 ? `支払いに進む（¥${event.price.toLocaleString()}）` : '申込む'}
           </Button>
         </div>
       )}

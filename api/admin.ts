@@ -192,10 +192,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .get();
       if (snap.empty) return res.status(200).json({ message: 'No active membership', withdrawn: 0 });
       const now = new Date().toISOString();
+      // カードで毎月決済している月額会員は、自動更新を止める（次回更新日までは会員のまま。追加の請求はしない）
+      let scheduled: string | null = null;
       const batch = db.batch();
-      snap.docs.forEach((d) => batch.update(d.ref, { isActive: false, withdrawnAt: now, updatedAt: now }));
+      for (const d of snap.docs) {
+        const subId = (d.data() as { stripeSubscriptionId?: string }).stripeSubscriptionId;
+        if (subId) {
+          const { cancelMembershipSubscription } = await import('../server-lib/billing.js');
+          await cancelMembershipSubscription(subId, true);
+          const after = await d.ref.get();
+          scheduled = ((after.data() || {}) as { currentPeriodEnd?: string }).currentPeriodEnd || '';
+        } else {
+          batch.update(d.ref, { isActive: false, withdrawnAt: now, updatedAt: now });
+        }
+      }
       await batch.commit();
-      return res.status(200).json({ message: 'Withdrawn', withdrawn: snap.size });
+      return res.status(200).json({ message: 'Withdrawn', withdrawn: snap.size, endsOn: scheduled });
     }
 
     const admin = await verifyAdmin(req);
@@ -505,6 +517,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'deleteOtherSale' && req.method === 'DELETE') {
       const id = String(req.query.id || '').trim();
       if (!id) return res.status(400).json({ error: 'id が必要です' });
+      const cur = await db.collection(COLLECTIONS.OTHER_SALES).doc(id).get();
+      if (cur.exists && (cur.data() as { source?: string }).source === 'STRIPE') {
+        return res.status(400).json({ error: 'カード・PayPay の決済から自動で入った売上は、ここでは消せません' });
+      }
       await db.collection(COLLECTIONS.OTHER_SALES).doc(id).delete();
       return res.status(200).json({ message: 'Deleted' });
     }
@@ -835,7 +851,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .where('eventId', '==', eventId)
         .get();
       const regs = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string; status?: string }))
+        .filter((r) => r.status !== 'PENDING') // 決済待ち（まだ申込みが確定していない）は出さない
         .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(regs);
     }
@@ -847,7 +864,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .where('schoolId', '==', schoolId)
         .get();
       const regs = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
+        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string; status?: string }))
+        .filter((r) => r.status !== 'PENDING') // 決済待ち（まだ申込みが確定していない）は出さない
         .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return res.status(200).json(regs);
     }
@@ -984,7 +1002,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'createMemberType' && req.method === 'POST') {
-      const { code, name, description, discountType, discountValue, monthlyFee, sortOrder, isActive } = req.body;
+      const { code, name, description, discountType, discountValue, monthlyFee, sortOrder, isActive, selfSignup } = req.body;
       if (!code || !name) return res.status(400).json({ error: 'Missing code or name' });
       const now = new Date().toISOString();
       const data = {
@@ -994,6 +1012,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         discountType: discountType || 'NONE',
         discountValue: Number(discountValue) || 0,
         monthlyFee: Number(monthlyFee) || 0,
+        selfSignup: selfSignup === true,
         sortOrder: Number(sortOrder) || 0,
         isActive: isActive !== false,
         createdAt: now,
@@ -1159,6 +1178,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'revokeMembership' && req.method === 'DELETE') {
       const membershipId = req.query.membershipId as string;
       if (!membershipId) return res.status(400).json({ error: 'Missing membershipId' });
+      // カードで毎月決済している月額会員は、定期課金もここで止める（外したあとに請求が続かないように）
+      const target = await db.collection(COLLECTIONS.USER_MEMBERSHIPS).doc(membershipId).get();
+      const subId = target.exists ? (target.data() as { stripeSubscriptionId?: string }).stripeSubscriptionId : undefined;
+      if (subId) {
+        const { cancelMembershipSubscription } = await import('../server-lib/billing.js');
+        await cancelMembershipSubscription(subId, false);
+      }
       await db.collection(COLLECTIONS.USER_MEMBERSHIPS).doc(membershipId).update({
         isActive: false,
         updatedAt: new Date().toISOString(),

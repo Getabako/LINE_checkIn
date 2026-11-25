@@ -245,6 +245,7 @@ export interface MemberType {
   trainingDiscountValue?: number;
   monthlyFee?: number;                  // 月額（STUDENT=3630等）
   monthlyCoversTraining?: boolean;      // 月額契約中ジム利用無料（STUDENT用）
+  selfSignup?: boolean;                 // アプリから申込み（カードで毎月自動決済）を受け付ける
   discounts?: Record<string, number>;   // 旧データ互換（拠点別）
   isActive: boolean;
   sortOrder: number;
@@ -276,6 +277,11 @@ export interface UserMembership {
   startDate?: string | null;
   endDate?: string | null;
   createdAt?: string;
+  // カードで毎月決済している月額会員だけに入る
+  stripeSubscriptionId?: string | null;
+  currentPeriodEnd?: string | null;   // 次回更新日（解約済みならこの日で終了）
+  cancelAtPeriodEnd?: boolean;        // 解約の手続き済み
+  paymentFailedAt?: string | null;    // 更新の決済ができなかった日時
 }
 
 // レビュー関連
@@ -368,8 +374,12 @@ export const memberTypeApi = {
 };
 
 export const membershipApi = {
-  get: () => api.get<{ membership: (UserMembership & { memberType: MemberType | null }) | null }>('/users/membership'),
-  withdraw: () => api.delete<{ message: string; withdrawn: number }>('/admin?action=withdrawMembership'),
+  get: () => api.get<{ membership: (UserMembership & { memberType: MemberType | null }) | null; plans?: MemberType[] }>('/users/membership'),
+  withdraw: () => api.delete<{ message: string; withdrawn: number; endsOn?: string | null }>('/admin?action=withdrawMembership'),
+  // 月額プランの申込み（カード決済の画面の URL が返る）
+  subscribe: (memberTypeId: string) => api.post<{ checkoutUrl: string }>('/users/membership', { action: 'subscribe', memberTypeId }),
+  // カードの変更ページの URL
+  portal: () => api.post<{ url: string }>('/users/membership', { action: 'portal' }),
 };
 
 export const reviewApi = {
@@ -395,6 +405,7 @@ export interface Event {
   imageUrl?: string;
   isActive: boolean;
   createdAt: string;
+  registered?: boolean; // 自分が申込み済み
 }
 
 export interface School {
@@ -439,7 +450,8 @@ export interface SchoolRegistration {
 
 export const eventApi = {
   getAll: () => api.get<Event[]>('/checkins?type=events'),
-  register: (eventId: string) => api.post<EventRegistration>('/checkins?type=event-register', { eventId }),
+  // 参加費があるイベントは checkoutUrl（カード・PayPay の決済画面）が返る。決済が終わると申込み完了
+  register: (eventId: string) => api.post<EventRegistration & { checkoutUrl?: string }>('/checkins?type=event-register', { eventId }),
 };
 
 export const schoolApi = {
@@ -459,7 +471,7 @@ export interface SalesData {
   otherAmount?: number;
 }
 
-/** 施設予約以外の売上（イベント参加費・登録料・更新料・月会費など）。スタッフが入力する */
+/** 施設予約以外の売上（イベント参加費・登録料・更新料など）。決済から自動で入る行と、スタッフが入力する行がある */
 export interface OtherSale {
   id: string;
   date: string;
@@ -468,6 +480,7 @@ export interface OtherSale {
   amount: number;
   payMethod?: string;
   memo?: string;
+  source?: string; // 'STRIPE' = カード・PayPay の決済から自動で入った行
 }
 
 export type AnnouncementPriority = 'info' | 'warning' | 'critical';

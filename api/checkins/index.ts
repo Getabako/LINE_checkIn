@@ -186,7 +186,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const events = snapshot.docs
           .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; date?: string }))
           .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-        return res.status(200).json(events);
+        // 自分が申込み済み（決済完了）のイベントに印を付ける
+        const mine = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
+          .where('lineUserId', '==', profile.userId)
+          .get();
+        const registeredIds = new Set(
+          mine.docs
+            .filter((d) => (d.data() as { status?: string }).status !== 'PENDING')
+            .map((d) => (d.data() as { eventId?: string }).eventId)
+        );
+        return res.status(200).json(events.map((e) => ({ ...e, registered: registeredIds.has(e.id) })));
       }
 
       // 公開スクール一覧
@@ -236,40 +245,93 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { eventId } = req.body;
         if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
 
+        const billing = await import('../../server-lib/billing.js');
+        // 決済待ちのまま時間が過ぎた申込みの席を戻してから、定員を見る
+        await billing.releaseStaleEventHolds(eventId);
+
         const eventDoc = await db.collection(COLLECTIONS.EVENTS).doc(eventId).get();
         if (!eventDoc.exists) return res.status(404).json({ error: 'Event not found' });
         const event = eventDoc.data()!;
+        if (event.isActive === false) return res.status(400).json({ error: 'このイベントは受付を終了しました' });
 
-        // 定員チェック
-        if (event.capacity > 0 && event.currentCount >= event.capacity) {
-          return res.status(400).json({ error: '定員に達しています' });
-        }
-
-        // 重複チェック
+        // 重複チェック（決済待ちのまま戻ってきた場合は、前の申込みを取り消してやり直す）
         const existing = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
           .where('eventId', '==', eventId)
           .where('lineUserId', '==', profile.userId)
-          .limit(1)
           .get();
-        if (!existing.empty) {
-          return res.status(400).json({ error: '既に申込み済みです' });
+        for (const d of existing.docs) {
+          if ((d.data() as { status?: string }).status === 'PENDING') await billing.releaseEventHold(d.id);
+          else return res.status(400).json({ error: '既に申込み済みです' });
+        }
+
+        // 定員チェック（取り消した分を反映するため読み直す）
+        const fresh = (await eventDoc.ref.get()).data()!;
+        if (fresh.capacity > 0 && (fresh.currentCount || 0) >= fresh.capacity) {
+          return res.status(400).json({ error: '定員に達しています' });
         }
 
         const now = new Date().toISOString();
+        const price = Math.round(Number(event.price) || 0);
+
+        // 無料のイベント（または開発用の決済スキップ中）は、その場で申込み完了
+        if (price <= 0 || billing.isPaymentSkipped()) {
+          const regData = {
+            eventId,
+            userId,
+            lineUserId: profile.userId,
+            status: 'REGISTERED',
+            paidAmount: 0,
+            createdAt: now,
+          };
+          const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
+          await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+          return res.status(201).json({ id: regRef.id, ...regData });
+        }
+
+        // 参加費があるイベントは、申込み時にカード・PayPay で決済する。
+        // 決済が終わるまで席を押さえ（決済待ち）、決済完了で申込み確定＋売上に計上する
+        const stripe = billing.getStripe()!;
+        const holdUntil = new Date(Date.now() + billing.EVENT_HOLD_MINUTES * 60 * 1000);
         const regData = {
           eventId,
           userId,
           lineUserId: profile.userId,
-          status: 'REGISTERED',
-          paidAmount: event.price || 0,
+          status: 'PENDING',
+          paidAmount: 0,
+          holdUntil: holdUntil.toISOString(),
           createdAt: now,
         };
         const regRef = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS).add(regData);
-
-        // カウントアップ
-                await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
-
-        return res.status(201).json({ id: regRef.id, ...regData });
+        await eventDoc.ref.update({ currentCount: FieldValue.increment(1) });
+        try {
+          const base = billing.baseUrl();
+          const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            // payment_method_types を省略し、Stripe で有効な決済方法（カード・PayPay）を出す
+            line_items: [
+              {
+                price_data: {
+                  currency: 'jpy',
+                  product_data: {
+                    name: `イベント参加費 ${event.title || ''}`.trim(),
+                    description: `${event.date || ''} ${event.startTime || ''}〜${event.endTime || ''}`.trim(),
+                  },
+                  unit_amount: price,
+                },
+                quantity: 1,
+              },
+            ],
+            expires_at: Math.floor(holdUntil.getTime() / 1000) + 60,
+            success_url: `${base}/api/payments/stripe-callback?kind=event&session_id={CHECKOUT_SESSION_ID}&event_id=${eventId}`,
+            cancel_url: `${base}/events/${eventId}?payment=cancelled`,
+            metadata: { kind: 'event', registrationId: regRef.id, eventId, userId, lineUserId: profile.userId },
+          });
+          await regRef.update({ paymentId: session.id });
+          return res.status(200).json({ id: regRef.id, ...regData, checkoutUrl: session.url });
+        } catch (e) {
+          await billing.releaseEventHold(regRef.id);
+          throw e;
+        }
       }
 
       // スクール申込み
