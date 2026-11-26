@@ -1,4 +1,4 @@
-// 施設予約以外のオンライン決済（イベント参加費・スクール受講料・月額会員の登録料／更新料）の共通処理。
+// 施設予約以外のオンライン決済（イベント参加費・月額会員の登録料／更新料）の共通処理。
 // どちらも Stripe で決済し、決済された日（日本時間）の売上として「その他の売上」に自動で 1 行入れる。
 // スタッフの入力は要らない。売上タブ・経理用CSV・RPA用CSV は「その他の売上」を読むので、全部に同じ金額で出る。
 //
@@ -54,7 +54,7 @@ export async function recordOnlineSale(s: {
   id: string;
   date: string;
   location: string;
-  category: 'EVENT_FEE' | 'SCHOOL_FEE' | 'REGISTRATION_FEE' | 'RENEWAL_FEE';
+  category: 'EVENT_FEE' | 'REGISTRATION_FEE' | 'RENEWAL_FEE';
   amount: number;
   memo: string;
   sourceRef: string;
@@ -79,52 +79,38 @@ export async function recordOnlineSale(s: {
   return true;
 }
 
-// ------------------------------------------------- イベント・スクールの申込み
+// ------------------------------------------------- イベントの申込み
 
-/** 申込みの種類。イベント（参加費）とスクール（全回分の受講料）は同じ流れで決済・キャンセルする */
-export type RegKind = 'event' | 'school';
-
+/** イベントの申込みで使う表・売上の種別 */
 const REG = {
-  event: {
-    table: 'event_registrations',
-    parentTable: 'events',
-    fk: 'event_id',
-    fkField: 'eventId',
-    coll: COLLECTIONS.EVENT_REGISTRATIONS,
-    parentColl: COLLECTIONS.EVENTS,
-    category: 'EVENT_FEE',
-    prefix: 'ev',
-    label: 'イベント',
-  },
-  school: {
-    table: 'school_registrations',
-    parentTable: 'schools',
-    fk: 'school_id',
-    fkField: 'schoolId',
-    coll: COLLECTIONS.SCHOOL_REGISTRATIONS,
-    parentColl: COLLECTIONS.SCHOOLS,
-    category: 'SCHOOL_FEE',
-    prefix: 'sc',
-    label: 'スクール',
-  },
+  table: 'event_registrations',
+  parentTable: 'events',
+  fk: 'event_id',
+  fkField: 'eventId',
+  coll: COLLECTIONS.EVENT_REGISTRATIONS,
+  parentColl: COLLECTIONS.EVENTS,
+  category: 'EVENT_FEE',
+  prefix: 'ev',
+  label: 'イベント',
 } as const;
 
-export const isRegKind = (k: unknown): k is RegKind => k === 'event' || k === 'school';
+/** 決済の metadata.kind がイベントの申込みか */
+export const isRegKind = (k: unknown): k is 'event' => k === 'event';
 
 /** 決済待ちのまま時間が過ぎた申込みを消して、押さえていた席を戻す */
-export async function releaseStaleHolds(kind: RegKind, parentId: string): Promise<void> {
-  const r = REG[kind];
+export async function releaseStaleHolds(parentId: string): Promise<void> {
+  const r = REG;
   const limit = new Date(Date.now() - (EVENT_HOLD_MINUTES + 5) * 60 * 1000).toISOString();
   const snap = await getDb().collection(r.coll).where(r.fkField, '==', parentId).where('status', '==', 'PENDING').get();
   for (const d of snap.docs) {
     const created = (d.data() as { createdAt?: string }).createdAt || '';
-    if (created && new Date(created).toISOString() < limit) await releaseHold(kind, d.id);
+    if (created && new Date(created).toISOString() < limit) await releaseHold(d.id);
   }
 }
 
 /** 決済待ちの申込み 1 件を取り消し、席を戻す（決済済みのものには何もしない） */
-export async function releaseHold(kind: RegKind, registrationId: string): Promise<boolean> {
-  const r = REG[kind];
+export async function releaseHold(registrationId: string): Promise<boolean> {
+  const r = REG;
   const { rows } = await sql<{ pid: string }>(
     `delete from ${r.table} where id = $1 and status = 'PENDING' returning ${r.fk} as pid`,
     [registrationId]
@@ -136,22 +122,21 @@ export async function releaseHold(kind: RegKind, registrationId: string): Promis
   return true;
 }
 
-const DAY_JA: Record<string, string> = { MON: '月', TUE: '火', WED: '水', THU: '木', FRI: '金', SAT: '土', SUN: '日' };
 
 /**
- * イベント参加費・スクール受講料の決済完了。申込みを確定し、決済日の売上に入れ、本人に LINE で知らせる。
- * 戻り値: 確定できた（または確定済み）なら 種類と イベント／スクールの ID
+ * イベント参加費の決済完了。申込みを確定し、決済日の売上に入れ、本人に LINE で知らせる。
+ * 戻り値: 確定できた（または確定済み）なら イベントの ID
  */
 export async function completeRegistration(
   session: Stripe.Checkout.Session
-): Promise<{ kind: RegKind; parentId: string } | null> {
+): Promise<{ parentId: string } | null> {
   const meta = session.metadata || {};
   const kind = meta.kind;
   const registrationId = meta.registrationId;
-  const parentId = meta.eventId || meta.schoolId;
+  const parentId = meta.eventId;
   if (!isRegKind(kind) || !registrationId || !parentId) return null;
   if (session.payment_status !== 'paid') return null;
-  const r = REG[kind];
+  const r = REG;
 
   const db = getDb();
   const regRef = db.collection(r.coll).doc(registrationId);
@@ -199,38 +184,30 @@ export async function completeRegistration(
 
   if (firstTime) {
     try {
-      if (kind === 'event') {
-        const { notifyEventComplete } = await import('./notify.js');
-        await notifyEventComplete(meta.lineUserId, {
-          title: parent.title,
-          date: parent.date,
-          time: parent.startTime && parent.endTime ? `${parent.startTime}〜${parent.endTime}` : parent.startTime,
-        });
-      } else if (meta.lineUserId && isLineConfigured()) {
-        await sendTextMessage(
-          meta.lineUserId,
-          `スクール「${parent.title || ''}」のお申し込みとお支払い（${amount.toLocaleString()}円）が完了しました。\n毎週${DAY_JA[parent.dayOfWeek] || ''}曜日 ${parent.startTime || ''}〜${parent.endTime || ''}／全${parent.totalSessions || '-'}回`
-        );
-      }
+      const { notifyEventComplete } = await import('./notify.js');
+      await notifyEventComplete(meta.lineUserId, {
+        title: parent.title,
+        date: parent.date,
+        time: parent.startTime && parent.endTime ? `${parent.startTime}〜${parent.endTime}` : parent.startTime,
+      });
     } catch (e) {
       console.error('registration notify error:', e);
     }
   }
-  return { kind, parentId };
+  return { parentId };
 }
 
 /**
  * 本人がキャンセルできるか。施設予約と同じ決まり:
- * 開催日（スクールは開始日）の前日まで、または申込みから 1 時間以内。
+ * 開催日の前日まで、または申込みから 1 時間以内。
  */
 export function canCancelRegistration(
-  kind: RegKind,
   parent: Record<string, any>,
   reg: Record<string, any>,
   now: Date = new Date()
 ): boolean {
   if (reg.status !== 'REGISTERED') return false;
-  const day = kind === 'event' ? parent.date : parent.startDate;
+  const day = parent.date;
   if (day && /^\d{4}-\d{2}-\d{2}/.test(String(day))) {
     if (now < new Date(`${String(day).slice(0, 10)}T00:00:00+09:00`)) return true;
   }
@@ -246,11 +223,10 @@ export class CancelError extends Error {}
  * 返金に失敗したときは例外を投げ、キャンセルもしない（やり直せるようにする）。
  */
 export async function cancelRegistration(
-  kind: RegKind,
   parentId: string,
   lineUserId: string
 ): Promise<{ refunded: boolean; refundAmount: number }> {
-  const r = REG[kind];
+  const r = REG;
   const db = getDb();
   const snap = await db.collection(r.coll).where(r.fkField, '==', parentId).where('lineUserId', '==', lineUserId).get();
   const regDoc = snap.docs.find((d) => (d.data() as { status?: string }).status === 'REGISTERED');
@@ -258,7 +234,7 @@ export async function cancelRegistration(
   const reg = regDoc.data() as Record<string, any>;
   const parentDoc = await db.collection(r.parentColl).doc(parentId).get();
   const parent = (parentDoc.exists ? parentDoc.data() : {}) as Record<string, any>;
-  if (!canCancelRegistration(kind, parent, reg)) {
+  if (!canCancelRegistration(parent, reg)) {
     throw new CancelError('キャンセル期限を過ぎています（前日まで／お申込みから1時間以内は可能です）');
   }
 
@@ -272,7 +248,7 @@ export async function cancelRegistration(
     const pi = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
     if (!pi) throw new Error(`No payment_intent for session ${paymentId}`);
     const refund = await stripe.refunds.create(
-      { payment_intent: pi, amount, reason: 'requested_by_customer', metadata: { kind, registrationId: regDoc.id } },
+      { payment_intent: pi, amount, reason: 'requested_by_customer', metadata: { kind: 'event', registrationId: regDoc.id } },
       { idempotencyKey: `refund_${r.prefix}_${regDoc.id}` }
     );
     refundId = refund.id;

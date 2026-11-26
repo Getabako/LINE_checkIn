@@ -266,7 +266,6 @@ export const buildRecurringDetail = (
 // その他の売上（イベント参加費・登録料・更新料・月会費など）。種別の名前は server-lib/salesCore と同じにする
 export const OTHER_SALE_CATEGORIES: Record<string, string> = {
   EVENT_FEE: 'イベント参加費',
-  SCHOOL_FEE: 'スクール受講料',
   REGISTRATION_FEE: '登録料',
   RENEWAL_FEE: '更新料',
   MONTHLY_FEE: '月会費',

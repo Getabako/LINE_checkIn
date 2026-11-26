@@ -8,7 +8,7 @@ import { Button } from '../../components/common/Button';
 import { useCheckinStore } from '../../stores/checkinStore';
 import { useUserStore } from '../../stores/userStore';
 import { mergeLocations, getLocationName } from '../../lib/locations';
-import { LocationId, Event, School, Announcement, MemberType, UserMembership, FacilityProfiles, eventApi, schoolApi, announcementApi, membershipApi, facilityApi } from '../../lib/api';
+import { LocationId, Event, Announcement, MemberType, UserMembership, FacilityProfiles, eventApi, announcementApi, membershipApi, facilityApi } from '../../lib/api';
 import clsx from 'clsx';
 
 const fmtD = (type: string | undefined, value: number | undefined): string => {
@@ -47,7 +47,6 @@ export const LocationPage: React.FC = () => {
   const { location, setLocation, reset } = useCheckinStore();
   const isAdmin = useUserStore((s) => s.isAdmin);
   const [events, setEvents] = React.useState<Event[]>([]);
-  const [schools, setSchools] = React.useState<School[]>([]);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
   const [membership, setMembership] = React.useState<(UserMembership & { memberType: MemberType | null }) | null>(null);
   const [profiles, setProfiles] = React.useState<FacilityProfiles | undefined>(undefined);
@@ -58,9 +57,8 @@ export const LocationPage: React.FC = () => {
   }, [reset]);
 
   React.useEffect(() => {
-    // イベント・スクール・お知らせ・会員を取得（失敗しても無視）
+    // イベント・お知らせ・会員を取得（失敗しても無視）
     eventApi.getAll().then(setEvents).catch(() => setEvents([]));
-    schoolApi.getAll().then(setSchools).catch(() => setSchools([]));
     announcementApi.getPublic().then(setAnnouncements).catch(() => setAnnouncements([]));
     membershipApi.get().then((res) => setMembership(res.membership)).catch(() => setMembership(null));
     facilityApi.getProfiles().then(setProfiles).catch(() => setProfiles(undefined));
@@ -81,7 +79,6 @@ export const LocationPage: React.FC = () => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
 
-  const activeSchools = schools.filter((s) => s.isActive).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-[#eef2f7]">
@@ -309,56 +306,6 @@ export const LocationPage: React.FC = () => {
                           {event.currentCount}/{event.capacity}
                         </span>
                         <span className="font-bold text-primary-600">¥{event.price.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* スクール */}
-        {activeSchools.length > 0 && (
-          <div className="mt-6 space-y-3 stagger-children">
-            <div className="flex items-center justify-between">
-              <h3 className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-bold rounded-lg shadow-sm">
-                <FiBook className="w-4 h-4" />
-                開講中のスクール
-              </h3>
-              <button
-                onClick={() => navigate('/schools')}
-                className="text-xs text-indigo-600 font-bold px-3 py-1.5 bg-white border border-indigo-200 rounded-lg shadow-sm"
-              >
-                すべて見る →
-              </button>
-            </div>
-            <div className="space-y-2">
-              {activeSchools.map((school) => (
-                <button
-                  key={school.id}
-                  onClick={() => navigate(`/schools/${school.id}`)}
-                  className="w-full p-4 bg-white rounded-2xl shadow-card border border-gray-100 text-left hover:shadow-card-hover transition-all duration-300"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-indigo-400 rounded-xl flex items-center justify-center shadow-sm text-white">
-                      <FiBook className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 text-sm truncate">{school.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        毎週{school.dayOfWeek}曜 {school.startTime}〜{school.endTime}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
-                        <span className="inline-flex items-center gap-1">
-                          <FiMapPin className="w-3 h-3" />
-                          {getLocationName(school.location)}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <FiClock className="w-3 h-3" />
-                          全{school.totalSessions}回
-                        </span>
-                        <span className="font-bold text-primary-600">¥{school.pricePerSession.toLocaleString()}/回</span>
                       </div>
                     </div>
                   </div>

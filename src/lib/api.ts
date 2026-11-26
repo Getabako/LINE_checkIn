@@ -409,41 +409,9 @@ export interface Event {
   canCancel?: boolean; // いまキャンセルできる（前日まで／申込みから1時間以内）
 }
 
-export interface School {
-  id: string;
-  title: string;
-  description: string;
-  location: LocationId;
-  facilityType: FacilityType;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  capacity: number;
-  currentCount: number;
-  pricePerSession: number;
-  totalSessions: number;
-  instructor?: string;
-  startDate?: string;
-  endDate?: string;
-  isActive: boolean;
-  createdAt: string;
-  registered?: boolean; // 自分が申込み済み
-  canCancel?: boolean; // いまキャンセルできる（開始日の前日まで／申込みから1時間以内）
-}
-
 export interface EventRegistration {
   id: string;
   eventId: string;
-  userId: string;
-  lineUserId: string;
-  status: string;
-  paidAmount: number;
-  createdAt: string;
-}
-
-export interface SchoolRegistration {
-  id: string;
-  schoolId: string;
   userId: string;
   lineUserId: string;
   status: string;
@@ -457,13 +425,6 @@ export const eventApi = {
   register: (eventId: string) => api.post<EventRegistration & { checkoutUrl?: string }>('/checkins?type=event-register', { eventId }),
   // 申込みのキャンセル。支払い済みの参加費は自動で全額返金される
   cancel: (eventId: string) => api.post<{ refunded: boolean; refundAmount: number }>('/checkins?type=event-cancel', { eventId }),
-};
-
-export const schoolApi = {
-  getAll: () => api.get<School[]>('/checkins?type=schools'),
-  // 受講料があるスクールは checkoutUrl（カード・PayPay の決済画面）が返る。決済が終わると申込み完了
-  register: (schoolId: string) => api.post<SchoolRegistration & { checkoutUrl?: string }>('/checkins?type=school-register', { schoolId }),
-  cancel: (schoolId: string) => api.post<{ refunded: boolean; refundAmount: number }>('/checkins?type=school-cancel', { schoolId }),
 };
 
 // 管理者API
@@ -580,13 +541,6 @@ export const adminApi = {
   updateEvent: (eventId: string, data: Partial<Event>) => api.put<void>('/admin?action=updateEvent', { eventId, ...data }),
   deleteEvent: (eventId: string) => api.delete<void>(`/admin?action=deleteEvent&eventId=${eventId}`),
   getEventRegistrations: (eventId: string) => api.get<EventRegistration[]>(`/admin?action=eventRegistrations&eventId=${eventId}`),
-
-  // スクール管理
-  getSchools: () => api.get<School[]>('/admin?action=schools'),
-  createSchool: (data: Partial<School>) => api.post<School>('/admin?action=createSchool', data),
-  updateSchool: (schoolId: string, data: Partial<School>) => api.put<void>('/admin?action=updateSchool', { schoolId, ...data }),
-  deleteSchool: (schoolId: string) => api.delete<void>(`/admin?action=deleteSchool&schoolId=${schoolId}`),
-  getSchoolRegistrations: (schoolId: string) => api.get<SchoolRegistration[]>(`/admin?action=schoolRegistrations&schoolId=${schoolId}`),
 
   // 売上集計
   getSales: (params: { period?: string; from?: string; to?: string; year?: string; groupBy?: string }) => {

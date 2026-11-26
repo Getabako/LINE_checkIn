@@ -1,13 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { FiCalendar, FiBook, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign, FiKey, FiShield, FiCopy } from 'react-icons/fi';
+import { FiCalendar, FiBarChart2, FiPlus, FiTrash2, FiGrid, FiDownload, FiBell, FiUser, FiSearch, FiTag, FiMapPin, FiDollarSign, FiKey, FiShield, FiCopy } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../../components/common/Header';
 import { useUserStore } from '../../stores/userStore';
 import { Button } from '../../components/common/Button';
 import { Loading } from '../../components/common/Loading';
-import { adminApi, Event, School, SalesData, OtherSale, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, AdminMember, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
+import { adminApi, Event, SalesData, OtherSale, Announcement, AnnouncementPriority, MemberType, UserMembership, DiscountType, Coupon, LocationId, NotificationTemplates, FacilityProfiles, PriceTable, AdminUser, AdminMember, StaffAccess, StaffAccessKind, StaffDoor, Weekday } from '../../lib/api';
 import { isHoliday as isJpHoliday } from '@holiday-jp/holiday_jp';
 import { getLocationName, getFacilityName, LOCATIONS, LOCATION_FACILITIES } from '../../lib/locations';
 import { buildGeneralDetail, buildRecurringDetail, buildMonthlySummary, buildOtherSalesDetail, OTHER_SALE_CATEGORIES, OTHER_SALE_PAY_METHODS, KeiriCheckin } from './keiriCsv';
@@ -34,7 +34,7 @@ const downloadCsv = (filename: string, rows: (string | number)[][]) => {
   URL.revokeObjectURL(url);
 };
 
-type Tab = 'calendar' | 'events' | 'schools' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing' | 'staff' | 'admins';
+type Tab = 'calendar' | 'events' | 'sales' | 'announcements' | 'members' | 'coupons' | 'notifications' | 'facilities' | 'pricing' | 'staff' | 'admins';
 
 const DISCOUNT_TYPE_LABEL: Record<DiscountType, string> = {
   NONE: '割引なし',
@@ -72,16 +72,6 @@ const PRIORITY_STYLE: Record<AnnouncementPriority, string> = {
   warning: 'bg-amber-50 text-amber-700 border-amber-200',
   critical: 'bg-red-50 text-red-700 border-red-200',
 };
-
-const DAY_OPTIONS = [
-  { value: 'MON', label: '月' },
-  { value: 'TUE', label: '火' },
-  { value: 'WED', label: '水' },
-  { value: 'THU', label: '木' },
-  { value: 'FRI', label: '金' },
-  { value: 'SAT', label: '土' },
-  { value: 'SUN', label: '日' },
-];
 
 // ============ イベント管理タブ ============
 const EventsTab: React.FC = () => {
@@ -184,133 +174,6 @@ const EventsTab: React.FC = () => {
               <p className="text-sm text-gray-500">{event.currentCount}/{event.capacity}名 / ¥{event.price.toLocaleString()}</p>
             </div>
             <button onClick={() => handleDelete(event.id)} className="p-2 text-red-400 hover:text-red-600">
-              <FiTrash2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// ============ スクール管理タブ ============
-const SchoolsTab: React.FC = () => {
-  const [schools, setSchools] = React.useState<School[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [showForm, setShowForm] = React.useState(false);
-  const [form, setForm] = React.useState({
-    title: '', description: '', location: 'ASP', facilityType: 'GYM',
-    dayOfWeek: 'MON', startTime: '10:00', endTime: '12:00',
-    capacity: 10, pricePerSession: 1000, totalSessions: 8, instructor: '',
-    startDate: '', endDate: '',
-  });
-
-  const loadSchools = () => {
-    adminApi.getSchools()
-      .then(setSchools)
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-  };
-
-  React.useEffect(loadSchools, []);
-
-  const handleCreate = async () => {
-    try {
-      await adminApi.createSchool(form as unknown as Partial<School>);
-      setShowForm(false);
-      setForm({
-        title: '', description: '', location: 'ASP', facilityType: 'GYM',
-        dayOfWeek: 'MON', startTime: '10:00', endTime: '12:00',
-        capacity: 10, pricePerSession: 1000, totalSessions: 8, instructor: '',
-        startDate: '', endDate: '',
-      });
-      loadSchools();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('削除しますか？')) return;
-    await adminApi.deleteSchool(id);
-    loadSchools();
-  };
-
-  if (isLoading) return <Loading text="読み込み中..." />;
-
-  return (
-    <div className="space-y-4">
-      <Button onClick={() => setShowForm(!showForm)}>
-        <FiPlus className="w-4 h-4" /> {showForm ? '閉じる' : 'スクール作成'}
-      </Button>
-
-      {showForm && (
-        <div className="bg-white p-5 rounded-2xl shadow-card border border-gray-100 space-y-3">
-          <input
-            placeholder="タイトル" value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg text-sm"
-          />
-          <textarea
-            placeholder="説明" value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg text-sm" rows={2}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <select value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} className="px-3 py-2 border rounded-lg text-sm">
-              <option value="ASP">ASP</option>
-              <option value="YABASE">やばせ</option>
-            </select>
-            <select value={form.dayOfWeek} onChange={(e) => setForm({ ...form, dayOfWeek: e.target.value })} className="px-3 py-2 border rounded-lg text-sm">
-              {DAY_OPTIONS.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}曜日</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <input type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} className="px-3 py-2 border rounded-lg text-sm" placeholder="開始" />
-            <input type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} className="px-3 py-2 border rounded-lg text-sm" placeholder="終了" />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-xs text-gray-500">定員</label>
-              <input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">1回料金</label>
-              <input type="number" value={form.pricePerSession} onChange={(e) => setForm({ ...form, pricePerSession: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">全回数</label>
-              <input type="number" value={form.totalSessions} onChange={(e) => setForm({ ...form, totalSessions: Number(e.target.value) })} className="w-full px-3 py-2 border rounded-lg text-sm" />
-            </div>
-          </div>
-          <input
-            placeholder="講師名（任意）" value={form.instructor}
-            onChange={(e) => setForm({ ...form, instructor: e.target.value })}
-            className="w-full px-3 py-2 border rounded-lg text-sm"
-          />
-          <Button fullWidth onClick={handleCreate} disabled={!form.title}>作成</Button>
-        </div>
-      )}
-
-      {schools.length === 0 && !showForm && (
-        <p className="text-center text-gray-400 py-8">スクールがありません</p>
-      )}
-
-      {schools.map((school) => (
-        <div key={school.id} className="bg-white p-4 rounded-2xl shadow-card border border-gray-100">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-bold text-gray-900">{school.title}</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                毎週{DAY_OPTIONS.find((d) => d.value === school.dayOfWeek)?.label || school.dayOfWeek}曜 {school.startTime}〜{school.endTime}
-              </p>
-              <p className="text-sm text-gray-500">
-                {school.currentCount}/{school.capacity}名 / ¥{school.pricePerSession.toLocaleString()}/回 × {school.totalSessions}回
-              </p>
-            </div>
-            <button onClick={() => handleDelete(school.id)} className="p-2 text-red-400 hover:text-red-600">
               <FiTrash2 className="w-4 h-4" />
             </button>
           </div>
@@ -3003,7 +2866,6 @@ export const AdminPage: React.FC = () => {
           {([
             { key: 'calendar', icon: FiGrid, label: 'カレンダー' },
             { key: 'events', icon: FiCalendar, label: 'イベント' },
-            { key: 'schools', icon: FiBook, label: 'スクール' },
             { key: 'sales', icon: FiBarChart2, label: '売上' },
             { key: 'announcements', icon: FiBell, label: 'お知らせ' },
             { key: 'members', icon: FiUser, label: '会員' },
@@ -3032,7 +2894,6 @@ export const AdminPage: React.FC = () => {
 
         {activeTab === 'calendar' && <CalendarTab />}
         {activeTab === 'events' && <EventsTab />}
-        {activeTab === 'schools' && <SchoolsTab />}
         {activeTab === 'sales' && <SalesTab />}
         {activeTab === 'announcements' && <AnnouncementsTab />}
         {activeTab === 'members' && <MembersTab />}

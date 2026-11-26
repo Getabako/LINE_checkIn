@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initializeLiff } from './lib/liff';
 import { userApi } from './lib/api';
@@ -14,8 +14,6 @@ import { CompletePage } from './features/complete/CompletePage';
 import { ReviewPage } from './features/review/ReviewPage';
 import { EventListPage } from './features/events/EventListPage';
 import { EventDetailPage } from './features/events/EventDetailPage';
-import { SchoolListPage } from './features/schools/SchoolListPage';
-import { SchoolDetailPage } from './features/schools/SchoolDetailPage';
 import { AdminPage } from './features/admin/AdminPage';
 import { ReservationsPage } from './features/reservations/ReservationsPage';
 import { PrivacyPolicyPage } from './features/legal/PrivacyPolicyPage';
@@ -111,8 +109,8 @@ const App: React.FC = () => {
           <Route path="/review" element={<ReviewPage />} />
           <Route path="/events" element={<EventListPage />} />
           <Route path="/events/:id" element={<EventDetailPage />} />
-          <Route path="/schools" element={<SchoolListPage />} />
-          <Route path="/schools/:id" element={<SchoolDetailPage />} />
+          {/* スクールはイベントに統合した。古いリンクはイベント一覧へ送る */}
+          <Route path="/schools/*" element={<Navigate to="/events" replace />} />
           <Route path="/reservations" element={<ReservationsPage />} />
           <Route path="/guide" element={<GuidePage />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />

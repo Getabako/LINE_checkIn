@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
 
-    // ---- 施設予約以外の決済（イベント参加費・スクール受講料・月額会員の登録料／更新料） ----
+    // ---- 施設予約以外の決済（イベント参加費・月額会員の登録料／更新料） ----
     {
       const billing = await import('../../server-lib/billing.js');
       const obj = event.data.object as any;
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (event.type === 'checkout.session.expired' || event.type === 'checkout.session.async_payment_failed') {
         if (billing.isRegKind(kind) && obj.metadata?.registrationId) {
-          await billing.releaseHold(kind, obj.metadata.registrationId);
+          await billing.releaseHold(obj.metadata.registrationId);
         }
         return res.status(200).json({ received: true });
       }

@@ -43,7 +43,6 @@ export interface OtherSale {
 
 export const OTHER_SALE_CATEGORIES: Record<string, string> = {
   EVENT_FEE: 'イベント参加費',
-  SCHOOL_FEE: 'スクール受講料',
   REGISTRATION_FEE: '登録料',
   RENEWAL_FEE: '更新料',
   MONTHLY_FEE: '月会費',

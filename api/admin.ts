@@ -388,59 +388,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(events);
     }
 
-    // ============ スクール管理 ============
-    if (action === 'createSchool' && req.method === 'POST') {
-      const { title, description, location, facilityType, dayOfWeek, startTime, endTime, capacity, pricePerSession, totalSessions, instructor, startDate, endDate } = req.body;
-      if (!title || !dayOfWeek || !startTime || !endTime) {
-        return res.status(400).json({ error: 'Missing required fields' });
-      }
-      const now = new Date().toISOString();
-      const schoolData = {
-        title,
-        description: description || '',
-        location: location || 'ASP',
-        facilityType: facilityType || 'GYM',
-        dayOfWeek,
-        startTime,
-        endTime,
-        capacity: capacity || 0,
-        currentCount: 0,
-        pricePerSession: pricePerSession || 0,
-        totalSessions: totalSessions || 0,
-        instructor: instructor || null,
-        startDate: startDate || null,
-        endDate: endDate || null,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const ref = await db.collection(COLLECTIONS.SCHOOLS).add(schoolData);
-      return res.status(201).json({ id: ref.id, ...schoolData });
-    }
-
-    if (action === 'updateSchool' && req.method === 'PUT') {
-      const { schoolId, ...updates } = req.body;
-      if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
-      updates.updatedAt = new Date().toISOString();
-      await db.collection(COLLECTIONS.SCHOOLS).doc(schoolId).update(updates);
-      return res.status(200).json({ message: 'Updated' });
-    }
-
-    if (action === 'deleteSchool' && req.method === 'DELETE') {
-      const schoolId = req.query.schoolId as string;
-      if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
-      await db.collection(COLLECTIONS.SCHOOLS).doc(schoolId).delete();
-      return res.status(200).json({ message: 'Deleted' });
-    }
-
-    if (action === 'schools' && req.method === 'GET') {
-      const snapshot = await db.collection(COLLECTIONS.SCHOOLS).get();
-      const schools = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string }))
-        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      return res.status(200).json(schools);
-    }
-
     // ============ 売上集計 (Phase 4) ============
     if (action === 'sales' && req.method === 'GET') {
       const period = req.query.period as string || 'daily';
@@ -849,19 +796,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!eventId) return res.status(400).json({ error: 'Missing eventId' });
       const snapshot = await db.collection(COLLECTIONS.EVENT_REGISTRATIONS)
         .where('eventId', '==', eventId)
-        .get();
-      const regs = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string; status?: string }))
-        .filter((r) => r.status !== 'PENDING') // 決済待ち（まだ申込みが確定していない）は出さない
-        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      return res.status(200).json(regs);
-    }
-
-    if (action === 'schoolRegistrations' && req.method === 'GET') {
-      const schoolId = req.query.schoolId as string;
-      if (!schoolId) return res.status(400).json({ error: 'Missing schoolId' });
-      const snapshot = await db.collection(COLLECTIONS.SCHOOL_REGISTRATIONS)
-        .where('schoolId', '==', schoolId)
         .get();
       const regs = snapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() } as { id: string; createdAt?: string; status?: string }))

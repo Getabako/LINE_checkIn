@@ -1,6 +1,6 @@
 import React from 'react';
 import { FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
-import { adminApi, Checkin, Event, School, LocationId, FacilityType } from '../../lib/api';
+import { adminApi, Checkin, Event, LocationId, FacilityType } from '../../lib/api';
 import { Loading } from '../../components/common/Loading';
 import { getLocationName, LOCATION_FACILITIES } from '../../lib/locations';
 import { calculatePrice, calculateEndTime, LOCATION_TIME_SLOTS, getAvailableDurations } from '../../lib/price';
@@ -9,9 +9,6 @@ import clsx from 'clsx';
 type CheckinItem = Checkin & { displayName?: string; isInvoicePayment?: boolean; remoteLockFailed?: boolean };
 
 const DAY_HEADERS = ['日', '月', '火', '水', '木', '金', '土'];
-const DAY_TO_NUM: Record<string, number> = {
-  SUN: 0, MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6,
-};
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
@@ -45,33 +42,6 @@ function buildMonthGrid(year: number, month: number): Date[] {
   return cells;
 }
 
-/** スクール（毎週繰り返し）を月内の開催日に展開 */
-function expandSchoolToDates(school: School, mStart: Date, mEnd: Date): string[] {
-  const targetDay = DAY_TO_NUM[school.dayOfWeek];
-  if (targetDay === undefined) return [];
-
-  const schoolStart = school.startDate ? new Date(school.startDate) : new Date('1970-01-01');
-  const schoolEnd = school.endDate ? new Date(school.endDate) : new Date('2999-12-31');
-  const rangeStart = new Date(Math.max(schoolStart.getTime(), mStart.getTime()));
-  const rangeEnd = new Date(Math.min(schoolEnd.getTime(), mEnd.getTime()));
-
-  const dates: string[] = [];
-  const limit = school.totalSessions || 99;
-  let count = 0;
-  for (
-    const d = new Date(rangeStart);
-    d <= rangeEnd && count < limit;
-    d.setDate(d.getDate() + 1)
-  ) {
-    if (d.getDay() === targetDay) {
-      dates.push(ymd(d));
-      count++;
-    }
-  }
-  return dates;
-}
-
-// ================== 予約追加モーダル ==================
 interface CreateCheckinModalProps {
   defaultDate: string;
   onClose: () => void;
@@ -439,7 +409,6 @@ export const CalendarTab: React.FC = () => {
 
   const [checkins, setCheckins] = React.useState<CheckinItem[]>([]);
   const [events, setEvents] = React.useState<Event[]>([]);
-  const [schools, setSchools] = React.useState<School[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [showCreateModal, setShowCreateModal] = React.useState(false);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
@@ -455,12 +424,10 @@ export const CalendarTab: React.FC = () => {
     Promise.all([
       adminApi.getCheckins({ from, to }).catch((e) => { console.error('getCheckins failed', e); return []; }),
       adminApi.getEvents().catch((e) => { console.error('getEvents failed', e); return []; }),
-      adminApi.getSchools().catch((e) => { console.error('getSchools failed', e); return []; }),
     ])
-      .then(([c, e, s]) => {
+      .then(([c, e]) => {
         setCheckins(c);
         setEvents(e);
-        setSchools(s);
       })
       .finally(() => setIsLoading(false));
   }, [mStart, mEnd]);
@@ -486,9 +453,9 @@ export const CalendarTab: React.FC = () => {
 
   /** 日付ごとのアイテム集約 */
   const itemsByDate = React.useMemo(() => {
-    const map = new Map<string, { checkins: CheckinItem[]; events: Event[]; schools: School[] }>();
+    const map = new Map<string, { checkins: CheckinItem[]; events: Event[] }>();
     const ensure = (key: string) => {
-      if (!map.has(key)) map.set(key, { checkins: [], events: [], schools: [] });
+      if (!map.has(key)) map.set(key, { checkins: [], events: [] });
       return map.get(key)!;
     };
 
@@ -498,13 +465,8 @@ export const CalendarTab: React.FC = () => {
     for (const e of events) {
       if (e.date && e.isActive) ensure(e.date).events.push(e);
     }
-    for (const s of schools) {
-      if (!s.isActive) continue;
-      const dates = expandSchoolToDates(s, mStart, mEnd);
-      for (const d of dates) ensure(d).schools.push(s);
-    }
     return map;
-  }, [checkins, events, schools, year, month]);
+  }, [checkins, events, year, month]);
 
   const handlePrev = () => {
     if (month === 0) {
@@ -563,9 +525,6 @@ export const CalendarTab: React.FC = () => {
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-orange-400" />イベント
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-green-400" />スクール
-          </span>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -608,8 +567,7 @@ export const CalendarTab: React.FC = () => {
               const items = itemsByDate.get(dateStr);
               const cCount = items?.checkins.length || 0;
               const eCount = items?.events.length || 0;
-              const sCount = items?.schools.length || 0;
-              const hasItems = cCount + eCount + sCount > 0;
+              const hasItems = cCount + eCount > 0;
 
               return (
                 <button
@@ -644,11 +602,6 @@ export const CalendarTab: React.FC = () => {
                           イベ{eCount}
                         </div>
                       )}
-                      {sCount > 0 && (
-                        <div className="text-[10px] px-1 rounded bg-green-100 text-green-700 truncate">
-                          スク{sCount}
-                        </div>
-                      )}
                     </div>
                   )}
                 </button>
@@ -675,7 +628,7 @@ export const CalendarTab: React.FC = () => {
             </button>
           </div>
 
-          {(!selected || (selected.checkins.length === 0 && selected.events.length === 0 && selected.schools.length === 0)) && (
+          {(!selected || (selected.checkins.length === 0 && selected.events.length === 0)) && (
             <p className="text-center text-gray-400 py-4 text-sm">この日は予定がありません</p>
           )}
 
@@ -727,21 +680,6 @@ export const CalendarTab: React.FC = () => {
             </div>
           )}
 
-          {selected && selected.schools.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-green-600 mb-1">スクール ({selected.schools.length}件)</p>
-              <div className="space-y-1">
-                {selected.schools.map((s) => (
-                  <div key={s.id} className="text-sm bg-green-50 rounded-lg p-2 border border-green-100">
-                    <div className="font-semibold text-green-800">{s.title}</div>
-                    <div className="text-xs text-gray-600">
-                      {s.startTime}〜{s.endTime} / {getLocationName(s.location)} / {s.currentCount}/{s.capacity}名
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
